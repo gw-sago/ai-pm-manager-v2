@@ -1,29 +1,9 @@
 /**
  * Services Module
  *
- * 状態遷移ロジックを提供するサービス層
+ * サービス層のエクスポート
  * ADR-001に基づき、状態管理をDB管理方式で実装
  */
-
-export { TaskService, StateTransitionError } from './TaskService';
-export type { TaskTransitionResult, StartTaskInput, CompleteTaskInput } from './TaskService';
-
-export { ReviewService, ReviewTransitionError } from './ReviewService';
-export type { ReviewQueueStats, ReviewWithTask } from './ReviewService';
-
-export { ProgressService } from './ProgressService';
-export type {
-  OrderProgress,
-  ProjectProgress,
-  TaskStatusCounts,
-} from './ProgressService';
-
-export { BacklogService } from './BacklogService';
-export type {
-  BacklogStats,
-  CreateBacklogInput,
-  UpdateBacklogInput,
-} from './BacklogService';
 
 export { FileWatcherService, fileWatcherService } from './FileWatcherService';
 export type {
