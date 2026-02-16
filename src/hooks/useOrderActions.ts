@@ -162,6 +162,8 @@ export const useOrderActions = ({
       disabledReason = 'このORDERはキャンセルされています';
     } else if (status === 'ON_HOLD') {
       disabledReason = 'このORDERは保留中です';
+    } else if (status === 'PLANNING_FAILED') {
+      disabledReason = 'PM処理に失敗しました - 再実行ボタンでリカバリできます';
     } else if (status === 'PLANNING') {
       disabledReason = isPmRunning ? 'PM処理実行中...' : 'PM処理を実行してタスクを生成してください';
     } else if (status === 'IN_PROGRESS') {

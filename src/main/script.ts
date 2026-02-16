@@ -117,6 +117,20 @@ export function registerScriptHandlers(): void {
     }
   );
 
+  // ORDER_155 TASK_1230: ORDER再実行
+  ipcMain.handle(
+    'script:retry-order',
+    async (
+      _event,
+      projectId: string,
+      orderId: string,
+      options?: { timeout?: number; model?: string; verbose?: boolean }
+    ): Promise<ExecutionResult> => {
+      console.log('[Script] retry-order called:', { projectId, orderId, options });
+      return scriptService.retryOrder(projectId, orderId, options);
+    }
+  );
+
   // ORDER_111: Worker ログファイル一覧取得
   ipcMain.handle(
     'script:get-worker-logs',

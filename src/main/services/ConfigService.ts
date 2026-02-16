@@ -3,19 +3,18 @@
  *
  * アプリケーション設定の永続化を担当するサービス
  *
- * V2パス設計（案C: frameworkPath/backendPath分離・読み書き分離）:
+ * V2パス設計（ORDER_002: DB一元化完了）:
  * - backendPath: Pythonスクリプト（読み取り専用）
  *   - 開発時: リポジトリ/backend/
  *   - パッケージ時: resources/backend/
  * - schemaPath: DBスキーマ（読み取り専用）
  *   - 開発時: リポジトリ/data/schema_v2.sql
  *   - パッケージ時: resources/data/schema_v2.sql
- * - frameworkPath: PROJECTS配下（読み書き）
+ * - frameworkPath: PROJECTS配下・DB（読み書き）
  *   - 開発時: リポジトリ/
- *   - パッケージ時: %APPDATA%/ai-pm-manager-v2/
- * - dbPath: DB本体（読み書き）
- *   - 開発時: リポジトリ/data/aipm.db
- *   - パッケージ時: %APPDATA%/.aipm/aipm.db
+ *   - パッケージ時: exe実行ディレクトリ（= exeと同階層にdata/, PROJECTS/を配置）
+ * - dbPath: DB本体（読み書き）→ 常にframeworkPath/data/aipm.db
+ * - configPath: UI設定（config.json）→ %APPDATA%/.aipm/（ユーザー固有）
  */
 
 import * as fs from 'node:fs';
@@ -56,10 +55,11 @@ const DEFAULT_CONFIG: AppConfig = {
 /**
  * ConfigService クラス
  *
- * V2パス設計（案C）:
+ * V2パス設計（ORDER_002: DB一元化）:
  * - backendPath: 読み取り専用リソース（Pythonスクリプト）
- * - frameworkPath: 読み書き用（PROJECTS、DB等）
- * - 設定 = config.json（ウィンドウサイズ等のUI設定のみ）
+ * - frameworkPath: 読み書き用（PROJECTS、data/aipm.db）
+ *   開発時=リポジトリルート、パッケージ時=exe実行ディレクトリ
+ * - configPath: UI設定（config.json）= %APPDATA%/.aipm/（ユーザー固有）
  */
 export class ConfigService {
   private configPath: string;
@@ -67,13 +67,15 @@ export class ConfigService {
   private _backendPath: string;
 
   constructor() {
+    // config.json はユーザー固有設定のため AppData に保存（変更なし）
     const userDataPath = app.getPath('userData');
     const aipmDir = path.join(userDataPath, '.aipm');
     this.configPath = path.join(aipmDir, 'config.json');
 
     if (app.isPackaged) {
-      // パッケージ時: frameworkPath = %APPDATA% (読み書き)
-      this._frameworkPath = userDataPath;
+      // パッケージ時: frameworkPath = exe実行ディレクトリ
+      // data/aipm.db, PROJECTS/ はexeと同じフォルダに配置する想定
+      this._frameworkPath = path.dirname(process.execPath);
       // パッケージ時: backendPath = resources/backend (読み取り専用)
       this._backendPath = path.join(process.resourcesPath, 'backend');
     } else {
@@ -138,7 +140,7 @@ export class ConfigService {
    *
    * PROJECTS配下やDB等の読み書きが必要なデータのルートパス。
    * - 開発時: リポジトリルート
-   * - パッケージ時: %APPDATA%/ai-pm-manager-v2/
+   * - パッケージ時: exe実行ディレクトリ
    */
   getActiveFrameworkPath(): string {
     return this._frameworkPath;
@@ -190,16 +192,11 @@ export class ConfigService {
   /**
    * AI PM Framework DB（aipm.db）のパスを取得（読み書き用）
    *
-   * - 開発時: リポジトリ/data/aipm.db
-   * - パッケージ時: %APPDATA%/ai-pm-manager-v2/.aipm/aipm.db
+   * ORDER_002: 開発時・パッケージ時ともに frameworkPath/data/aipm.db を返す。
+   * AppData DBは完全廃止。
    */
   getAipmDbPath(): string {
-    if (app.isPackaged) {
-      const userDataPath = app.getPath('userData');
-      return path.join(userDataPath, '.aipm', 'aipm.db');
-    } else {
-      return path.join(this._frameworkPath, 'data', 'aipm.db');
-    }
+    return path.join(this._frameworkPath, 'data', 'aipm.db');
   }
 
   /**

@@ -6,12 +6,13 @@ import { BacklogDetailPanel } from './BacklogDetailPanel';
 import { ExecutionLog } from './ExecutionLog';
 import { Settings } from './Settings';
 import { SupervisorDashboard } from './SupervisorDashboard';
+import { ProjectInfo } from './ProjectInfo';
 import type { Project, TaskInfo, OrderInfo, BacklogItem, Supervisor, SupervisorProject } from '../preload';
 
 /**
- * メインコンテンツのタブ種別（ORDER_040追加）
+ * メインコンテンツのタブ種別（ORDER_040追加, ORDER_156拡張）
  */
-type MainContentTab = 'backlog' | 'execution-log';
+type MainContentTab = 'backlog' | 'execution-log' | 'project-info';
 
 
 /**
@@ -257,7 +258,7 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
       {/* フレームワーク設定済みコンテンツ */}
       {isFrameworkConfigured && (
         <div className="flex flex-col h-full space-y-4">
-          {/* タブ切り替えUI（ORDER_040追加） */}
+          {/* タブ切り替えUI（ORDER_040追加, ORDER_156拡張） */}
           {selectedProject && selectedProject.state && (
             <div className="flex border-b border-gray-200">
               <button
@@ -279,6 +280,16 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
                 }`}
               >
                 実行ログ
+              </button>
+              <button
+                onClick={() => setActiveTab('project-info')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'project-info'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                プロジェクト情報
               </button>
             </div>
           )}
@@ -303,6 +314,13 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
           {selectedProject && selectedProject.state && activeTab === 'execution-log' && (
             <div className="w-full">
               <ExecutionLog maxItems={50} projectId={selectedProject.name} />
+            </div>
+          )}
+
+          {/* プロジェクト情報（プロジェクト選択時 & プロジェクト情報タブ選択時）（ORDER_156 / TASK_1233） */}
+          {selectedProject && selectedProject.state && activeTab === 'project-info' && (
+            <div className="w-full">
+              <ProjectInfo projectId={selectedProject.name} />
             </div>
           )}
 

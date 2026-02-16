@@ -35,6 +35,10 @@ const orderStatusColors: Record<string, { bg: string; text: string }> = {
     bg: 'bg-purple-100',
     text: 'text-purple-800',
   },
+  PLANNING_FAILED: {
+    bg: 'bg-red-100',
+    text: 'text-red-800',
+  },
   ON_HOLD: {
     bg: 'bg-gray-100',
     text: 'text-gray-800',
@@ -162,9 +166,10 @@ export const OrderList: React.FC<OrderListProps> = ({
         IN_PROGRESS: 0,
         REVIEW: 1,
         REWORK: 2,
-        PLANNING: 3,
-        ON_HOLD: 4,
-        COMPLETED: 5,
+        PLANNING_FAILED: 3,
+        PLANNING: 4,
+        ON_HOLD: 5,
+        COMPLETED: 6,
       };
 
       const aPriority = statusPriority[a.status] ?? 3;

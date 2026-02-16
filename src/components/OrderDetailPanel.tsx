@@ -6,6 +6,7 @@ import { OrderReleaseSection } from './OrderReleaseSection';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ReleaseReadinessPanel } from './ReleaseReadinessPanel';
 import { useOrderActions } from '../hooks/useOrderActions';
+import { useRetryOrder } from '../hooks/useRetryOrder';
 
 interface OrderDetailPanelProps {
   /** プロジェクト名 */
@@ -28,6 +29,8 @@ interface OrderDetailPanelProps {
   onExecuteWorker?: (projectId: string, orderId: string) => void;
   /** ORDER_131 TASK_1136: リリース実行コールバック */
   onExecuteRelease?: (projectId: string, orderId: string) => void;
+  /** ORDER_155 TASK_1229: ORDER一覧リフレッシュコールバック */
+  onRefresh?: () => void;
 }
 
 type TabType = 'order' | 'artifacts' | 'goal' | 'requirements' | 'staffing' | 'reports';
@@ -54,6 +57,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   onExecutePm,
   onExecuteWorker,
   onExecuteRelease,
+  onRefresh,
 }) => {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +113,19 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     isReleaseRunning,
   });
 
+  // ORDER_155 TASK_1229: PLANNING_FAILEDリカバリhook
+  const {
+    isRetrying,
+    retryError,
+    retrySuccess,
+    handleRetryOrder,
+    clearRetryState,
+  } = useRetryOrder({
+    projectId: projectName,
+    orderId: order.id,
+    onSuccess: onRefresh,
+  });
+
   // TASK_1125: ORDER変更時にPM成果物関連stateをリセット（staleデータ防止）
   useEffect(() => {
     setResultFileContent(null);
@@ -121,6 +138,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     setReportLoading(false);
     setReportError(null);
     setActiveTab('order');
+    clearRetryState();
   }, [order.id]);
 
   // ORDER詳細を取得
@@ -260,6 +278,8 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         return 'bg-red-100 text-red-800';
       case 'PLANNING':
         return 'bg-purple-100 text-purple-800';
+      case 'PLANNING_FAILED':
+        return 'bg-red-100 text-red-800';
       case 'CANCELLED':
         return 'bg-gray-200 text-gray-600';
       case 'REJECTED':
@@ -547,6 +567,50 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>リリース済み</span>
+            </div>
+          )}
+          {/* ORDER_155 TASK_1229: PLANNING_FAILED時のリカバリボタン */}
+          {order.status === 'PLANNING_FAILED' && (
+            <div className="flex items-center gap-2">
+              {retrySuccess && (
+                <span className="text-sm text-green-600 font-medium">
+                  再実行完了
+                </span>
+              )}
+              {retryError && (
+                <span className="text-sm text-red-600 max-w-xs truncate" title={retryError}>
+                  {retryError}
+                </span>
+              )}
+              <button
+                onClick={handleRetryOrder}
+                disabled={isRetrying}
+                title={isRetrying ? 'PM処理を再実行中...' : 'PLANNING_FAILEDのORDERを再実行します'}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors
+                  ${isRetrying
+                    ? 'bg-orange-100 text-orange-600 cursor-wait'
+                    : 'bg-orange-600 text-white hover:bg-orange-700'
+                  }
+                `}
+              >
+                {isRetrying ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>PM処理を再実行中...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>PM処理を再実行</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>

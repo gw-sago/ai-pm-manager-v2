@@ -8,3 +8,6 @@ export type { TaskDependencyStatus, TaskDependencyUpdate } from './useTaskDepend
 
 export { useOrderActions } from './useOrderActions';
 export type { OrderActionsResult, UseOrderActionsOptions } from './useOrderActions';
+
+export { useRetryOrder } from './useRetryOrder';
+export type { UseRetryOrderOptions, UseRetryOrderResult } from './useRetryOrder';

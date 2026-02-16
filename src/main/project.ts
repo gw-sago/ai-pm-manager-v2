@@ -807,6 +807,79 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] Backlog prioritization IPC handler registered (ORDER_144 / TASK_1188)');
 
+  // === プロジェクト情報取得・更新IPCハンドラ (ORDER_156 / TASK_1233) ===
+
+  /**
+   * プロジェクト情報取得
+   */
+  ipcMain.handle(
+    'project:get-project-info',
+    async (_event, projectId: string): Promise<{
+      id: number;
+      name: string;
+      path: string;
+      description: string | null;
+      purpose: string | null;
+      tech_stack: string | null;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    } | null> => {
+      console.log(`[Project IPC] プロジェクト情報取得: ${projectId}`);
+      try {
+        const aipmDbService = getAipmDbService();
+        if (!aipmDbService.isAvailable()) {
+          console.log('[Project IPC] DB not available');
+          return null;
+        }
+
+        const project = aipmDbService.getProjectByName(projectId);
+        return project;
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト情報取得エラー:', error);
+        return null;
+      }
+    }
+  );
+
+  /**
+   * プロジェクト情報更新
+   */
+  ipcMain.handle(
+    'project:update-project-info',
+    async (
+      _event,
+      projectId: string,
+      updates: {
+        description?: string;
+        purpose?: string;
+        tech_stack?: string;
+      }
+    ): Promise<{ success: boolean; error?: string }> => {
+      console.log(`[Project IPC] プロジェクト情報更新: ${projectId}`, updates);
+      try {
+        const aipmDbService = getAipmDbService();
+        if (!aipmDbService.isAvailable()) {
+          return {
+            success: false,
+            error: 'Database not available',
+          };
+        }
+
+        aipmDbService.updateProjectInfo(projectId, updates);
+        return { success: true };
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト情報更新エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Project info IPC handlers registered (ORDER_156 / TASK_1233)');
+
   console.log('[Project] IPC handlers registered');
 }
 

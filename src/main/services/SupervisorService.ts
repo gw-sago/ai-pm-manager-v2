@@ -6,7 +6,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import Database from 'better-sqlite3';
 import { getConfigService } from './ConfigService';
 
@@ -84,9 +83,7 @@ export class SupervisorService {
 
   private getDbPath(): string | null {
     const configService = getConfigService();
-    const frameworkPath = configService.getActiveFrameworkPath();
-    if (!frameworkPath) return null;
-    return path.join(frameworkPath, 'data', 'aipm.db');
+    return configService.getAipmDbPath();
   }
 
   isAvailable(): boolean {

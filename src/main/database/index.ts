@@ -11,6 +11,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import { getConfigService } from '../services/ConfigService';
+import { autoInitializeDatabase } from '../utils/db-initializer';
 
 // シングルトンインスタンス
 let dbInstance: Database.Database | null = null;
@@ -27,6 +28,7 @@ export function getDatabasePath(): string {
 
 /**
  * データベースを初期化
+ * ORDER_157: DB自動初期化対応 - DBファイルが存在しない場合は自動作成を試みる
  */
 export function initDatabase(customPath?: string): Database.Database {
   if (dbInstance) {
@@ -35,9 +37,27 @@ export function initDatabase(customPath?: string): Database.Database {
 
   currentDbPath = customPath ?? getDatabasePath();
 
+  // ORDER_157: DBファイルが存在しない場合は自動初期化を試みる
   if (!fs.existsSync(currentDbPath)) {
-    console.error(`[Database] DB file not found: ${currentDbPath}`);
-    throw new Error(`Database file not found: ${currentDbPath}. Run backend scripts to initialize.`);
+    console.log(`[Database] DB file not found: ${currentDbPath}`);
+    console.log('[Database] Attempting auto-initialization...');
+
+    // DB自動初期化を試みる
+    try {
+      const result = autoInitializeDatabase(currentDbPath);
+
+      if (!result.success) {
+        throw new Error(result.error || 'DB initialization failed');
+      }
+
+      if (result.created) {
+        console.log('[Database] Database auto-initialized successfully');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[Database] Auto-initialization failed:', errorMessage);
+      throw new Error(`Database file not found and auto-initialization failed: ${errorMessage}`);
+    }
   }
 
   // データベース接続

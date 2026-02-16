@@ -16,9 +16,11 @@ import { AipmDbService, resetAipmDbService } from '../AipmDbService';
 
 // Mock ConfigService
 const mockGetActiveFrameworkPath = vi.fn();
+const mockGetAipmDbPath = vi.fn();
 vi.mock('../ConfigService', () => ({
   getConfigService: vi.fn(() => ({
     getActiveFrameworkPath: mockGetActiveFrameworkPath,
+    getAipmDbPath: mockGetAipmDbPath,
   })),
 }));
 
@@ -42,9 +44,9 @@ describe('AipmDbService', () => {
     cleanupTestDir();
     resetAipmDbService();
     service = new AipmDbService();
-    mockGetActiveFrameworkPath.mockReturnValue(TEST_DIR);
     vi.clearAllMocks();
     mockGetActiveFrameworkPath.mockReturnValue(TEST_DIR);
+    mockGetAipmDbPath.mockReturnValue(TEST_DB_PATH);
   });
 
   afterEach(() => {
@@ -54,24 +56,25 @@ describe('AipmDbService', () => {
   });
 
   describe('getDbPath', () => {
-    it('should return null when framework path is not set', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
-
-      const result = service.getDbPath();
-
-      expect(result).toBeNull();
-    });
-
-    it('should return correct DB path when framework path is set', () => {
-      mockGetActiveFrameworkPath.mockReturnValue('/path/to/framework');
+    it('should delegate to ConfigService.getAipmDbPath()', () => {
+      mockGetAipmDbPath.mockReturnValue(path.join('/path/to/framework', 'data', 'aipm.db'));
 
       const result = service.getDbPath();
 
       expect(result).toBe(path.join('/path/to/framework', 'data', 'aipm.db'));
     });
 
+    it('should return packaged path when ConfigService returns APPDATA path', () => {
+      const appdataPath = path.join('C:\\Users\\test\\AppData\\Roaming\\ai-pm-manager-v2', '.aipm', 'aipm.db');
+      mockGetAipmDbPath.mockReturnValue(appdataPath);
+
+      const result = service.getDbPath();
+
+      expect(result).toBe(appdataPath);
+    });
+
     it('should handle Windows-style paths', () => {
-      mockGetActiveFrameworkPath.mockReturnValue('D:\\your_workspace\\AI_PM');
+      mockGetAipmDbPath.mockReturnValue(path.join('D:\\your_workspace\\AI_PM', 'data', 'aipm.db'));
 
       const result = service.getDbPath();
 
@@ -80,8 +83,8 @@ describe('AipmDbService', () => {
   });
 
   describe('isAvailable', () => {
-    it('should return false when framework path is not set', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
+    it('should return false when DB path is not set', () => {
+      mockGetAipmDbPath.mockReturnValue(null);
 
       expect(service.isAvailable()).toBe(false);
     });
@@ -99,25 +102,25 @@ describe('AipmDbService', () => {
 
   describe('error handling (without DB connection)', () => {
     it('should throw error when trying to get projects without framework path', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
+      mockGetAipmDbPath.mockReturnValue(null);
 
       expect(() => service.getProjects()).toThrow('Framework path is not configured');
     });
 
     it('should throw error when trying to get orders without framework path', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
+      mockGetAipmDbPath.mockReturnValue(null);
 
       expect(() => service.getOrders('proj_001')).toThrow('Framework path is not configured');
     });
 
     it('should throw error when trying to get tasks without framework path', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
+      mockGetAipmDbPath.mockReturnValue(null);
 
       expect(() => service.getTasks('ORDER_001', 'proj_001')).toThrow('Framework path is not configured');
     });
 
     it('should throw error when trying to get review queue without framework path', () => {
-      mockGetActiveFrameworkPath.mockReturnValue(null);
+      mockGetAipmDbPath.mockReturnValue(null);
 
       expect(() => service.getReviewQueue('proj_001')).toThrow('Framework path is not configured');
     });

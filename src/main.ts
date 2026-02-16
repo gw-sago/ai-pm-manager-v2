@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import started from 'electron-squirrel-startup';
@@ -19,8 +19,9 @@ import { registerDependencyUpdateHandlers, cleanupDependencyUpdate } from './mai
 import { getAipmDbService } from './main/services/AipmDbService';
 import { getConfigService } from './main/services/ConfigService';
 
-// DB初期化エラー情報を保持（レンダラーへの通知用）
+// DB初期化ステータスを保持（レンダラーへの通知用）
 let dbInitError: string | null = null;
+let dbInitialized = false;
 
 // ログファイルへの出力を設定
 const logFile = path.join(app.getPath('userData'), 'main-debug.log');
@@ -57,8 +58,10 @@ const createWindow = () => {
   // and load the index.html of the app.
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
-  // Open the DevTools (temporarily always open for debugging)
-  mainWindow.webContents.openDevTools();
+  // Open the DevTools only in development mode
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 };
 
 // This method will be called when Electron has finished
@@ -71,7 +74,7 @@ app.on('ready', async () => {
   console.log('[Main] Framework path:', configService.getActiveFrameworkPath());
 
   // Initialize database (data/aipm.db に一元化)
-  let dbInitialized = false;
+  // ORDER_157: DB自動初期化機能追加 - DBファイルが存在しない場合は自動作成
   try {
     const dbPath = getDatabasePath();
     console.log('[Main] Database path:', dbPath);
@@ -87,11 +90,18 @@ app.on('ready', async () => {
     console.error('[Main] Stack:', errorStack);
     dbInitError = errorMessage;
 
+    // ORDER_157: エラーメッセージを改善（自動初期化失敗時の情報を追加）
+    const errorDetails = errorMessage.includes('Schema file not found')
+      ? `\n\nSchema file is missing from the application resources.\nThis may indicate a packaging error.`
+      : errorMessage.includes('auto-initialization failed')
+      ? `\n\nThe database could not be created automatically.\nPlease check file permissions for:\n${getDatabasePath()}`
+      : '';
+
     // ユーザーにエラーを通知
     dialog.showErrorBox(
       'Database Initialization Error',
       `Failed to initialize database.\n\n` +
-        `Error: ${errorMessage}\n\n` +
+        `Error: ${errorMessage}${errorDetails}\n\n` +
         `Some features may not work correctly.\n` +
         `Please check the log file for details:\n` +
         `${logFile}`
@@ -140,6 +150,21 @@ app.on('ready', async () => {
 
   // Register IPC handlers for dependency updates (ORDER_122 / TASK_1103)
   registerDependencyUpdateHandlers();
+
+  // ORDER_157: DB初期化ステータスをレンダラーに公開するIPCハンドラ
+  ipcMain.handle('db:get-init-status', () => {
+    return {
+      initialized: dbInitialized,
+      error: dbInitError,
+      dbPath: (() => {
+        try {
+          return getDatabasePath();
+        } catch {
+          return null;
+        }
+      })(),
+    };
+  });
 
   createWindow();
 });

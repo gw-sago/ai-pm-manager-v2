@@ -1468,6 +1468,16 @@ export interface ElectronAPI {
   executeWorkerProcess: (projectId: string, orderId: string) => Promise<ExecutionResult>;
 
   /**
+   * ORDER再実行（PLANNING_FAILED → PLANNING → 再処理）
+   * ORDER_155 TASK_1230
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param options オプション（タイムアウト、モデル、詳細ログ）
+   * @returns 実行結果
+   */
+  retryOrder: (projectId: string, orderId: string, options?: { timeout?: number; model?: string; verbose?: boolean }) => Promise<ExecutionResult>;
+
+  /**
    * 実行中のジョブ一覧を取得
    * @returns 実行中ジョブ一覧
    */
@@ -1962,6 +1972,56 @@ export interface ElectronAPI {
    * @returns レビュー履歴情報
    */
   getTaskReviewHistory: (projectId: string, taskId: string) => Promise<TaskReviewHistory>;
+
+  // ============================================================
+  // ORDER_156: TASK_1233 - プロジェクト情報取得・更新
+  // ============================================================
+
+  /**
+   * プロジェクト情報を取得
+   * @param projectId プロジェクトID
+   * @returns プロジェクト情報（見つからない場合はnull）
+   */
+  getProjectInfo: (projectId: string) => Promise<{
+    id: number;
+    name: string;
+    path: string;
+    description: string | null;
+    purpose: string | null;
+    tech_stack: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  } | null>;
+
+  /**
+   * プロジェクト情報を更新
+   * @param projectId プロジェクトID
+   * @param updates 更新内容
+   * @returns 更新結果
+   */
+  updateProjectInfo: (
+    projectId: string,
+    updates: {
+      description?: string;
+      purpose?: string;
+      tech_stack?: string;
+    }
+  ) => Promise<{ success: boolean; error?: string }>;
+
+  // ============================================================
+  // ORDER_157: DB初期化ステータス
+  // ============================================================
+
+  /**
+   * DB初期化ステータスを取得
+   * @returns DB初期化ステータス（initialized, error, dbPath）
+   */
+  getDbInitStatus: () => Promise<{
+    initialized: boolean;
+    error: string | null;
+    dbPath: string | null;
+  }>;
 }
 
 /**
@@ -2085,6 +2145,8 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('script:execute-pm', projectId, backlogId),
   executeWorkerProcess: (projectId: string, orderId: string) =>
     ipcRenderer.invoke('script:execute-worker', projectId, orderId),
+  retryOrder: (projectId: string, orderId: string, options?: { timeout?: number; model?: string; verbose?: boolean }) =>
+    ipcRenderer.invoke('script:retry-order', projectId, orderId, options),
   getRunningJobs: () =>
     ipcRenderer.invoke('script:get-running-jobs'),
   isJobRunning: (projectId: string, targetId: string) =>
@@ -2175,6 +2237,7 @@ const electronAPI: ElectronAPI = {
   // ORDER_119: タスク実行ステップ取得
   getTaskExecutionSteps: (projectId: string, taskId: string) =>
     ipcRenderer.invoke('script:get-task-execution-steps', projectId, taskId),
+
   onTaskStatusChanged: (callback: (data: {
     taskId: string; title: string; oldStatus: string; newStatus: string; projectId: string; orderId: string;
   }) => void) =>
@@ -2253,6 +2316,20 @@ const electronAPI: ElectronAPI = {
   // ORDER_138: TASK_1158 - レビュー履歴取得
   getTaskReviewHistory: (projectId: string, taskId: string) =>
     ipcRenderer.invoke('project:get-task-review-history', projectId, taskId),
+
+  // ORDER_156: TASK_1233 - プロジェクト情報取得・更新
+  getProjectInfo: (projectId: string) =>
+    ipcRenderer.invoke('project:get-project-info', projectId),
+  updateProjectInfo: (projectId: string, updates: {
+    description?: string;
+    purpose?: string;
+    tech_stack?: string;
+  }) =>
+    ipcRenderer.invoke('project:update-project-info', projectId, updates),
+
+  // ORDER_157: DB初期化ステータス
+  getDbInitStatus: () =>
+    ipcRenderer.invoke('db:get-init-status'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

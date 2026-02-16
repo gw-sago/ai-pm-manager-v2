@@ -5,39 +5,47 @@
 - **発注日**: 2026-02-16
 - **発注者**: User
 - **優先度**: P0
-- **由来**: BACKLOG_001
+- **由来**: BACKLOG_212
 
 ---
 
 ## 発注内容
 
 ### 概要
-PROJECT_INFO構造セットアップ（旧プロジェクト引き継ぎ）
+getAipmDbPath()パッケージ時パス統一（AppData DB完全廃止）
 
 ### 詳細
-カテゴリ: ドキュメント
+カテゴリ: リファクタリング
 
-旧ai_pm_managerのPROJECT_INFO/ディレクトリ構造をV2に移植。INDEX.md、サブディレクトリ（02_VERSION_HISTORY, 03_SPECIFICATIONS, 03_DESIGN, 04_MANUALS, 05_DIAGRAMS, 06_ADR, 07_FAQ, 08_GLOSSARY）を作成し、V2統合アーキテクチャに合わせて内容を更新する。
+getAipmDbPath()がパッケージ時（exe起動）にAppData側のDB（%APPDATA%/.aipm/aipm.db）を参照する設計が残っている。開発時・パッケージ時ともにリポジトリルートのdata/aipm.dbを参照するように統一し、AppData DBへのコピー運用を不要にする。
+
+現状の問題:
+- ConfigService.getAipmDbPath()がapp.isPackaged時にAppDataパスを返す
+- Pythonバックエンドは常にdata/aipm.dbに書き込む
+- exe起動時とCLI操作でDB参照先が異なりデータ不整合が発生
 
 ### 受け入れ条件
-（BACKLOGから引き継ぎ）
+1. getAipmDbPath()が開発時・パッケージ時ともにdata/aipm.dbを返すこと
+2. frameworkPathもパッケージ時にリポジトリルートを返すこと
+3. AppData DBへの依存コードが全て除去されていること
+4. npm startでビルド通過すること
 
 ---
 
 ## PM記入欄
 
 ### 要件理解チェック
-- [ ] 発注内容を理解した
-- [ ] GOAL.mdを作成した
-- [ ] REQUIREMENTS.mdを作成した
-- [ ] STAFFING.mdを作成した
-- [ ] タスクを発行した
+- [x] 発注内容を理解した
+- [x] GOAL.mdを作成した
+- [x] REQUIREMENTS.mdを作成した
+- [x] STAFFING.mdを作成した
+- [x] タスクを発行した
 
 ### 備考
-（PM記入）
+全2タスク完了。レビューAPPROVED。2026-02-16 完了。
 
 ---
 
 **作成日**: 2026-02-16
 **作成者**: System（BACKLOG→ORDER変換）
-**変換元**: PROJECTS/ai_pm_manager_v2/BACKLOG.md#BACKLOG_001
+**変換元**: BACKLOG_212
