@@ -143,17 +143,13 @@ export class AipmDbService {
 
   /**
    * DBファイルのパスを取得
+   * ORDER_157: ConfigService.getAipmDbPath()に委譲し、
+   * パッケージ時は%APPDATA%配下、開発時はframework/data/を参照
    * @returns DBファイルのパス（存在しない場合はnull）
    */
   getDbPath(): string | null {
     const configService = getConfigService();
-    const frameworkPath = configService.getActiveFrameworkPath();
-
-    if (!frameworkPath) {
-      return null;
-    }
-
-    return path.join(frameworkPath, 'data', 'aipm.db');
+    return configService.getAipmDbPath();
   }
 
   /**
@@ -289,6 +285,118 @@ export class AipmDbService {
       }));
     } catch (error) {
       console.error('[AipmDbService] getProjects failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * プロジェクト情報を名前で取得（ORDER_156 / TASK_1233）
+   * @param projectName プロジェクト名
+   * @returns プロジェクト情報（見つからない場合はnull）
+   */
+  getProjectByName(projectName: string): {
+    id: number;
+    name: string;
+    path: string;
+    description: string | null;
+    purpose: string | null;
+    tech_stack: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  } | null {
+    try {
+      const db = this.getConnection();
+
+      const stmt = db.prepare(`
+        SELECT
+          id,
+          name,
+          path,
+          description,
+          purpose,
+          tech_stack,
+          status,
+          created_at,
+          updated_at
+        FROM projects
+        WHERE name = ?
+      `);
+
+      const row = stmt.get(projectName) as {
+        id: number;
+        name: string;
+        path: string;
+        description: string | null;
+        purpose: string | null;
+        tech_stack: string | null;
+        status: string;
+        created_at: string;
+        updated_at: string;
+      } | undefined;
+
+      return row || null;
+    } catch (error) {
+      console.error('[AipmDbService] getProjectByName failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * プロジェクト情報を更新（ORDER_156 / TASK_1233）
+   * @param projectName プロジェクト名
+   * @param updates 更新内容
+   */
+  updateProjectInfo(
+    projectName: string,
+    updates: {
+      description?: string;
+      purpose?: string;
+      tech_stack?: string;
+    }
+  ): void {
+    try {
+      const db = this.getConnection();
+
+      // 更新するフィールドを構築
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+
+      if (updates.description !== undefined) {
+        setClauses.push('description = ?');
+        values.push(updates.description);
+      }
+      if (updates.purpose !== undefined) {
+        setClauses.push('purpose = ?');
+        values.push(updates.purpose);
+      }
+      if (updates.tech_stack !== undefined) {
+        setClauses.push('tech_stack = ?');
+        values.push(updates.tech_stack);
+      }
+
+      if (setClauses.length === 0) {
+        // 更新するフィールドがない場合は何もしない
+        return;
+      }
+
+      // updated_atを更新
+      setClauses.push('updated_at = ?');
+      values.push(new Date().toISOString());
+
+      // WHERE句用のプロジェクト名を追加
+      values.push(projectName);
+
+      const stmt = db.prepare(`
+        UPDATE projects
+        SET ${setClauses.join(', ')}
+        WHERE name = ?
+      `);
+
+      stmt.run(...values);
+      console.log('[AipmDbService] プロジェクト情報更新完了:', projectName);
+    } catch (error) {
+      console.error('[AipmDbService] updateProjectInfo failed:', error);
       throw error;
     }
   }
@@ -667,7 +775,11 @@ export class AipmDbService {
       return { success: false, error: 'Framework path not configured' };
     }
 
-    const reorderScriptPath = path.join(frameworkPath, 'backend', 'backlog', 'reorder.py');
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+    const reorderScriptPath = path.join(backendPath, 'backlog', 'reorder.py');
 
     if (!fs.existsSync(reorderScriptPath)) {
       return { success: false, error: `reorder.py not found: ${reorderScriptPath}` };
@@ -925,7 +1037,11 @@ export class AipmDbService {
       return { success: false, error: 'Framework path not configured' };
     }
 
-    const addScriptPath = path.join(frameworkPath, 'backend', 'backlog', 'add.py');
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+    const addScriptPath = path.join(backendPath, 'backlog', 'add.py');
 
     if (!fs.existsSync(addScriptPath)) {
       return { success: false, error: `add.py not found: ${addScriptPath}` };
@@ -995,7 +1111,11 @@ export class AipmDbService {
       return { success: false, error: 'Framework path not configured' };
     }
 
-    const updateScriptPath = path.join(frameworkPath, 'backend', 'backlog', 'update.py');
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+    const updateScriptPath = path.join(backendPath, 'backlog', 'update.py');
 
     if (!fs.existsSync(updateScriptPath)) {
       return { success: false, error: `update.py not found: ${updateScriptPath}` };
@@ -1095,7 +1215,11 @@ export class AipmDbService {
       return { success: false, error: 'Framework path not configured' };
     }
 
-    const prioritizeScriptPath = path.join(frameworkPath, 'backend', 'backlog', 'prioritize.py');
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+    const prioritizeScriptPath = path.join(backendPath, 'backlog', 'prioritize.py');
 
     if (!fs.existsSync(prioritizeScriptPath)) {
       return { success: false, error: `prioritize.py not found: ${prioritizeScriptPath}` };
@@ -1979,6 +2103,138 @@ function extractSummaryFromReport(reportContent: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * PLANNING_FAILED状態のORDERを再実行
+ *
+ * ORDER_155: TASK_1230 - 再実行APIのバックエンド実装
+ *
+ * retry_order.pyスクリプトを呼び出し、ORDERステータスをPLANNINGに戻してprocess_order.pyを再実行する
+ *
+ * @param projectId プロジェクトID
+ * @param orderId ORDER ID
+ * @param timeout タイムアウト秒数（デフォルト: 600）
+ * @param model AIモデル（haiku/sonnet/opus、デフォルト: sonnet）
+ * @returns 実行結果
+ */
+export async function retryOrder(
+  projectId: string,
+  orderId: string,
+  timeout = 600,
+  model = 'sonnet',
+): Promise<{
+  success: boolean;
+  message: string;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+}> {
+  try {
+    const frameworkPath = getConfigService().getAipmFrameworkPath();
+    if (!frameworkPath) {
+      return {
+        success: false,
+        message: 'Framework path not configured',
+        error: 'Framework path not configured',
+      };
+    }
+
+    const { spawn } = await import('child_process');
+    const path = await import('path');
+
+    const scriptPath = path.join(
+      frameworkPath,
+      'scripts',
+      'aipm-db',
+      'order',
+      'retry_order.py'
+    );
+
+    return new Promise((resolve) => {
+      let stdout = '';
+      let stderr = '';
+
+      const args = [
+        scriptPath,
+        projectId,
+        orderId,
+        '--timeout',
+        timeout.toString(),
+        '--model',
+        model,
+        '--json', // JSON形式で出力を取得
+      ];
+
+      console.log(`[AipmDbService] Executing retry_order.py: python ${args.join(' ')}`);
+
+      const childProcess = spawn('python', args, {
+        cwd: path.join(frameworkPath, 'scripts', 'aipm-db'),
+        env: { ...process.env },
+      });
+
+      if (childProcess.stdout) {
+        childProcess.stdout.setEncoding('utf-8');
+        childProcess.stdout.on('data', (data: string) => {
+          stdout += data;
+          console.log(`[retry_order.py stdout] ${data.trim()}`);
+        });
+      }
+
+      if (childProcess.stderr) {
+        childProcess.stderr.setEncoding('utf-8');
+        childProcess.stderr.on('data', (data: string) => {
+          stderr += data;
+          console.warn(`[retry_order.py stderr] ${data.trim()}`);
+        });
+      }
+
+      childProcess.on('close', (exitCode) => {
+        if (exitCode === 0) {
+          // 成功時はJSON出力をパース
+          try {
+            const result = JSON.parse(stdout);
+            resolve({
+              success: true,
+              message: `ORDER ${orderId} was successfully retried`,
+              stdout,
+            });
+          } catch (e) {
+            // JSONパースに失敗してもexitCode 0なら成功とみなす
+            resolve({
+              success: true,
+              message: `ORDER ${orderId} was successfully retried`,
+              stdout,
+            });
+          }
+        } else {
+          resolve({
+            success: false,
+            message: `ORDER retry failed with exit code ${exitCode}`,
+            stdout,
+            stderr,
+            error: `Script exited with code ${exitCode}`,
+          });
+        }
+      });
+
+      childProcess.on('error', (error) => {
+        console.error(`[AipmDbService] retry_order.py error:`, error);
+        resolve({
+          success: false,
+          message: `Failed to execute retry_order.py: ${error.message}`,
+          error: error.message,
+        });
+      });
+    });
+  } catch (error) {
+    console.error('[AipmDbService] retryOrder failed:', error);
+    return {
+      success: false,
+      message: `Failed to retry ORDER: ${error}`,
+      error: String(error),
+    };
+  }
 }
 
 /**

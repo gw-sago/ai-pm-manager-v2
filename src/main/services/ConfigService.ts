@@ -3,9 +3,19 @@
  *
  * アプリケーション設定の永続化を担当するサービス
  *
- * V2統合: UIとフレームワークが1リポジトリに統合されたため、
- * frameworkPath = リポジトリルート（固定）。
- * AppData DBは廃止し、設定はconfig.jsonのみで管理。
+ * V2パス設計（案C: frameworkPath/backendPath分離・読み書き分離）:
+ * - backendPath: Pythonスクリプト（読み取り専用）
+ *   - 開発時: リポジトリ/backend/
+ *   - パッケージ時: resources/backend/
+ * - schemaPath: DBスキーマ（読み取り専用）
+ *   - 開発時: リポジトリ/data/schema_v2.sql
+ *   - パッケージ時: resources/data/schema_v2.sql
+ * - frameworkPath: PROJECTS配下（読み書き）
+ *   - 開発時: リポジトリ/
+ *   - パッケージ時: %APPDATA%/ai-pm-manager-v2/
+ * - dbPath: DB本体（読み書き）
+ *   - 開発時: リポジトリ/data/aipm.db
+ *   - パッケージ時: %APPDATA%/.aipm/aipm.db
  */
 
 import * as fs from 'node:fs';
@@ -46,25 +56,31 @@ const DEFAULT_CONFIG: AppConfig = {
 /**
  * ConfigService クラス
  *
- * V2統合アーキテクチャ:
- * - frameworkPath = リポジトリルート（固定、DB不要）
- * - DB = data/aipm.db（1つのみ）
+ * V2パス設計（案C）:
+ * - backendPath: 読み取り専用リソース（Pythonスクリプト）
+ * - frameworkPath: 読み書き用（PROJECTS、DB等）
  * - 設定 = config.json（ウィンドウサイズ等のUI設定のみ）
  */
 export class ConfigService {
   private configPath: string;
   private _frameworkPath: string;
+  private _backendPath: string;
 
   constructor() {
     const userDataPath = app.getPath('userData');
     const aipmDir = path.join(userDataPath, '.aipm');
     this.configPath = path.join(aipmDir, 'config.json');
 
-    // V2統合: リポジトリルート = frameworkPath
     if (app.isPackaged) {
-      this._frameworkPath = path.join(process.resourcesPath, 'framework');
+      // パッケージ時: frameworkPath = %APPDATA% (読み書き)
+      this._frameworkPath = userDataPath;
+      // パッケージ時: backendPath = resources/backend (読み取り専用)
+      this._backendPath = path.join(process.resourcesPath, 'backend');
     } else {
+      // 開発時: frameworkPath = リポジトリルート
       this._frameworkPath = app.getAppPath();
+      // 開発時: backendPath = リポジトリ/backend
+      this._backendPath = path.join(app.getAppPath(), 'backend');
     }
   }
 
@@ -118,10 +134,11 @@ export class ConfigService {
   }
 
   /**
-   * フレームワークパスを取得（V2: 固定パス）
+   * フレームワークパスを取得（読み書き用）
    *
-   * V2ではUI+フレームワークが1リポジトリに統合されているため、
-   * リポジトリルートが常にframeworkPath。
+   * PROJECTS配下やDB等の読み書きが必要なデータのルートパス。
+   * - 開発時: リポジトリルート
+   * - パッケージ時: %APPDATA%/ai-pm-manager-v2/
    */
   getActiveFrameworkPath(): string {
     return this._frameworkPath;
@@ -136,10 +153,53 @@ export class ConfigService {
   }
 
   /**
-   * AI PM Framework DB（aipm.db）のパスを取得
+   * バックエンドパスを取得（読み取り専用）
+   *
+   * Pythonスクリプト（pm/, worker/, review/等）のルートパス。
+   * - 開発時: リポジトリ/backend/
+   * - パッケージ時: resources/backend/
+   */
+  getBackendPath(): string {
+    return this._backendPath;
+  }
+
+  /**
+   * スキーマファイルのパスを取得（読み取り専用）
+   *
+   * - 開発時: リポジトリ/data/schema_v2.sql（優先）またはframework/data/schema_v2.sql
+   * - パッケージ時: resources/data/schema_v2.sql
+   */
+  getSchemaPath(): string {
+    if (app.isPackaged) {
+      const primaryPath = path.join(process.resourcesPath, 'data', 'schema_v2.sql');
+      if (fs.existsSync(primaryPath)) {
+        return primaryPath;
+      }
+      // フォールバック: framework/data/配下
+      return path.join(process.resourcesPath, 'framework', 'data', 'schema_v2.sql');
+    } else {
+      // 開発時: data/（優先）→ framework/data/（フォールバック）
+      const primaryPath = path.join(app.getAppPath(), 'data', 'schema_v2.sql');
+      if (fs.existsSync(primaryPath)) {
+        return primaryPath;
+      }
+      return path.join(app.getAppPath(), 'framework', 'data', 'schema_v2.sql');
+    }
+  }
+
+  /**
+   * AI PM Framework DB（aipm.db）のパスを取得（読み書き用）
+   *
+   * - 開発時: リポジトリ/data/aipm.db
+   * - パッケージ時: %APPDATA%/ai-pm-manager-v2/.aipm/aipm.db
    */
   getAipmDbPath(): string {
-    return path.join(this._frameworkPath, 'data', 'aipm.db');
+    if (app.isPackaged) {
+      const userDataPath = app.getPath('userData');
+      return path.join(userDataPath, '.aipm', 'aipm.db');
+    } else {
+      return path.join(this._frameworkPath, 'data', 'aipm.db');
+    }
   }
 
   /**

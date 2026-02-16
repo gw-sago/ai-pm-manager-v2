@@ -7,9 +7,13 @@ module.exports = {
       // ネイティブモジュール（.node）とその依存関係をasarから除外
       unpack: '{**/node_modules/better-sqlite3/**/*,**/*.node}',
     },
-    // PythonバックエンドをextraResourceとして同梱
+    // PythonバックエンドとスキーマファイルをextraResourceとして同梱
+    // ORDER_157: framework/dataディレクトリごと同梱（schema_v2.sqlのみ含む）
+    // ORDER_159: backendは読み取り専用、framework/dataはスキーマ配布用
+    // パッケージ後: resources/backend/, resources/data/schema_v2.sql
     extraResource: [
       path.join(__dirname, 'backend'),
+      path.join(__dirname, 'framework', 'data'),
     ],
     // 無視パターンからnode_modules/better-sqlite3とchokidarを除外
     ignore: (file) => {

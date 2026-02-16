@@ -269,11 +269,20 @@ export class ScriptExecutionService extends EventEmitter {
   }
 
   /**
-   * AI PM Frameworkのパスを取得
+   * AI PM Frameworkのパスを取得（読み書き用: PROJECTS, DB等）
    */
   private getFrameworkPath(): string | null {
     const configService = getConfigService();
     return configService.getActiveFrameworkPath();
+  }
+
+  /**
+   * バックエンドパスを取得（読み取り専用: Pythonスクリプト）
+   * ORDER_159: frameworkPath/backendPath分離
+   */
+  private getBackendPath(): string | null {
+    const configService = getConfigService();
+    return configService.getBackendPath();
   }
 
   /**
@@ -297,10 +306,10 @@ export class ScriptExecutionService extends EventEmitter {
    * aipm-autoスクリプトのパスを取得
    */
   private getAipmAutoPath(scriptName: string): string | null {
-    const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return null;
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
 
-    const scriptPath = path.join(frameworkPath, 'backend', 'aipm_auto', scriptName);
+    const scriptPath = path.join(backendPath, 'aipm_auto', scriptName);
     return fs.existsSync(scriptPath) ? scriptPath : null;
   }
 
@@ -313,14 +322,14 @@ export class ScriptExecutionService extends EventEmitter {
    * @returns スクリプトパス（存在しない場合はnull）
    */
   private getParentScriptPath(scriptType: 'pm' | 'worker' | 'review'): string | null {
-    const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return null;
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
 
-    // スクリプトタイプに応じたパスを決定
+    // スクリプトタイプに応じたパスを決定（backendPathベース）
     const scriptMap: Record<string, string> = {
-      pm: path.join(frameworkPath, 'backend', 'pm', 'process_order.py'),
-      worker: path.join(frameworkPath, 'backend', 'worker', 'execute_task.py'),
-      review: path.join(frameworkPath, 'backend', 'review', 'process_review.py'),
+      pm: path.join(backendPath, 'pm', 'process_order.py'),
+      worker: path.join(backendPath, 'worker', 'execute_task.py'),
+      review: path.join(backendPath, 'review', 'process_review.py'),
     };
 
     const scriptPath = scriptMap[scriptType];
@@ -351,9 +360,9 @@ export class ScriptExecutionService extends EventEmitter {
    * ORDER_098: 並列Worker起動スクリプト
    */
   private getParallelLauncherPath(): string | null {
-    const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return null;
-    const scriptPath = path.join(frameworkPath, 'backend', 'worker', 'parallel_launcher.py');
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
+    const scriptPath = path.join(backendPath, 'worker', 'parallel_launcher.py');
     if (fs.existsSync(scriptPath)) {
       console.log(`[ScriptExecution] Found parallel_launcher.py: ${scriptPath}`);
       return scriptPath;
@@ -368,9 +377,9 @@ export class ScriptExecutionService extends EventEmitter {
    * ORDER_098: 並列実行可能タスク検出スクリプト
    */
   private getParallelDetectorPath(): string | null {
-    const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return null;
-    const scriptPath = path.join(frameworkPath, 'backend', 'worker', 'parallel_detector.py');
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
+    const scriptPath = path.join(backendPath, 'worker', 'parallel_detector.py');
     if (fs.existsSync(scriptPath)) {
       console.log(`[ScriptExecution] Found parallel_detector.py: ${scriptPath}`);
       return scriptPath;
@@ -547,7 +556,8 @@ export class ScriptExecutionService extends EventEmitter {
         lastOutput: `Step 1: ORDER作成中 (${backlogId})...`,
       } as ExecutionProgress);
 
-      const toOrderScript = path.join(frameworkPath, 'backend', 'backlog', 'to_order.py');
+      const backendPath = this.getBackendPath()!;
+      const toOrderScript = path.join(backendPath, 'backlog', 'to_order.py');
       const step1Args = [toOrderScript, projectId, backlogId, '--json'];
 
       const step1Result = await this.runPythonScript(pythonCommand, step1Args, frameworkPath);
@@ -1186,7 +1196,8 @@ export class ScriptExecutionService extends EventEmitter {
 
     // フォールバック2: 従来のexecute_all.py
     console.log(`[ScriptExecution] Fallback: Using execute_all.py`);
-    const scriptPath = path.join(frameworkPath, 'backend', 'task', 'execute_all.py');
+    const backendPath = this.getBackendPath()!;
+    const scriptPath = path.join(backendPath, 'task', 'execute_all.py');
     const args = [scriptPath, projectId, orderId, '--json'];
     return this.executeScript('worker', projectId, orderId, args, executionId, startedAt);
   }
@@ -2149,7 +2160,9 @@ export class ScriptExecutionService extends EventEmitter {
     if (!frameworkPath) return [];
 
     const pythonCommand = this.getPythonCommand();
-    const taskListScript = path.join(frameworkPath, 'backend', 'task', 'list.py');
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return [];
+    const taskListScript = path.join(backendPath, 'task', 'list.py');
     const args = [taskListScript, projectId, '--order', orderId, '--json'];
 
     const result = await this.runPythonScript(pythonCommand, args, frameworkPath, 30000);
@@ -2175,7 +2188,9 @@ export class ScriptExecutionService extends EventEmitter {
     if (!frameworkPath) return null;
 
     const pythonCommand = this.getPythonCommand();
-    const scriptPath = path.join(frameworkPath, 'backend', 'worker', 'get_execution_steps.py');
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
+    const scriptPath = path.join(backendPath, 'worker', 'get_execution_steps.py');
 
     // スクリプトの存在チェック
     if (!fs.existsSync(scriptPath)) {
@@ -2538,7 +2553,8 @@ export class ScriptExecutionService extends EventEmitter {
     const frameworkPath = this.getFrameworkPath();
     if (frameworkPath) {
       const pythonCommand = this.getPythonCommand();
-      const recoverScript = path.join(frameworkPath, 'backend', 'worker', 'recover_crashed.py');
+      const backendPath = this.getBackendPath();
+      const recoverScript = backendPath ? path.join(backendPath, 'worker', 'recover_crashed.py') : '';
 
       if (fs.existsSync(recoverScript)) {
         const reason = `Process crashed (PID: ${pid})`;
@@ -2925,6 +2941,115 @@ export class ScriptExecutionService extends EventEmitter {
       }
     } catch (error) {
       console.error(`[WorkerLog] Error handling change for ${filePath}:`, error);
+    }
+  }
+
+  /**
+   * PLANNING_FAILEDステータスのORDERを再実行
+   * ORDER_155 / TASK_1230
+   *
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param options オプション（timeout, model, verbose）
+   * @returns 実行結果
+   */
+  async retryOrder(
+    projectId: string,
+    orderId: string,
+    options?: { timeout?: number; model?: string; verbose?: boolean }
+  ): Promise<ExecutionResult> {
+    const timeout = options?.timeout ?? 600;
+    const model = options?.model ?? 'sonnet';
+    const verbose = options?.verbose ?? false;
+    const frameworkPath = this.getFrameworkPath();
+    if (!frameworkPath) {
+      return this.createErrorResult('pm', projectId, orderId, 'Framework path not configured');
+    }
+
+    // retry_order.py のパスを取得
+    const retryScriptPath = path.join(frameworkPath, 'scripts', 'aipm-db', 'order', 'retry_order.py');
+    if (!fs.existsSync(retryScriptPath)) {
+      return this.createErrorResult('pm', projectId, orderId, 'retry_order.py not found');
+    }
+
+    const executionId = this.generateExecutionId();
+    const startedAt = new Date();
+    const pythonCommand = this.getPythonCommand();
+
+    // ジョブを登録
+    const job: RunningJob = {
+      executionId,
+      type: 'pm',
+      projectId,
+      targetId: orderId,
+      process: null as unknown as ChildProcess,
+      stdout: '',
+      stderr: '',
+      startedAt,
+    };
+    this.runningJobs.set(executionId, job);
+
+    // 開始イベントを発行
+    this.emit('progress', {
+      executionId,
+      type: 'pm',
+      projectId,
+      targetId: orderId,
+      status: 'running',
+      lastOutput: 'ORDER再実行を開始...',
+    } as ExecutionProgress);
+
+    try {
+      const args = [
+        retryScriptPath,
+        projectId,
+        orderId,
+        '--timeout', String(timeout),
+        '--model', model,
+        '--json'
+      ];
+
+      if (verbose) {
+        args.push('--verbose');
+      }
+
+      console.log(`[ScriptExecution] Executing retry_order.py: ${pythonCommand} ${args.join(' ')}`);
+
+      const result = await this.runPythonScript(pythonCommand, args, frameworkPath, timeout * 1000 + 30000);
+
+      this.runningJobs.delete(executionId);
+
+      if (!result.success) {
+        const errorResult = this.createExecutionResult(
+          'pm', projectId, orderId, executionId, startedAt,
+          false, result.stdout, result.stderr, result.exitCode || null,
+          result.error || 'ORDER再実行が失敗しました'
+        );
+        this.addToHistory(errorResult);
+        this.emitComplete(errorResult);
+        return errorResult;
+      }
+
+      // 成功
+      const successResult = this.createExecutionResult(
+        'pm', projectId, orderId, executionId, startedAt,
+        true, result.stdout, result.stderr, result.exitCode || 0
+      );
+      this.addToHistory(successResult);
+      this.emitComplete(successResult);
+      return successResult;
+
+    } catch (error) {
+      console.error(`[ScriptExecution] Retry order error:`, error);
+      this.runningJobs.delete(executionId);
+      const errorResult = this.createExecutionResult(
+        'pm', projectId, orderId, executionId, startedAt,
+        false, job.stdout, job.stderr, null,
+        `予期しないエラー: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.addToHistory(errorResult);
+      this.emitComplete(errorResult);
+      return errorResult;
     }
   }
 

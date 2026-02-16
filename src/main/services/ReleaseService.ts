@@ -138,14 +138,23 @@ export class ReleaseService {
   }
 
   /**
+   * バックエンドパスを取得（Pythonスクリプト用）
+   * ORDER_159: frameworkPath/backendPath分離
+   */
+  private getBackendPath(): string | null {
+    const configService = getConfigService();
+    return configService.getBackendPath();
+  }
+
+  /**
    * release_order.py のパスを取得
    * ORDER_108 / TASK_994
    */
   private getReleaseScriptPath(): string | null {
-    const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return null;
+    const backendPath = this.getBackendPath();
+    if (!backendPath) return null;
 
-    const scriptPath = path.join(frameworkPath, 'backend', 'release', 'release_order.py');
+    const scriptPath = path.join(backendPath, 'release', 'release_order.py');
     if (fs.existsSync(scriptPath)) {
       return scriptPath;
     }

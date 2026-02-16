@@ -52,7 +52,7 @@ export async function fetchDependencyStatus(
     return [];
   }
 
-  const scriptsDir = path.join(frameworkPath, 'backend');
+  const scriptsDir = configService.getBackendPath();
   const pythonScript = path.join(scriptsDir, 'portfolio', 'dependency_status.py');
 
   return new Promise((resolve, reject) => {
@@ -80,6 +80,11 @@ export async function fetchDependencyStatus(
 
     let stdout = '';
     let stderr = '';
+
+    proc.on('error', (err) => {
+      console.error('[DependencyUpdate] Failed to spawn python:', err.message);
+      resolve([]);
+    });
 
     proc.stdout.on('data', (data) => {
       stdout += data.toString();
