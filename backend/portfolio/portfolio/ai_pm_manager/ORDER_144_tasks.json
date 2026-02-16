@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_144",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1185",
+      "orderId": "ORDER_144",
+      "projectId": "ai_pm_manager",
+      "title": "BacklogList.tsxのマウント時reorder呼び出し削除",
+      "description": "BacklogList.tsx（L353-369）のuseEffect内でreorderAllBacklogs()を呼び出している処理を削除し、マウント時に自動でsort_orderが振り直されないようにする",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:31:47.171266",
+      "completedAt": "2026-02-16T11:34:32.869839",
+      "createdAt": "2026-02-16T11:31:34.794633",
+      "updatedAt": "2026-02-16T11:34:32.869846"
+    },
+    {
+      "id": "TASK_1186",
+      "orderId": "ORDER_144",
+      "projectId": "ai_pm_manager",
+      "title": "reorder.pyのロジック見直し（既存sort_order尊重）",
+      "description": "reorder.pyを修正し、既存のsort_orderを保持したまま新規追加分のみ末尾に追加するロジックに変更する。既存レコードのsort_orderは変更しない。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:31:47.872666",
+      "completedAt": "2026-02-16T11:33:09.132158",
+      "createdAt": "2026-02-16T11:31:34.931653",
+      "updatedAt": "2026-02-16T11:33:09.132175"
+    },
+    {
+      "id": "TASK_1187",
+      "orderId": "ORDER_144",
+      "projectId": "ai_pm_manager",
+      "title": "優先度自動整理スクリプト（prioritize.py）実装",
+      "description": "backlog/prioritize.pyを新規作成。全アクティブBACKLOGと直近のインシデント・エスカレーション履歴を取得し、Claude Code CLIスキル経由で優先度判断を実行。判断基準（自動実行安定性>運用改善>新機能>将来構想）を適用し、priority・sort_orderをDB更新する。CLI単体実行可能にする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:31:49.043966",
+      "completedAt": "2026-02-16T11:38:47.298755",
+      "createdAt": "2026-02-16T11:31:35.034264",
+      "updatedAt": "2026-02-16T11:38:47.298764"
+    },
+    {
+      "id": "TASK_1188",
+      "orderId": "ORDER_144",
+      "projectId": "ai_pm_manager",
+      "title": "Electron UI連携（IPC追加＋リフレッシュボタン接続）",
+      "description": "AipmDbService.tsにprioritizeBacklogs()メソッドを追加し、preload.tsにIPC定義を追加。BacklogList.tsxのリフレッシュボタンイベントからprioritize.pyをspawn実行し、実行中はローディング表示、完了後に一覧を再描画する。BUG_009（IPC型定義とバックエンド実装の乖離）に注意。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:33:20.314202",
+      "completedAt": "2026-02-16T11:38:45.057308",
+      "createdAt": "2026-02-16T11:31:35.171246",
+      "updatedAt": "2026-02-16T11:38:45.057313"
+    }
+  ]
+}

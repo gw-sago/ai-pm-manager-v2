@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_146",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1193",
+      "orderId": "ORDER_146",
+      "projectId": "ai_pm_manager",
+      "title": "execute_task.pyに破壊的SQL検知・警告機能を追加",
+      "description": "Worker実行環境で破壊的DB変更（DROP TABLE, ALTER TABLE DROP COLUMN等）を検知し、エラーまたは警告を出す仕組みを実装する。REPORTに破壊的変更検知ログを記録し、PMレビュー時に確認できるようにする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T12:57:12.410734",
+      "completedAt": "2026-02-16T13:04:52.902823",
+      "createdAt": "2026-02-16T12:55:48.537084",
+      "updatedAt": "2026-02-16T13:04:52.902830"
+    },
+    {
+      "id": "TASK_1194",
+      "orderId": "ORDER_146",
+      "projectId": "ai_pm_manager",
+      "title": "PM設計フローに破壊的DB変更タスクの最終フェーズ配置ロジックを追加",
+      "description": "redesign_orders.pyに、破壊的DB変更タスク（タイトルまたはdescriptionにDROP TABLE等を含む）を検知し、最終フェーズに配置するロジックを追加。他タスクが破壊的変更タスクに依存している場合は警告を出す。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T12:57:13.608978",
+      "completedAt": "2026-02-16T13:03:51.512766",
+      "createdAt": "2026-02-16T12:55:48.627856",
+      "updatedAt": "2026-02-16T13:03:51.512774"
+    },
+    {
+      "id": "TASK_1195",
+      "orderId": "ORDER_146",
+      "projectId": "ai_pm_manager",
+      "title": "/aipm-releaseにマイグレーション実行フローを追加",
+      "description": "/aipm-releaseスキルにマイグレーション→ビルド→デプロイの一括実行フローを追加。破壊的DB変更を含むORDERのリリース時に、マイグレーションスクリプト実行→Electronアプリビルド→デプロイの順序で実行する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T12:57:15.016224",
+      "completedAt": "2026-02-16T13:10:06.840909",
+      "createdAt": "2026-02-16T12:55:48.725722",
+      "updatedAt": "2026-02-16T13:10:06.840916"
+    },
+    {
+      "id": "TASK_1196",
+      "orderId": "ORDER_146",
+      "projectId": "ai_pm_manager",
+      "title": "破壊的DB変更タスクのメタデータ設計・DB追加",
+      "description": "tasksテーブルまたは別途メタデータテーブルに、破壊的DB変更フラグ（is_destructive_db_change）を追加。PM設計時・Worker実行時・リリース時に参照できるようにする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T12:57:16.384042",
+      "completedAt": "2026-02-16T13:01:55.848377",
+      "createdAt": "2026-02-16T12:55:48.848209",
+      "updatedAt": "2026-02-16T13:01:55.848385"
+    }
+  ]
+}

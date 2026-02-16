@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_116",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1024",
+      "orderId": "ORDER_116",
+      "projectId": "ai_pm_manager",
+      "title": "孤立DONEタスク検出機能の実装",
+      "description": "tasks テーブルから status='DONE' かつ review_queue に対応エントリが存在しないタスクを検出する関数を実装する。LEFT JOIN を使用し、review_queue.task_id が NULL のレコードを抽出する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T12:59:13.243766",
+      "completedAt": "2026-02-10T13:01:27.239489",
+      "createdAt": "2026-02-10T12:52:20.310191",
+      "updatedAt": "2026-02-10T13:01:27.239532"
+    },
+    {
+      "id": "TASK_1025",
+      "orderId": "ORDER_116",
+      "projectId": "ai_pm_manager",
+      "title": "review_queue自動登録機能の実装",
+      "description": "検出した孤立DONEタスクをreview_queueテーブルに登録する関数を実装する。status='PENDING', priority はタスクの優先度を継承、created_at は現在時刻を設定する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T13:01:59.307716",
+      "completedAt": "2026-02-10T13:04:32.556729",
+      "createdAt": "2026-02-10T12:52:20.553631",
+      "updatedAt": "2026-02-10T13:04:32.556755"
+    },
+    {
+      "id": "TASK_1026",
+      "orderId": "ORDER_116",
+      "projectId": "ai_pm_manager",
+      "title": "daemon_loop()にレビューキュー監視ステップを追加",
+      "description": "daemon_loop() 内に定期的にレビューキュー監視を実行するステップを追加する。Worker完了チェックと同等の頻度（例: 毎ループまたは一定間隔）で孤立DONEタスクを検出し、review_queueに登録する。ログ出力で検出・登録件数を記録する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T13:05:05.092692",
+      "completedAt": "2026-02-10T13:07:01.448140",
+      "createdAt": "2026-02-10T12:52:20.662144",
+      "updatedAt": "2026-02-10T13:07:01.448162"
+    },
+    {
+      "id": "TASK_1027",
+      "orderId": "ORDER_116",
+      "projectId": "ai_pm_manager",
+      "title": "既存孤立タスクの検証と動作確認",
+      "description": "実装後、ORDER_034〜ORDER_059 の18件のDONEタスクが正しく検出され、review_queueに登録されることを確認する。dry-runモードでの動作確認、実行ログの検証を行う。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T13:07:31.252875",
+      "completedAt": "2026-02-10T13:10:23.712155",
+      "createdAt": "2026-02-10T12:52:20.754206",
+      "updatedAt": "2026-02-10T13:10:23.712178"
+    }
+  ]
+}

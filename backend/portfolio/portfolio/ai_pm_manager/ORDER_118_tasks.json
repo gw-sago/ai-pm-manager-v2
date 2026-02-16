@@ -1,0 +1,78 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_118",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1029",
+      "orderId": "ORDER_118",
+      "projectId": "ai_pm_manager",
+      "title": "ステータス色定義・アイコン定義の拡張",
+      "description": "TaskDependencyView.tsxまたは共通定数ファイルで、CANCELLED/IN_REVIEW/REJECTED/SKIPPED/REWORKに対応する色・アイコン・装飾スタイルを定義する。色覚多様性を考慮し、色だけでなくアイコンや装飾（取り消し線、禁止マーク、警告マーク等）で区別できるようにする。",
+      "status": "IN_PROGRESS",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T13:29:43.809023",
+      "completedAt": null,
+      "createdAt": "2026-02-10T13:29:18.306824",
+      "updatedAt": "2026-02-10T13:48:20.077234"
+    },
+    {
+      "id": "TASK_1030",
+      "orderId": "ORDER_118",
+      "projectId": "ai_pm_manager",
+      "title": "ノード表示ロジックの更新",
+      "description": "TaskDependencyView.tsxのノード描画ロジックで、CANCELLED/IN_REVIEW/REJECTED/SKIPPED/REWORKの各ステータスに対して定義済みのスタイル・アイコン・装飾を適用する。既存のQUEUED/BLOCKED/IN_PROGRESS/DONE/COMPLETEDの表示は維持しつつ、新規ステータスを区別して描画する。",
+      "status": "BLOCKED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1029"
+      ],
+      "startedAt": null,
+      "completedAt": null,
+      "createdAt": "2026-02-10T13:29:18.750395",
+      "updatedAt": "2026-02-10T13:29:18.750395"
+    },
+    {
+      "id": "TASK_1031",
+      "orderId": "ORDER_118",
+      "projectId": "ai_pm_manager",
+      "title": "レジェンド（凡例）の全ステータス対応",
+      "description": "TaskDependencyView.tsxのレジェンド表示部分を更新し、全10ステータス（QUEUED, BLOCKED, IN_PROGRESS, DONE, IN_REVIEW, REWORK, COMPLETED, CANCELLED, REJECTED, SKIPPED）を表示する。各ステータスに対応する色・アイコン・装飾をレジェンドにも反映し、視覚的に対応関係が理解できるようにする。",
+      "status": "BLOCKED",
+      "priority": "P1",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1030"
+      ],
+      "startedAt": null,
+      "completedAt": null,
+      "createdAt": "2026-02-10T13:29:18.867308",
+      "updatedAt": "2026-02-10T13:29:18.867308"
+    },
+    {
+      "id": "TASK_1032",
+      "orderId": "ORDER_118",
+      "projectId": "ai_pm_manager",
+      "title": "ORDER詳細画面のステータス表示更新",
+      "description": "ORDER詳細画面（OrderDetailView等）でタスクステータスを表示している箇所で、CANCELLED/IN_REVIEW/REJECTED/SKIPPED/REWORKが正しく区別されて表示されるように更新する。TaskDependencyViewと同様のスタイル定義を適用し、統一感を持たせる。",
+      "status": "BLOCKED",
+      "priority": "P1",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1029"
+      ],
+      "startedAt": null,
+      "completedAt": null,
+      "createdAt": "2026-02-10T13:29:18.984846",
+      "updatedAt": "2026-02-10T13:29:18.984846"
+    }
+  ]
+}

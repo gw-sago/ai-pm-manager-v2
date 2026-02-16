@@ -1,0 +1,96 @@
+{
+  "success": true,
+  "projectId": "Pokemon_TCG_Info",
+  "orderId": "ORDER_003",
+  "count": 5,
+  "tasks": [
+    {
+      "id": "TASK_242",
+      "orderId": "ORDER_003",
+      "projectId": "Pokemon_TCG_Info",
+      "title": "現行レギュレーション情報調査",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-01-29T16:55:25.486168",
+      "completedAt": "2026-01-29 08:01:58",
+      "createdAt": "2026-01-29T16:46:53.125786",
+      "updatedAt": "2026-01-29T16:55:25.486197"
+    },
+    {
+      "id": "TASK_243",
+      "orderId": "ORDER_003",
+      "projectId": "Pokemon_TCG_Info",
+      "title": "INFO/CARD_POOL.md新規作成",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Opus",
+      "dependsOn": [
+        "TASK_242"
+      ],
+      "startedAt": "2026-01-29T17:04:49.567157",
+      "completedAt": "2026-01-29 08:10:17",
+      "createdAt": "2026-01-29T16:46:54.668762",
+      "updatedAt": "2026-01-29T17:04:49.567186"
+    },
+    {
+      "id": "TASK_244",
+      "orderId": "ORDER_003",
+      "projectId": "Pokemon_TCG_Info",
+      "title": "INFO/CARD_TAXONOMY.md更新",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Opus",
+      "dependsOn": [
+        "TASK_242"
+      ],
+      "startedAt": "2026-01-29T17:13:08.521640",
+      "completedAt": "2026-01-29 08:17:50",
+      "createdAt": "2026-01-29T16:46:56.297933",
+      "updatedAt": "2026-01-29T17:13:08.521669"
+    },
+    {
+      "id": "TASK_245",
+      "orderId": "ORDER_003",
+      "projectId": "Pokemon_TCG_Info",
+      "title": "INFO/MAINTENANCE_GUIDE.md更新",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker A",
+      "recommendedModel": "Opus",
+      "dependsOn": [
+        "TASK_243"
+      ],
+      "startedAt": "2026-01-29 08:20:39",
+      "completedAt": "2026-01-29 08:27:23",
+      "createdAt": "2026-01-29T16:46:57.672178",
+      "updatedAt": "2026-01-29T16:46:57.672178"
+    },
+    {
+      "id": "TASK_246",
+      "orderId": "ORDER_003",
+      "projectId": "Pokemon_TCG_Info",
+      "title": "META/環境情報連携強化",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker A",
+      "recommendedModel": "Opus",
+      "dependsOn": [
+        "TASK_243"
+      ],
+      "startedAt": "2026-01-29T17:46:43.651677",
+      "completedAt": "2026-01-29 08:50:09",
+      "createdAt": "2026-01-29T16:46:59.486370",
+      "updatedAt": "2026-01-29T17:46:43.651711"
+    }
+  ]
+}

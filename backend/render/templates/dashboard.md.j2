@@ -1,0 +1,229 @@
+# DASHBOARD.md
+
+## エグゼクティブダッシュボード
+
+> **全プロジェクトの状況を俯瞰するダッシュボード**
+> 健康状態、エスカレーション、承認待ち、バックログを一覧表示します。
+
+---
+
+## 全体サマリ
+
+| 指標 | 値 |
+|------|-----|
+| **総プロジェクト数** | {{ total_projects }}件 |
+| **🟢 正常** | {{ healthy_projects }}件 |
+| **🟡 注意** | {{ warning_projects }}件 |
+| **🔴 問題** | {{ critical_projects }}件 |
+
+---
+
+## プロジェクト健康状態一覧
+
+| プロジェクト | 状態 | ORDER | ステータス | タスク進捗 | レビュー待ち | ESC | 最終更新 |
+|-------------|------|-------|----------|-----------|-------------|-----|---------|
+{% if projects -%}
+{% for p in projects -%}
+| {{ p.project_name }} | {% if p.status == 'healthy' %}🟢{% elif p.status == 'warning' %}🟡{% elif p.status == 'critical' %}🔴{% else %}⚪{% endif %} | {{ p.current_order_id | default('-', true) }} | {{ p.order_status | default('-', true) }} | {{ p.completed_tasks }}/{{ p.total_tasks }} ({{ p.completion_rate_percent }}%) | {{ p.pending_reviews }} | {{ p.open_escalations }} | {{ p.last_activity | default('-', true) }} |
+{% endfor -%}
+{% else -%}
+| - | - | - | - | - | - | - | - |
+{% endif %}
+
+### 健康状態の判定基準
+
+| 状態 | アイコン | 条件 |
+|------|---------|------|
+| 正常 | 🟢 | エスカレーション=0、ブロック=0、アクティブORDER<3 |
+| 注意 | 🟡 | アクティブORDER≧3 または ブロックタスク≧1 |
+| 問題 | 🔴 | エスカレーション≧1 または 長期停滞タスク存在（7日以上） |
+| 不明 | ⚪ | タスクなし |
+
+---
+
+## エスカレーション一覧
+
+### サマリ
+
+| 指標 | 値 |
+|------|-----|
+| **未解決総数** | {{ escalation_summary.total_open }}件 |
+| **本日解決** | {{ escalation_summary.total_resolved_today }}件 |
+| **最長未解決日数** | {{ escalation_summary.oldest_open_days }}日 |
+
+{% if escalation_summary.by_project %}
+### プロジェクト別内訳
+
+| プロジェクト | 未解決数 |
+|-------------|---------|
+{% for proj, count in escalation_summary.by_project.items() -%}
+| {{ proj }} | {{ count }}件 |
+{% endfor %}
+{% endif %}
+
+{% if escalation_summary.recent_escalations %}
+### 直近のエスカレーション
+
+| ESC ID | プロジェクト | タイトル | ステータス | 作成日 | 経過日数 |
+|--------|-------------|---------|----------|--------|---------|
+{% for esc in escalation_summary.recent_escalations -%}
+| {{ esc.id | default('-', true) }} | {{ esc.project_id | default('-', true) }} | {{ esc.title | default('-', true) }} | {{ esc.status | default('-', true) }} | {{ esc.created_at | default('-', true) }} | {{ esc.days_open | default('-', true) }} |
+{% endfor %}
+{% else %}
+（未解決エスカレーションはありません）
+{% endif %}
+
+---
+
+## 承認待ち一覧
+
+### サマリ
+
+| 指標 | 値 |
+|------|-----|
+| **承認待ち総数** | {{ review_summary.total_pending }}件 |
+| **レビュー中** | {{ review_summary.total_in_review }}件 |
+| **P0（最優先）** | {{ review_summary.p0_count }}件 |
+| **P1（通常）** | {{ review_summary.p1_count }}件 |
+| **P2（低優先）** | {{ review_summary.p2_count }}件 |
+| **最長待ち時間** | {{ "%.1f"|format(review_summary.oldest_pending_hours) }}時間 |
+
+{% if review_summary.by_project %}
+### プロジェクト別内訳
+
+| プロジェクト | 承認待ち数 |
+|-------------|-----------|
+{% for proj, count in review_summary.by_project.items() -%}
+| {{ proj }} | {{ count }}件 |
+{% endfor %}
+{% endif %}
+
+{% if review_summary.pending_items %}
+### 承認待ちキュー（優先度順）
+
+| 優先度 | プロジェクト | Task ID | タイトル | 提出日時 | 待ち時間 |
+|--------|-------------|---------|---------|---------|---------|
+{% for item in review_summary.pending_items -%}
+| {{ item.priority | default('P1', true) }} | {{ item.project_id | default('-', true) }} | {{ item.task_id | default('-', true) }} | {{ item.task_title | default('-', true) }} | {{ item.submitted_at | default('-', true) }} | {{ "%.1f"|format(item.hours_pending | default(0)) }}h |
+{% endfor %}
+{% else %}
+（承認待ちタスクはありません）
+{% endif %}
+
+---
+
+## バックログサマリ
+
+### サマリ
+
+| 指標 | 値 |
+|------|-----|
+| **総項目数** | {{ backlog_summary.total_items }}件 |
+| **TODO** | {{ backlog_summary.todo_count }}件 |
+| **進行中** | {{ backlog_summary.in_progress_count }}件 |
+| **高優先度** | {{ backlog_summary.high_priority_count }}件 |
+
+{% if backlog_summary.by_project %}
+### プロジェクト別内訳
+
+| プロジェクト | 項目数 |
+|-------------|-------|
+{% for proj, count in backlog_summary.by_project.items() -%}
+| {{ proj }} | {{ count }}件 |
+{% endfor %}
+{% endif %}
+
+{% if backlog_summary.by_category %}
+### カテゴリ別内訳
+
+| カテゴリ | 項目数 |
+|---------|-------|
+{% for cat, count in backlog_summary.by_category.items() -%}
+| {{ cat }} | {{ count }}件 |
+{% endfor %}
+{% endif %}
+
+{% if backlog_summary.by_priority %}
+### 優先度別内訳
+
+| 優先度 | 件数 |
+|--------|------|
+{% for priority in ['High', 'Medium', 'Low'] -%}
+{% if priority in backlog_summary.by_priority -%}
+| {{ priority }} | {{ backlog_summary.by_priority[priority] }}件 |
+{% endif -%}
+{% endfor %}
+{% endif %}
+
+{% if backlog_summary.by_status %}
+### ステータス別内訳
+
+| ステータス | 件数 |
+|-----------|------|
+{% for status in ['TODO', 'IN_PROGRESS', 'DONE', 'CANCELED', 'EXTERNAL'] -%}
+{% if status in backlog_summary.by_status -%}
+| {{ status }} | {{ backlog_summary.by_status[status] }}件 |
+{% endif -%}
+{% endfor %}
+{% endif %}
+
+{% if backlog_summary.filtered_items %}
+### フィルタ結果
+
+{% if backlog_summary.applied_filters %}
+**適用フィルタ:**
+{% if backlog_summary.applied_filters.priority %}- 優先度: {{ backlog_summary.applied_filters.priority | join(', ') }}
+{% endif %}
+{% if backlog_summary.applied_filters.status %}- ステータス: {{ backlog_summary.applied_filters.status | join(', ') }}
+{% endif %}
+{% if backlog_summary.applied_filters.project %}- プロジェクト: {{ backlog_summary.applied_filters.project }}
+{% endif %}
+{% endif %}
+
+| ID | プロジェクト | タイトル | 優先度 | ステータス | 登録日 |
+|----|-------------|---------|--------|----------|-------|
+{% for item in backlog_summary.filtered_items -%}
+| {{ item.id | default('-', true) }} | {{ item.project_id | default('-', true) }} | {{ item.title | default('-', true) }} | {{ item.priority | default('-', true) }} | {{ item.status | default('-', true) }} | {{ item.created_at | default('-', true) }} |
+{% endfor %}
+{% endif %}
+
+{% if backlog_summary.recent_items %}
+### 直近追加項目
+
+| ID | プロジェクト | タイトル | 優先度 | ステータス | 登録日 |
+|----|-------------|---------|--------|----------|-------|
+{% for item in backlog_summary.recent_items -%}
+| {{ item.id | default('-', true) }} | {{ item.project_id | default('-', true) }} | {{ item.title | default('-', true) }} | {{ item.priority | default('-', true) }} | {{ item.status | default('-', true) }} | {{ item.created_at | default('-', true) }} |
+{% endfor %}
+{% else %}
+（直近の追加項目はありません）
+{% endif %}
+
+---
+
+## 使い方
+
+### ダッシュボード生成
+
+```bash
+# 標準出力に生成
+python backend/render/dashboard.py
+
+# ファイルに出力
+python backend/render/dashboard.py -o DASHBOARD.md
+```
+
+### 各プロジェクトの詳細確認
+
+```bash
+# プロジェクト状態確認
+/aipm-status PROJECT_NAME
+
+# エスカレーション詳細
+/aipm-escalation PROJECT_NAME ESC_XXX
+```
+
+---
+
+**生成日時**: {{ render_date }} {{ render_time }}
+**更新者**: {{ updated_by }}

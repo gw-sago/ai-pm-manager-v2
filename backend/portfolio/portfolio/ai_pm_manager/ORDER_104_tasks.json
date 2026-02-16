@@ -1,0 +1,76 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_104",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_981",
+      "orderId": "ORDER_104",
+      "projectId": "ai_pm_manager",
+      "title": "process_review.pyにCOMPLETED/REWORK遷移時のロック解放処理を追加",
+      "description": "DONE→COMPLETED遷移時とDONE→REWORK遷移時にFileLockManager.release_locks(task_id)を呼び出す。ロック解放失敗時はログ記録のみ行い、遷移自体はブロックしない。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T16:57:46.945448",
+      "completedAt": "2026-02-09 07:59:44",
+      "createdAt": "2026-02-09T16:57:23.588489",
+      "updatedAt": "2026-02-09T16:57:46.945459"
+    },
+    {
+      "id": "TASK_982",
+      "orderId": "ORDER_104",
+      "projectId": "ai_pm_manager",
+      "title": "execute_task.pyのREWORK再実行時ロック整合処理を実装",
+      "description": "_step_assign_worker()でIN_PROGRESS遷移前に、自タスクの既存ロックを一旦FileLockManager.release_locks()で解放してから再取得。これによりREWORKループでのロック蓄積を防止。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T17:00:01.324077",
+      "completedAt": "2026-02-09 08:01:55",
+      "createdAt": "2026-02-09T16:57:23.684933",
+      "updatedAt": "2026-02-09T17:00:01.324085"
+    },
+    {
+      "id": "TASK_983",
+      "orderId": "ORDER_104",
+      "projectId": "ai_pm_manager",
+      "title": "task/update.pyに状態遷移フックでの自動ロック解放を追加",
+      "description": "update_task()でCOMPLETED/REJECTED遷移時にFileLockManager.release_locks(task_id)を自動実行するフックを追加。どの経路からCOMPLETEDに遷移してもロックが確実に解放される仕組みを構築。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T17:02:11.390615",
+      "completedAt": "2026-02-09 08:04:02",
+      "createdAt": "2026-02-09T16:57:23.785114",
+      "updatedAt": "2026-02-09T17:02:11.390627"
+    },
+    {
+      "id": "TASK_984",
+      "orderId": "ORDER_104",
+      "projectId": "ai_pm_manager",
+      "title": "ロック解放処理の統合テストとBUG_008検証",
+      "description": "REWORK→IN_PROGRESS→DONE→COMPLETED/REWORKの各経路でロック解放が正しく動作するか検証。TASK_950のような完了済みタスクのロック残存が発生しないことを確認し、BUG_008の根本修正完了を検証。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_981",
+        "TASK_982",
+        "TASK_983"
+      ],
+      "startedAt": "2026-02-09T17:04:16.895067",
+      "completedAt": "2026-02-09T17:41:10.889502",
+      "createdAt": "2026-02-09T16:57:23.871164",
+      "updatedAt": "2026-02-09T17:41:10.889524"
+    }
+  ]
+}

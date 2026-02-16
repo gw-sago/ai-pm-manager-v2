@@ -1,0 +1,59 @@
+{
+  "profiles": {
+    "research": {
+      "description": "調査・分析タスク用",
+      "allowed_tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "WebSearch",
+        "WebFetch",
+        "TodoWrite",
+        "Task"
+      ]
+    },
+    "development": {
+      "description": "実装・開発タスク用",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "TodoWrite",
+        "Task",
+        "NotebookEdit"
+      ]
+    },
+    "document": {
+      "description": "ドキュメント作成タスク用",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "TodoWrite"
+      ]
+    },
+    "full": {
+      "description": "フルアクセス（全ツール許可）",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "WebSearch",
+        "WebFetch",
+        "TodoWrite",
+        "Task",
+        "NotebookEdit"
+      ]
+    }
+  },
+  "default_profile": "development",
+  "version": "1.0.0"
+}

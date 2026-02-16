@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_099",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_960",
+      "orderId": "ORDER_099",
+      "projectId": "ai_pm_manager",
+      "title": "REVIEW生成ロジックにREPORT内容統合機能を追加",
+      "description": "process_review.pyでREVIEWファイル生成時に、対応するREPORTファイルの内容を読み込み、REVIEWファイルに「## 実施内容」セクションとして統合する。既存のPM判定結果は「## 判定結果」セクションとして記載する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T13:28:24.468392",
+      "completedAt": "2026-02-09 04:31:36",
+      "createdAt": "2026-02-09T13:27:53.146103",
+      "updatedAt": "2026-02-09T13:28:24.468406"
+    },
+    {
+      "id": "TASK_961",
+      "orderId": "ORDER_099",
+      "projectId": "ai_pm_manager",
+      "title": "PM処理時のTASK_XXX.md生成強化",
+      "description": "PM処理（タスク発行時）に04_QUEUE/TASK_XXX.mdを生成する際、概要だけでなく「## 実施内容」「## 完了条件」「## 対象ファイル」「## 注意事項」セクションを含めるようロジックを追加。DB fallback時もdescriptionを構造化して表示できるようにする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T13:31:36.364027",
+      "completedAt": "2026-02-09 04:34:27",
+      "createdAt": "2026-02-09T13:27:53.267723",
+      "updatedAt": "2026-02-09T13:31:36.364043"
+    },
+    {
+      "id": "TASK_962",
+      "orderId": "ORDER_099",
+      "projectId": "ai_pm_manager",
+      "title": "TaskDetail.tsxのタブ構成を2タブに変更",
+      "description": "TaskDetail.tsxで現在3タブ（TASK/REPORT/REVIEW）を2タブ（TASK/REVIEW）に変更。REPORTタブを削除し、REVIEWタブ内で統合内容を表示する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T13:34:28.664237",
+      "completedAt": "2026-02-09 04:57:49",
+      "createdAt": "2026-02-09T13:27:53.508008",
+      "updatedAt": "2026-02-09T13:57:34.792851"
+    },
+    {
+      "id": "TASK_963",
+      "orderId": "ORDER_099",
+      "projectId": "ai_pm_manager",
+      "title": "ProjectService.tsのREVIEW読み込みロジック調整",
+      "description": "ProjectService.tsでREVIEWファイル読み込み時に統合フォーマット（実施内容+判定結果）を想定した処理にする。REPORTファイル読み込みは内部的に残すが、UIには公開しない。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T13:44:41.083221",
+      "completedAt": "2026-02-09T14:04:36.352925",
+      "createdAt": "2026-02-09T13:27:53.607889",
+      "updatedAt": "2026-02-09T14:04:36.352952"
+    }
+  ]
+}

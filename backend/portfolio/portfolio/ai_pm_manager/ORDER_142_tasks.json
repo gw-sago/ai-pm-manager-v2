@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_142",
+  "count": 3,
+  "tasks": [
+    {
+      "id": "TASK_1179",
+      "orderId": "ORDER_142",
+      "projectId": "ai_pm_manager",
+      "title": "レビュー前REPORTバリデーション追加（process_review.py）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Opus",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:12:56.528665",
+      "completedAt": "2026-02-16T11:14:00.164161",
+      "createdAt": "2026-02-16T11:12:29.865545",
+      "updatedAt": "2026-02-16T11:14:00.164187"
+    },
+    {
+      "id": "TASK_1180",
+      "orderId": "ORDER_142",
+      "projectId": "ai_pm_manager",
+      "title": "Worker REPORT書き込み検証強化（execute_task.py）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Opus",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:14:22.010701",
+      "completedAt": "2026-02-16T11:15:41.029392",
+      "createdAt": "2026-02-16T11:12:30.744056",
+      "updatedAt": "2026-02-16T11:15:41.029417"
+    },
+    {
+      "id": "TASK_1181",
+      "orderId": "ORDER_142",
+      "projectId": "ai_pm_manager",
+      "title": "parallel_launcher REPORT存在チェック追加",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Opus",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T11:16:03.474042",
+      "completedAt": "2026-02-16T11:17:22.192292",
+      "createdAt": "2026-02-16T11:12:31.586775",
+      "updatedAt": "2026-02-16T11:17:22.192316"
+    }
+  ]
+}

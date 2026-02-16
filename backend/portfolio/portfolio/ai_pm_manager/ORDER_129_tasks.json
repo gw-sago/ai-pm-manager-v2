@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_129",
+  "count": 3,
+  "tasks": [
+    {
+      "id": "TASK_1131",
+      "orderId": "ORDER_129",
+      "projectId": "ai_pm_manager",
+      "title": "アクティブプロジェクト取得処理の実装",
+      "description": "全アクティブプロジェクトのリストを取得する処理を実装する。既存のgetProjects()またはDB直接クエリを利用し、is_active=1のプロジェクトのproject_id配列を返す。",
+      "status": "CANCELLED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:48:20.455151",
+      "completedAt": null,
+      "createdAt": "2026-02-10T16:43:08.127061",
+      "updatedAt": "2026-02-10T16:48:55.146978"
+    },
+    {
+      "id": "TASK_1130",
+      "orderId": "ORDER_129",
+      "projectId": "ai_pm_manager",
+      "title": "AipmDbServiceにバックログ自動整理機能を追加",
+      "description": "AipmDbService初期化時に全アクティブプロジェクトのリストを取得し、各プロジェクトに対してreorder.pyを非同期実行する処理を実装する。execFile/spawnを使用してPythonスクリプトを呼び出し、Promise.allSettledで並列実行する。失敗時は警告ログのみ出力し、起動処理は継続する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:43:41.832456",
+      "completedAt": "2026-02-10T16:48:13.787962",
+      "createdAt": "2026-02-10T16:43:07.944206",
+      "updatedAt": "2026-02-10T16:48:13.787973"
+    },
+    {
+      "id": "TASK_1132",
+      "orderId": "ORDER_129",
+      "projectId": "ai_pm_manager",
+      "title": "エラーハンドリングとログ出力の実装",
+      "description": "reorder.py実行時のエラーハンドリングを実装し、失敗時は警告ログを出力するが起動処理は継続する。Promise.allSettledを使用して各プロジェクトの結果を収集し、rejected状態のものをログ出力する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:48:51.225320",
+      "completedAt": "2026-02-10T16:50:49.491985",
+      "createdAt": "2026-02-10T16:43:08.260831",
+      "updatedAt": "2026-02-10T16:50:49.491999"
+    }
+  ]
+}

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PM Portfolio View</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#4f46e5',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+
+        /* Sidebar navigation */
+        .nav-item {
+            transition: all 0.2s ease;
+        }
+        .nav-item:hover {
+            background: rgba(37, 99, 235, 0.1);
+        }
+        .nav-item.active {
+            background: rgba(37, 99, 235, 0.15);
+            border-left: 3px solid #2563eb;
+        }
+
+        /* Project prefix badge */
+        .project-prefix {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.375rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border-radius: 0.25rem;
+            font-size: 0.625rem;
+            font-weight: 600;
+            margin-right: 0.375rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-todo { background: #e2e8f0; color: #475569; }
+        .status-in_progress { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #dcfce7; color: #166534; }
+        .status-blocked { background: #fee2e2; color: #991b1b; }
+        .status-rework { background: #fef3c7; color: #92400e; }
+        .status-escalated { background: #fce7f3; color: #9d174d; }
+        .status-planning { background: #e0e7ff; color: #3730a3; }
+
+        /* Priority badges */
+        .priority-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.625rem;
+            font-weight: 700;
+        }
+        .priority-p0 { background: #fee2e2; color: #991b1b; }
+        .priority-p1 { background: #fef3c7; color: #92400e; }
+        .priority-p2 { background: #dbeafe; color: #1e40af; }
+        .priority-p3 { background: #e2e8f0; color: #475569; }
+        .priority-high { background: #fee2e2; color: #991b1b; }
+        .priority-medium { background: #fef3c7; color: #92400e; }
+        .priority-low { background: #e2e8f0; color: #475569; }
+
+        /* Card styles */
+        .info-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+        .info-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .info-card.selected {
+            ring: 2px;
+            ring-color: #2563eb;
+            box-shadow: 0 0 0 2px #2563eb;
+        }
+
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            transition: width 0.3s ease;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.2s ease;
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div x-data="portfolioView()" x-init="init()" x-cloak class="flex h-screen">
+        <!-- Left Sidebar: ORDER List -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
+            <!-- Header -->
+            <div class="p-4 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-800 text-lg">Portfolio View</h1>
+                        <p class="text-xs text-slate-500">全プロジェクト統合管理</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="p-3 border-b border-slate-200">
+                <div class="flex gap-2 flex-wrap">
+                    <button @click="orderFilter = 'all'"
+                            class="px-2 py-1 text-xs rounded-full transition-colors"
+                            :class="orderFilter === 'all' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        All
+                    </button>
+                    <button @click="orderFilter = 'in_progress'"
+                            class="px-2 py-1 text-xs rounded-full transition-colors"
+                            :class="orderFilter === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        In Progress
+                    </button>
+                    <button @click="orderFilter = 'planning'"
+                            class="px-2 py-1 text-xs rounded-full transition-colors"
+                            :class="orderFilter === 'planning' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        Planning
+                    </button>
+                    <button @click="orderFilter = 'completed'"
+                            class="px-2 py-1 text-xs rounded-full transition-colors"
+                            :class="orderFilter === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        Completed
+                    </button>
+                </div>
+            </div>
+
+            <!-- ORDER List -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-2">
+                <template x-if="loading">
+                    <div class="flex items-center justify-center h-32">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                </template>
+
+                <template x-if="!loading && filteredOrders.length === 0">
+                    <div class="text-center py-8 text-slate-500 text-sm">
+                        該当するORDERがありません
+                    </div>
+                </template>
+
+                <template x-for="order in filteredOrders" :key="order.portfolioId">
+                    <div class="nav-item rounded-lg p-3 mb-2 cursor-pointer"
+                         :class="{ 'active': selectedOrder?.portfolioId === order.portfolioId }"
+                         @click="selectOrder(order)">
+                        <div class="flex items-start justify-between mb-1">
+                            <div class="flex items-center flex-wrap">
+                                <span class="project-prefix" x-text="order.projectPrefix"></span>
+                                <span class="text-xs font-mono text-slate-600" x-text="order.id"></span>
+                            </div>
+                            <span class="status-badge"
+                                  :class="'status-' + order.status.toLowerCase().replace(' ', '_')"
+                                  x-text="order.status"></span>
+                        </div>
+                        <p class="text-sm font-medium text-slate-800 line-clamp-2" x-text="order.title"></p>
+                        <div class="mt-2">
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" :style="'width: ' + order.progress + '%'"></div>
+                            </div>
+                            <div class="flex justify-between mt-1 text-xs text-slate-500">
+                                <span x-text="order.completedTasks + '/' + order.totalTasks + ' tasks'"></span>
+                                <span x-text="order.progress + '%'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-3 border-t border-slate-200 bg-slate-50">
+                <div class="text-xs text-slate-500 flex justify-between">
+                    <span>Total: <span x-text="orders.length"></span> orders</span>
+                    <span x-text="new Date().toLocaleString('ja-JP')"></span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content: Backlog List -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="bg-white border-b border-slate-200 p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">バックログ一覧</h2>
+                        <p class="text-xs text-slate-500">全プロジェクトのバックログを統合表示</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <select x-model="backlogStatusFilter"
+                                class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">All Status</option>
+                            <option value="todo,in_progress">TODO + In Progress</option>
+                            <option value="todo">TODO</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                        <select x-model="backlogPriorityFilter"
+                                class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">All Priority</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Backlog Grid -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-4">
+                <template x-if="loading">
+                    <div class="flex items-center justify-center h-32">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                </template>
+
+                <template x-if="!loading && filteredBacklogs.length === 0">
+                    <div class="text-center py-16 text-slate-500">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        <p class="text-sm">該当するバックログがありません</p>
+                    </div>
+                </template>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="backlog in filteredBacklogs" :key="backlog.portfolioId">
+                        <div class="info-card"
+                             :class="{ 'selected': selectedBacklog?.portfolioId === backlog.portfolioId }"
+                             @click="selectBacklog(backlog)">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex items-center">
+                                    <span class="project-prefix" x-text="backlog.projectPrefix"></span>
+                                    <span class="text-xs font-mono text-slate-500" x-text="backlog.id"></span>
+                                </div>
+                                <div class="flex gap-1">
+                                    <span class="priority-badge"
+                                          :class="'priority-' + backlog.priority.toLowerCase()"
+                                          x-text="backlog.priority.charAt(0)"></span>
+                                    <span class="status-badge"
+                                          :class="'status-' + backlog.status.toLowerCase().replace(' ', '_')"
+                                          x-text="backlog.status"></span>
+                                </div>
+                            </div>
+                            <h3 class="text-sm font-medium text-slate-800 mb-2 line-clamp-2" x-text="backlog.title"></h3>
+                            <p class="text-xs text-slate-500 line-clamp-2" x-text="backlog.description || 'No description'"></p>
+                            <template x-if="backlog.relatedOrderId">
+                                <div class="mt-2 pt-2 border-t border-slate-100">
+                                    <span class="text-xs text-slate-400">Related: </span>
+                                    <span class="text-xs font-mono text-blue-600" x-text="backlog.relatedOrderId"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="bg-white border-t border-slate-200 p-3">
+                <div class="flex justify-between text-xs text-slate-500">
+                    <span>Showing <span x-text="filteredBacklogs.length"></span> of <span x-text="backlogs.length"></span> backlogs</span>
+                    <button @click="refreshData()" class="text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </footer>
+        </main>
+
+        <!-- Right Sidebar: Detail Panel -->
+        <aside class="w-96 bg-white border-l border-slate-200 flex flex-col" x-show="selectedOrder || selectedBacklog || selectedTask" x-transition:enter="slide-in">
+            <!-- Detail Header -->
+            <div class="p-4 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800" x-text="detailPanelTitle"></h3>
+                    <button @click="closeDetailPanel()" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Detail Content -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-4">
+                <!-- ORDER Detail -->
+                <template x-if="selectedOrder && !selectedTask">
+                    <div class="fade-in">
+                        <div class="mb-4">
+                            <div class="flex items-center mb-2">
+                                <span class="project-prefix" x-text="selectedOrder.projectPrefix"></span>
+                                <span class="font-mono text-sm text-slate-600" x-text="selectedOrder.id"></span>
+                            </div>
+                            <h4 class="text-lg font-semibold text-slate-800" x-text="selectedOrder.title"></h4>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Status</span>
+                                <p class="font-medium text-slate-800" x-text="selectedOrder.status"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Priority</span>
+                                <p class="font-medium text-slate-800" x-text="selectedOrder.priority"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Progress</span>
+                                <p class="font-medium text-slate-800" x-text="selectedOrder.progress + '%'"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Tasks</span>
+                                <p class="font-medium text-slate-800" x-text="selectedOrder.completedTasks + '/' + selectedOrder.totalTasks"></p>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar mb-4">
+                            <div class="progress-bar-fill" :style="'width: ' + selectedOrder.progress + '%'"></div>
+                        </div>
+
+                        <!-- Task List -->
+                        <div class="mt-4">
+                            <h5 class="text-sm font-semibold text-slate-700 mb-2">Tasks</h5>
+                            <div class="space-y-2">
+                                <template x-for="task in selectedOrder.tasks" :key="task.id">
+                                    <div class="bg-slate-50 rounded-lg p-3 cursor-pointer hover:bg-slate-100 transition-colors"
+                                         @click="selectTask(task)">
+                                        <div class="flex items-start justify-between">
+                                            <div class="flex-1">
+                                                <span class="text-xs font-mono text-slate-500" x-text="task.id"></span>
+                                                <p class="text-sm font-medium text-slate-800" x-text="task.title"></p>
+                                            </div>
+                                            <span class="status-badge ml-2"
+                                                  :class="'status-' + task.status.toLowerCase().replace(' ', '_')"
+                                                  x-text="task.status"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Backlog Detail -->
+                <template x-if="selectedBacklog && !selectedOrder">
+                    <div class="fade-in">
+                        <div class="mb-4">
+                            <div class="flex items-center mb-2">
+                                <span class="project-prefix" x-text="selectedBacklog.projectPrefix"></span>
+                                <span class="font-mono text-sm text-slate-600" x-text="selectedBacklog.id"></span>
+                            </div>
+                            <h4 class="text-lg font-semibold text-slate-800" x-text="selectedBacklog.title"></h4>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Status</span>
+                                <p class="font-medium text-slate-800" x-text="selectedBacklog.status"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Priority</span>
+                                <p class="font-medium text-slate-800" x-text="selectedBacklog.priority"></p>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-sm font-semibold text-slate-700 mb-2">Description</h5>
+                            <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600" x-html="marked.parse(selectedBacklog.description || 'No description')"></div>
+                        </div>
+
+                        <template x-if="selectedBacklog.relatedOrderId">
+                            <div class="mb-4">
+                                <h5 class="text-sm font-semibold text-slate-700 mb-2">Related ORDER</h5>
+                                <div class="bg-blue-50 rounded-lg p-3 cursor-pointer hover:bg-blue-100 transition-colors"
+                                     @click="navigateToOrder(selectedBacklog.relatedOrderId)">
+                                    <span class="text-sm font-mono text-blue-600" x-text="selectedBacklog.relatedOrderId"></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="text-xs text-slate-400 mt-4">
+                            <p>Created: <span x-text="formatDate(selectedBacklog.createdAt)"></span></p>
+                            <p>Updated: <span x-text="formatDate(selectedBacklog.updatedAt)"></span></p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Task Detail -->
+                <template x-if="selectedTask">
+                    <div class="fade-in">
+                        <div class="mb-4">
+                            <button @click="selectedTask = null" class="text-xs text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                                Back to ORDER
+                            </button>
+                            <div class="flex items-center mb-2">
+                                <span class="font-mono text-sm text-slate-600" x-text="selectedTask.id"></span>
+                            </div>
+                            <h4 class="text-lg font-semibold text-slate-800" x-text="selectedTask.title"></h4>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Status</span>
+                                <p class="font-medium text-slate-800" x-text="selectedTask.status"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Priority</span>
+                                <p class="font-medium text-slate-800" x-text="selectedTask.priority"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Assignee</span>
+                                <p class="font-medium text-slate-800" x-text="selectedTask.assignee || '-'"></p>
+                            </div>
+                            <div class="bg-slate-50 rounded-lg p-3">
+                                <span class="text-xs text-slate-500">Model</span>
+                                <p class="font-medium text-slate-800" x-text="selectedTask.recommendedModel || '-'"></p>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-sm font-semibold text-slate-700 mb-2">Description</h5>
+                            <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600" x-html="marked.parse(selectedTask.description || 'No description')"></div>
+                        </div>
+
+                        <template x-if="selectedTask.dependsOn && selectedTask.dependsOn.length > 0">
+                            <div class="mb-4">
+                                <h5 class="text-sm font-semibold text-slate-700 mb-2">Dependencies</h5>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="dep in selectedTask.dependsOn" :key="dep">
+                                        <span class="px-2 py-1 bg-slate-100 rounded text-xs font-mono text-slate-600" x-text="dep"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        function portfolioView() {
+            return {
+                loading: true,
+                orders: [],
+                backlogs: [],
+                selectedOrder: null,
+                selectedBacklog: null,
+                selectedTask: null,
+                orderFilter: 'all',
+                backlogStatusFilter: 'todo,in_progress',
+                backlogPriorityFilter: 'all',
+
+                // API base path (relative to this HTML file)
+                apiBase: './',
+
+                async init() {
+                    await this.loadData();
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    try {
+                        // Load orders and backlogs from Supervisor API
+                        await Promise.all([
+                            this.loadOrders(),
+                            this.loadBacklogs()
+                        ]);
+                    } catch (e) {
+                        console.error('Failed to load data:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadOrders() {
+                    try {
+                        const response = await fetch(this.apiBase + 'portfolio/get_all_orders.json');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.orders = data.orders || [];
+                        } else {
+                            // Use mock data for demo
+                            this.orders = this.getMockOrders();
+                        }
+                    } catch (e) {
+                        console.warn('Could not load orders, using mock data:', e);
+                        this.orders = this.getMockOrders();
+                    }
+                },
+
+                async loadBacklogs() {
+                    try {
+                        const response = await fetch(this.apiBase + 'portfolio/get_all_backlog.json');
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.backlogs = data.backlogs || [];
+                        } else {
+                            // Use mock data for demo
+                            this.backlogs = this.getMockBacklogs();
+                        }
+                    } catch (e) {
+                        console.warn('Could not load backlogs, using mock data:', e);
+                        this.backlogs = this.getMockBacklogs();
+                    }
+                },
+
+                async loadOrderTasks(order) {
+                    try {
+                        // Try project-specific task file first
+                        const taskFile = `portfolio/${order.projectId}/${order.id}_tasks.json`;
+                        const response = await fetch(this.apiBase + taskFile);
+                        if (response.ok) {
+                            const data = await response.json();
+                            order.tasks = data.tasks || [];
+                        } else {
+                            // Fallback to mock data
+                            order.tasks = this.getMockTasks(order);
+                        }
+                    } catch (e) {
+                        console.warn('Could not load tasks, using mock data:', e);
+                        order.tasks = this.getMockTasks(order);
+                    }
+                },
+
+                getMockOrders() {
+                    return [
+                        {
+                            portfolioId: 'ai_pm_manager/ORDER_068',
+                            projectId: 'ai_pm_manager',
+                            projectPrefix: 'APM',
+                            id: 'ORDER_068',
+                            title: 'AIPMポートフォリオ統合ビュー',
+                            status: 'IN_PROGRESS',
+                            priority: 'P0',
+                            progress: 25,
+                            totalTasks: 4,
+                            completedTasks: 1,
+                            tasks: []
+                        },
+                        {
+                            portfolioId: 'ai_pm_manager/ORDER_069',
+                            projectId: 'ai_pm_manager',
+                            projectPrefix: 'APM',
+                            id: 'ORDER_069',
+                            title: 'バックログ一覧のデフォルトフィルタ変更',
+                            status: 'IN_PROGRESS',
+                            priority: 'P1',
+                            progress: 0,
+                            totalTasks: 1,
+                            completedTasks: 0,
+                            tasks: []
+                        },
+                        {
+                            portfolioId: 'AI_PM_PJ/ORDER_102',
+                            projectId: 'AI_PM_PJ',
+                            projectPrefix: 'AIPM',
+                            id: 'ORDER_102',
+                            title: 'Framework Core Enhancement',
+                            status: 'PLANNING',
+                            priority: 'P0',
+                            progress: 0,
+                            totalTasks: 0,
+                            completedTasks: 0,
+                            tasks: []
+                        }
+                    ];
+                },
+
+                getMockBacklogs() {
+                    return [
+                        {
+                            portfolioId: 'ai_pm_manager/BACKLOG_116',
+                            projectId: 'ai_pm_manager',
+                            projectPrefix: 'APM',
+                            id: 'BACKLOG_116',
+                            title: 'AIPMポートフォリオ統合ビュー',
+                            description: '複数プロジェクトを統合したポートフォリオビューを実装',
+                            status: 'IN_PROGRESS',
+                            priority: 'High',
+                            relatedOrderId: 'ORDER_068',
+                            createdAt: '2026-02-06T11:46:28',
+                            updatedAt: '2026-02-06T13:07:42'
+                        },
+                        {
+                            portfolioId: 'ai_pm_manager/BACKLOG_117',
+                            projectId: 'ai_pm_manager',
+                            projectPrefix: 'APM',
+                            id: 'BACKLOG_117',
+                            title: 'ダッシュボードUI改善',
+                            description: 'レスポンシブ対応とアクセシビリティ改善',
+                            status: 'TODO',
+                            priority: 'Medium',
+                            relatedOrderId: null,
+                            createdAt: '2026-02-06T14:00:00',
+                            updatedAt: '2026-02-06T14:00:00'
+                        },
+                        {
+                            portfolioId: 'AI_PM_PJ/BACKLOG_050',
+                            projectId: 'AI_PM_PJ',
+                            projectPrefix: 'AIPM',
+                            id: 'BACKLOG_050',
+                            title: 'コマンド自動補完機能',
+                            description: 'スラッシュコマンドの自動補完を実装',
+                            status: 'TODO',
+                            priority: 'High',
+                            relatedOrderId: null,
+                            createdAt: '2026-02-05T10:00:00',
+                            updatedAt: '2026-02-05T10:00:00'
+                        }
+                    ];
+                },
+
+                getMockTasks(order) {
+                    if (order.id === 'ORDER_068') {
+                        return [
+                            { id: 'TASK_699', title: 'ポートフォリオビュー用HTML画面の実装', status: 'IN_PROGRESS', priority: 'P0', assignee: 'Auto', recommendedModel: 'Sonnet', description: 'aipm-portfolio.htmlを新規作成', dependsOn: [] },
+                            { id: 'TASK_700', title: '複数プロジェクト統合データ取得APIの実装', status: 'BLOCKED', priority: 'P0', assignee: null, recommendedModel: 'Sonnet', description: 'supervisor.pyに統合データ取得機能を追加', dependsOn: ['TASK_699'] },
+                            { id: 'TASK_701', title: 'ポートフォリオビューとSupervisor連携の実装', status: 'BLOCKED', priority: 'P0', assignee: null, recommendedModel: 'Sonnet', description: 'HTMLからSupervisor APIを呼び出し', dependsOn: ['TASK_700'] },
+                            { id: 'TASK_702', title: 'ポートフォリオビュー起動バッチとドキュメント整備', status: 'BLOCKED', priority: 'P0', assignee: null, recommendedModel: 'Sonnet', description: '起動用batファイルとREADME更新', dependsOn: ['TASK_701'] }
+                        ];
+                    }
+                    return [];
+                },
+
+                get filteredOrders() {
+                    if (this.orderFilter === 'all') return this.orders;
+                    return this.orders.filter(o => o.status.toLowerCase().replace(' ', '_') === this.orderFilter);
+                },
+
+                get filteredBacklogs() {
+                    let filtered = this.backlogs;
+
+                    // Status filter
+                    if (this.backlogStatusFilter !== 'all') {
+                        const statuses = this.backlogStatusFilter.split(',');
+                        filtered = filtered.filter(b => statuses.includes(b.status.toLowerCase().replace(' ', '_')));
+                    }
+
+                    // Priority filter
+                    if (this.backlogPriorityFilter !== 'all') {
+                        filtered = filtered.filter(b => b.priority.toLowerCase() === this.backlogPriorityFilter);
+                    }
+
+                    return filtered;
+                },
+
+                get detailPanelTitle() {
+                    if (this.selectedTask) return 'Task Detail';
+                    if (this.selectedOrder) return 'ORDER Detail';
+                    if (this.selectedBacklog) return 'Backlog Detail';
+                    return 'Detail';
+                },
+
+                async selectOrder(order) {
+                    this.selectedBacklog = null;
+                    this.selectedTask = null;
+                    this.selectedOrder = order;
+
+                    // Load tasks if not already loaded
+                    if (!order.tasks || order.tasks.length === 0) {
+                        await this.loadOrderTasks(order);
+                    }
+                },
+
+                selectBacklog(backlog) {
+                    this.selectedOrder = null;
+                    this.selectedTask = null;
+                    this.selectedBacklog = backlog;
+                },
+
+                selectTask(task) {
+                    this.selectedTask = task;
+                },
+
+                closeDetailPanel() {
+                    this.selectedOrder = null;
+                    this.selectedBacklog = null;
+                    this.selectedTask = null;
+                },
+
+                navigateToOrder(orderId) {
+                    const order = this.orders.find(o => o.id === orderId);
+                    if (order) {
+                        this.selectOrder(order);
+                    }
+                },
+
+                async refreshData() {
+                    await this.loadData();
+                },
+
+                formatDate(dateStr) {
+                    if (!dateStr) return '-';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('ja-JP', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+            };
+        }
+    </script>
+</body>
+</html>

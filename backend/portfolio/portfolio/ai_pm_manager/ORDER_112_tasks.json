@@ -1,0 +1,97 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_112",
+  "count": 5,
+  "tasks": [
+    {
+      "id": "TASK_1004",
+      "orderId": "ORDER_112",
+      "projectId": "ai_pm_manager",
+      "title": "SESSION.md参照箇所の全件調査",
+      "description": ".claude/commands/とscripts/aipm-db/配下で'SESSION.md'文字列を全検索し、参照・生成・読み書きしている箇所をすべてリストアップ。影響範囲を明確化する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T19:28:40.666768",
+      "completedAt": "2026-02-09 10:32:11",
+      "createdAt": "2026-02-09T19:27:50.522892",
+      "updatedAt": "2026-02-09T19:28:41.149910"
+    },
+    {
+      "id": "TASK_1005",
+      "orderId": "ORDER_112",
+      "projectId": "ai_pm_manager",
+      "title": "スラッシュコマンドからSESSION.md参照を除去",
+      "description": ".claude/commands/aipm-*.mdファイル内でSESSION.mdの読み込み指示・参照記述を削除。コマンド実行時にSESSION.mdを期待しないよう修正。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1004"
+      ],
+      "startedAt": "2026-02-10T10:13:32.588228",
+      "completedAt": "2026-02-10T10:37:56.020668",
+      "createdAt": "2026-02-09T19:27:50.631303",
+      "updatedAt": "2026-02-10T10:37:56.020692"
+    },
+    {
+      "id": "TASK_1006",
+      "orderId": "ORDER_112",
+      "projectId": "ai_pm_manager",
+      "title": "PythonスクリプトからSESSION.md参照を除去",
+      "description": "scripts/aipm-db/配下でSESSION.mdを参照・生成・読み書きするコードをすべて削除。プロジェクト初期化ロジック、PM/Worker/Review処理からSESSION.md関連処理を除去。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1004"
+      ],
+      "startedAt": "2026-02-10T10:38:16.476211",
+      "completedAt": "2026-02-10T10:41:54.202044",
+      "createdAt": "2026-02-09T19:27:50.708279",
+      "updatedAt": "2026-02-10T10:41:54.202070"
+    },
+    {
+      "id": "TASK_1007",
+      "orderId": "ORDER_112",
+      "projectId": "ai_pm_manager",
+      "title": "SESSION.mdファイルをすべて削除",
+      "description": "TEMPLATE/SESSION.md、TEMPLATE/.framework/TEMPLATES/SESSION.md、各プロジェクトのSESSION.mdをすべて削除。参照除去完了後に実施し、FileNotFoundエラーが発生しないことを確認。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1005",
+        "TASK_1006"
+      ],
+      "startedAt": "2026-02-10T10:42:10.215035",
+      "completedAt": "2026-02-10T10:45:26.549112",
+      "createdAt": "2026-02-09T19:27:50.932011",
+      "updatedAt": "2026-02-10T10:45:26.549136"
+    },
+    {
+      "id": "TASK_1008",
+      "orderId": "ORDER_112",
+      "projectId": "ai_pm_manager",
+      "title": "動作確認と回帰テスト",
+      "description": "新規プロジェクト作成、PM/Worker/Review実行、各スラッシュコマンド実行を行い、SESSION.md削除後もエラーなく動作することを確認。MEMORY.mdとDB状態管理が正常に機能していることを検証。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1007"
+      ],
+      "startedAt": "2026-02-10T10:45:41.331495",
+      "completedAt": "2026-02-10T10:49:42.829969",
+      "createdAt": "2026-02-09T19:27:51.182638",
+      "updatedAt": "2026-02-10T10:49:42.829993"
+    }
+  ]
+}

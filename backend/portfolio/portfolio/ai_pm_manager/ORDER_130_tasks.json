@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_130",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1133",
+      "orderId": "ORDER_130",
+      "projectId": "ai_pm_manager",
+      "title": "REWORK→IN_PROGRESS遷移時のreviewed_atリセット実装",
+      "description": "execute_task.pyまたは状態遷移処理（transition_task_status等）で、タスクがREWORKからIN_PROGRESSに遷移する際にreviewed_atカラムをNULLにリセットする処理を追加する。UPDATE文でreviewed_at = NULLを設定する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:59:00.295791",
+      "completedAt": "2026-02-10T17:03:33.179959",
+      "createdAt": "2026-02-10T16:58:51.007628",
+      "updatedAt": "2026-02-10T17:03:33.179966"
+    },
+    {
+      "id": "TASK_1134",
+      "orderId": "ORDER_130",
+      "projectId": "ai_pm_manager",
+      "title": "reviewed_atリセット後の自動レビュー動作確認",
+      "description": "REWORK→IN_PROGRESS→DONEの遷移をシミュレートし、reviewed_atがNULLにリセットされ、2回目のDONEで自動レビューが実行されることを確認する。テストケースまたは手動検証手順を作成する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T17:03:39.826992",
+      "completedAt": "2026-02-10T17:21:28.506508",
+      "createdAt": "2026-02-10T16:58:51.136662",
+      "updatedAt": "2026-02-10T17:21:28.506537"
+    },
+    {
+      "id": "TASK_1135",
+      "orderId": "ORDER_130",
+      "projectId": "ai_pm_manager",
+      "title": "既存レビューロジックとの統合確認",
+      "description": "review_queue/update.pyやprocess_review.pyなど既存のレビュー関連処理がreviewed_atリセット後も正常に動作することを確認する。特にDONE→REWORK→DONE→COMPLETEDの完全フローでレビューキューが正しく更新されることを検証する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:59:01.151233",
+      "completedAt": "2026-02-10T17:03:59.301343",
+      "createdAt": "2026-02-10T16:58:51.255416",
+      "updatedAt": "2026-02-10T17:03:59.301352"
+    },
+    {
+      "id": "TASK_TEST_REVIEWED_AT",
+      "orderId": "ORDER_130",
+      "projectId": "ai_pm_manager",
+      "title": "Test reviewed_at reset",
+      "description": "Test task for reviewed_at reset functionality",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": null,
+      "completedAt": "2026-02-10T17:22:01.084880",
+      "createdAt": "2026-02-10T17:00:38.897648",
+      "updatedAt": "2026-02-10T17:22:01.084880"
+    }
+  ]
+}

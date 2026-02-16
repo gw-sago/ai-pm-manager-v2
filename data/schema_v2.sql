@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS projects (
     path TEXT NOT NULL,                           -- Project directory path
     status TEXT NOT NULL DEFAULT 'INITIAL',       -- Project status
     current_order_id TEXT,                        -- Currently active ORDER
+    is_active INTEGER NOT NULL DEFAULT 1,         -- Active flag (1=active, 0=inactive)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     estimated_tokens INTEGER DEFAULT NULL,        -- Estimated token count
     actual_tokens INTEGER DEFAULT NULL,           -- Actual token usage
     cost_usd REAL DEFAULT NULL,                   -- Task cost in USD
+    target_files TEXT DEFAULT NULL,              -- Target file list (JSON array)
     is_destructive_db_change INTEGER NOT NULL DEFAULT 0, -- Flag for destructive DB operations (DROP TABLE, etc.)
     started_at DATETIME,                          -- Start timestamp
     completed_at DATETIME,                        -- Completion timestamp

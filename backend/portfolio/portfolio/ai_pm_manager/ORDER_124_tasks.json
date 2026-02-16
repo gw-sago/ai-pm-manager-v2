@@ -1,0 +1,98 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_124",
+  "count": 5,
+  "tasks": [
+    {
+      "id": "TASK_1109",
+      "orderId": "ORDER_124",
+      "projectId": "ai_pm_manager",
+      "title": "tasksテーブルにreviewed_atカラム追加（存在確認含む）",
+      "description": "tasks.reviewed_atカラムが存在するか確認し、存在しない場合はマイグレーションスクリプトで追加する。このカラムはレビュー完了時にタイムスタンプを記録し、review_queueなしでレビュー済み判定を可能にする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T15:38:02.671028",
+      "completedAt": "2026-02-10 06:41:18",
+      "createdAt": "2026-02-10T15:37:52.589611",
+      "updatedAt": "2026-02-10T15:38:03.104097"
+    },
+    {
+      "id": "TASK_1110",
+      "orderId": "ORDER_124",
+      "projectId": "ai_pm_manager",
+      "title": "parallel_launcher.py孤立検出ロジックの変更",
+      "description": "parallel_launcher.py L939-953の孤立DONEタスク検出を「LEFT JOIN review_queue WHERE review_queue.id IS NULL」から「status='DONE' AND reviewed_at IS NULL」に変更。review_queueへのINSERT処理を削除。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1109"
+      ],
+      "startedAt": "2026-02-10T15:41:41.360312",
+      "completedAt": "2026-02-10T15:44:37.293296",
+      "createdAt": "2026-02-10T15:37:52.773902",
+      "updatedAt": "2026-02-10T15:44:37.293311"
+    },
+    {
+      "id": "TASK_1111",
+      "orderId": "ORDER_124",
+      "projectId": "ai_pm_manager",
+      "title": "execute_task.py Step5のreview_queue登録スキップ",
+      "description": "execute_task.py Step5でreview_queueへのINSERT処理をスキップ可能にする（完全削除または条件分岐）。タスク完了時にreviewed_atをNULLのままにしてDONE状態にする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker E",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1109"
+      ],
+      "startedAt": "2026-02-10T15:41:42.223759",
+      "completedAt": "2026-02-10T15:44:21.450485",
+      "createdAt": "2026-02-10T15:37:53.034110",
+      "updatedAt": "2026-02-10T15:44:21.450492"
+    },
+    {
+      "id": "TASK_1112",
+      "orderId": "ORDER_124",
+      "projectId": "ai_pm_manager",
+      "title": "process_review.pyのレビュー取得元変更",
+      "description": "process_review.pyのレビュー対象取得をreview_queueテーブルからtasks(status='DONE' AND reviewed_at IS NULL)に変更。レビュー完了後にreviewed_atに現在時刻を設定。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker F",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1109"
+      ],
+      "startedAt": "2026-02-10T15:41:43.410589",
+      "completedAt": "2026-02-10T15:45:52.935125",
+      "createdAt": "2026-02-10T15:37:53.133333",
+      "updatedAt": "2026-02-10T15:45:52.935132"
+    },
+    {
+      "id": "TASK_1113",
+      "orderId": "ORDER_124",
+      "projectId": "ai_pm_manager",
+      "title": "統合テストとdaemonループ動作確認",
+      "description": "変更後のparallel_launcher.py daemonループを実行し、DONEタスクが正しく検出されprocess_review.pyで処理されることを確認。review_queueを経由せずレビューが完了し、reviewed_atが設定されることを検証。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1110",
+        "TASK_1111",
+        "TASK_1112"
+      ],
+      "startedAt": "2026-02-10T15:45:59.466872",
+      "completedAt": "2026-02-10T15:52:32.042690",
+      "createdAt": "2026-02-10T15:37:53.239475",
+      "updatedAt": "2026-02-10T15:52:32.042700"
+    }
+  ]
+}

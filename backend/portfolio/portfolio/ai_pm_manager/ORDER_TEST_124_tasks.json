@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_TEST_124",
+  "count": 1,
+  "tasks": [
+    {
+      "id": "TASK_TEST_1770706143",
+      "orderId": "ORDER_TEST_124",
+      "projectId": "ai_pm_manager",
+      "title": "daemon動作確認テスト",
+      "description": "reviewed_at検証用タスク",
+      "status": "DONE",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Opus",
+      "dependsOn": [],
+      "startedAt": null,
+      "completedAt": null,
+      "createdAt": "2026-02-10 06:49:03",
+      "updatedAt": "2026-02-10 06:49:03"
+    }
+  ]
+}

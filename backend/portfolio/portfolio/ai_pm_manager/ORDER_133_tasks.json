@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_133",
+  "count": 2,
+  "tasks": [
+    {
+      "id": "TASK_1146",
+      "orderId": "ORDER_133",
+      "projectId": "ai_pm_manager",
+      "title": "process_review.pyの_handle_escalation()にPM自動判断を追加",
+      "description": "process_review.pyの_handle_escalation()メソッドを改善する。現在はESCALATEDステータスに更新するだけで終了しているが、以下の処理を追加する:\n\n1. ESCALATED後にPMEscalationHandler（pm_escalation.py）を呼び出してAI再設計を実行\n2. レビュー結果（issues/recommendations）をコンテキストとしてAIに渡す\n3. 再設計成功時: ESCALATED → QUEUED（reject_countリセット、再実行へ）\n4. 再設計不可（AI判断困難/エスカレーション回数超過）: ESCALATED → REJECTED（終端化）\n5. エスカレーション回数の上限管理（デフォルト2回、超過でREJECTED）\n6. escalationsテーブルにreview_escalation種別でエスカレーション履歴を記録\n\n対象ファイル: scripts/aipm-db/review/process_review.py\n\n注意点:\n- pm_escalation.pyのPMEscalationHandlerを再利用する\n- claude_runner利用不可時はフォールバックでREJECTED遷移\n- 既存のAPPROVED/REJECTEDパスに影響を与えないこと\n- ESCALATED→QUEUED遷移にはstatus_transitionsテーブルで許可が必要（なければ直接UPDATE）\n- _handle_escalation()がエラーで失敗した場合でもESCALATEDステータスは保持（安全弁でカバー）",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T17:51:11.840177",
+      "completedAt": null,
+      "createdAt": "2026-02-10T17:50:19.450351",
+      "updatedAt": "2026-02-10T17:53:18.622138"
+    },
+    {
+      "id": "TASK_1147",
+      "orderId": "ORDER_133",
+      "projectId": "ai_pm_manager",
+      "title": "parallel_launcher.pyにESCALATEDタイムアウト安全弁を追加",
+      "description": "parallel_launcher.pyのdaemon_loopにESCALATEDタスクのタイムアウト安全弁を追加する。\n\nTASK_1146の変更によりESCALATED→QUEUED/REJECTED遷移が自動で行われるようになるが、万が一PM自動判断が失敗した場合やprocess_review.py側の処理がエラーで中断した場合に備えて安全弁を設置する。\n\n実装内容:\n1. ESCALATEDタスクの最終更新時刻を監視\n2. 一定時間（5分）遷移しない場合にREJECTEDに自動遷移\n3. タイムアウト遷移をchange_historyとescalationsテーブルに記録\n4. デーモンループの既存の_check_worker_health()パターンを参考にタイムアウトチェックを実装\n\n対象ファイル: scripts/aipm-db/worker/parallel_launcher.py\n\n注意点:\n- daemon_loop内の適切なタイミングでチェックを実行（ポーリングごと）\n- ESCALATEDタスクのupdated_atを基準にタイムアウト判定\n- タイムアウト値は設定可能にする（デフォルト300秒）\n- 既存のdaemon_loopの処理フローに影響を与えないこと",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1146"
+      ],
+      "startedAt": "2026-02-10T17:54:33.931854",
+      "completedAt": null,
+      "createdAt": "2026-02-10T17:50:26.073474",
+      "updatedAt": "2026-02-10T17:56:02.684211"
+    }
+  ]
+}

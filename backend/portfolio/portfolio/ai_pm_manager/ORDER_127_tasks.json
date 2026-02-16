@@ -1,0 +1,77 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_127",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1122",
+      "orderId": "ORDER_127",
+      "projectId": "ai_pm_manager",
+      "title": "RESULTディレクトリMarkdownファイル読み込みAPI実装",
+      "description": "AipmDbService.tsにPROJECTS/{project}/RESULT/{order}/配下のMarkdownファイル（01_GOAL.md、02_REQUIREMENTS.md、03_STAFFING.md）および05_REPORT/配下のレポートファイル一覧・内容を読み込むAPIメソッドを追加する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker D",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:02:43.604781",
+      "completedAt": "2026-02-10T16:08:14.789840",
+      "createdAt": "2026-02-10T15:58:44.212972",
+      "updatedAt": "2026-02-10T16:08:14.789847"
+    },
+    {
+      "id": "TASK_1123",
+      "orderId": "ORDER_127",
+      "projectId": "ai_pm_manager",
+      "title": "Markdownレンダリングコンポーネント準備",
+      "description": "Markdownをリッチテキストとして表示するコンポーネント（MarkdownViewer.tsx）を作成または既存コンポーネントを特定・流用する。見出し・リスト・コードブロックに対応したレンダリングを実装する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T16:00:05.189956",
+      "completedAt": "2026-02-10T16:37:38.567372",
+      "createdAt": "2026-02-10T15:58:44.560495",
+      "updatedAt": "2026-02-10T16:37:38.567395"
+    },
+    {
+      "id": "TASK_1124",
+      "orderId": "ORDER_127",
+      "projectId": "ai_pm_manager",
+      "title": "ORDER詳細画面にPM成果物表示タブ/セクション追加",
+      "description": "OrderDetail.tsxにGOAL・要件定義・STAFFING・REPORTを表示するタブまたはセクションを追加し、AipmDbServiceのAPIを呼び出してMarkdownコンテンツを取得・表示する。MarkdownViewerコンポーネントを使用してレンダリングする。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1122",
+        "TASK_1123"
+      ],
+      "startedAt": "2026-02-10T16:38:24.413135",
+      "completedAt": "2026-02-10T16:42:42.979836",
+      "createdAt": "2026-02-10T15:58:44.788566",
+      "updatedAt": "2026-02-10T16:42:42.979864"
+    },
+    {
+      "id": "TASK_1125",
+      "orderId": "ORDER_127",
+      "projectId": "ai_pm_manager",
+      "title": "統合テスト・エラーハンドリング実装",
+      "description": "ファイルが存在しない場合のエラーメッセージ表示、大きなMarkdownファイルの表示パフォーマンス確認、タブ/セクション切り替えの動作確認を行い、不具合があれば修正する。",
+      "status": "COMPLETED",
+      "priority": "P2",
+      "assignee": "Worker Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1124"
+      ],
+      "startedAt": "2026-02-10T16:43:11.758269",
+      "completedAt": "2026-02-10T16:47:13.827912",
+      "createdAt": "2026-02-10T15:58:44.894864",
+      "updatedAt": "2026-02-10T16:47:13.827936"
+    }
+  ]
+}

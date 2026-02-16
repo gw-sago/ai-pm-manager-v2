@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_120",
+  "count": 2,
+  "tasks": [
+    {
+      "id": "TASK_1095",
+      "orderId": "ORDER_120",
+      "projectId": "ai_pm_manager",
+      "title": "execute_task.pyにデフォルトallowed_tools設定を追加",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T14:41:17.296811",
+      "completedAt": "2026-02-10T14:44:06.584942",
+      "createdAt": "2026-02-10T14:40:19.541175",
+      "updatedAt": "2026-02-10T14:44:06.584965"
+    },
+    {
+      "id": "TASK_1096",
+      "orderId": "ORDER_120",
+      "projectId": "ai_pm_manager",
+      "title": "parallel_launcherでの権限設定伝搬",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": null,
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1095"
+      ],
+      "startedAt": "2026-02-10T14:44:34.082605",
+      "completedAt": "2026-02-10T14:47:08.041180",
+      "createdAt": "2026-02-10T14:40:24.493809",
+      "updatedAt": "2026-02-10T14:47:08.041218"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_109",
+  "count": 3,
+  "tasks": [
+    {
+      "id": "TASK_997",
+      "orderId": "ORDER_109",
+      "projectId": "ai_pm_manager",
+      "title": "Python側ログファイル書き出し実装（parallel_launcher.py修正）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker-1",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T18:51:50.303947",
+      "completedAt": "2026-02-09T19:05:08.589205",
+      "createdAt": "2026-02-09T18:50:08.214736",
+      "updatedAt": "2026-02-09T19:05:08.589228"
+    },
+    {
+      "id": "TASK_998",
+      "orderId": "ORDER_109",
+      "projectId": "ai_pm_manager",
+      "title": "クラッシュ検知・DB修復スクリプト作成（recover_crashed.py新規）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker-2",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T18:51:51.755695",
+      "completedAt": "2026-02-09T19:05:08.825873",
+      "createdAt": "2026-02-09T18:50:09.678940",
+      "updatedAt": "2026-02-09T19:05:08.825897"
+    },
+    {
+      "id": "TASK_999",
+      "orderId": "ORDER_109",
+      "projectId": "ai_pm_manager",
+      "title": "Electron側PID監視・エラー検知・通知実装",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker-3",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_997",
+        "TASK_998"
+      ],
+      "startedAt": "2026-02-09T19:05:26.916542",
+      "completedAt": "2026-02-09T19:12:35.999771",
+      "createdAt": "2026-02-09T18:50:16.519144",
+      "updatedAt": "2026-02-09T19:12:35.999793"
+    }
+  ]
+}

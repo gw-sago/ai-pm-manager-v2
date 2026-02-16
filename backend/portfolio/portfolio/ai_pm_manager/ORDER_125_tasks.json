@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_125",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1114",
+      "orderId": "ORDER_125",
+      "projectId": "ai_pm_manager",
+      "title": "バックログ再整理ロジックの実装",
+      "description": "scripts/aipm-db/backlog/reorder.pyを新規作成し、バックログのsort_orderを優先度・依存関係・ステータスに基づいて再計算するロジックを実装する。priority順（High→Medium→Low）、同一priority内は依存関係順（前提未達は後ろ）、IN_PROGRESSは最上位固定とする。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T15:40:51.867115",
+      "completedAt": "2026-02-10T15:43:42.731595",
+      "createdAt": "2026-02-10T15:40:28.557370",
+      "updatedAt": "2026-02-10T15:43:42.731603"
+    },
+    {
+      "id": "TASK_1115",
+      "orderId": "ORDER_125",
+      "projectId": "ai_pm_manager",
+      "title": "バックログ追加時の自動sort_order設定",
+      "description": "scripts/aipm-db/backlog/add.pyを修正し、バックログ追加時にpriorityに応じた仮sort_orderを自動設定する。High/Medium/Lowごとに現在の最大sort_order+1を設定し、デフォルト値999を廃止する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T15:40:52.588251",
+      "completedAt": "2026-02-10T15:44:24.390004",
+      "createdAt": "2026-02-10T15:40:28.671786",
+      "updatedAt": "2026-02-10T15:44:24.390013"
+    },
+    {
+      "id": "TASK_1116",
+      "orderId": "ORDER_125",
+      "projectId": "ai_pm_manager",
+      "title": "aipm-releaseスキルへの再整理ステップ統合",
+      "description": ".claude/commands/aipm-release.mdを修正し、BACKLOG完了処理後にバックログ再整理（reorder.py）を実行するステップを追加する。リリースフロー内で自動的にsort_orderが再計算されるようにする。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T15:40:53.395669",
+      "completedAt": "2026-02-10 06:42:35",
+      "createdAt": "2026-02-10T15:40:28.775005",
+      "updatedAt": "2026-02-10T15:40:54.273613"
+    },
+    {
+      "id": "TASK_1117",
+      "orderId": "ORDER_125",
+      "projectId": "ai_pm_manager",
+      "title": "統合テストおよび動作確認",
+      "description": "バックログ追加→リリース実行の一連のフローをテストし、sort_orderが正しく設定・再整理されることを確認する。既存データへの影響がないことを検証する。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker D",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T15:40:54.075152",
+      "completedAt": "2026-02-10T15:46:51.107409",
+      "createdAt": "2026-02-10T15:40:28.885615",
+      "updatedAt": "2026-02-10T15:46:51.107416"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_147",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1197",
+      "orderId": "ORDER_147",
+      "projectId": "ai_pm_manager",
+      "title": "Workerの出力先パス生成バリデーション追加",
+      "description": "Workerの出力先パス生成ロジック（os.path.join()呼び出し箇所）に、引数に絶対パスが混入していないかチェックするバリデーションを追加。os.path.isabs()で検出し、絶対パスが含まれる場合はValueErrorを発生させる。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T13:02:14.942887",
+      "completedAt": "2026-02-16T13:08:04.556341",
+      "createdAt": "2026-02-16T12:57:54.508630",
+      "updatedAt": "2026-02-16T13:08:04.556348"
+    },
+    {
+      "id": "TASK_1198",
+      "orderId": "ORDER_147",
+      "projectId": "ai_pm_manager",
+      "title": "git_release.pyのオクタルエスケープデコードテスト追加",
+      "description": "git_release.pyの_decode_git_quoted_path()関数に対するユニットテストを作成。オクタルエスケープ付きパス（\\357\\200\\272形式）、日本語パス、通常パスの3ケースをカバーし、期待通りデコードされることを検証する。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker D",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T13:02:16.438812",
+      "completedAt": "2026-02-16T13:05:10.572084",
+      "createdAt": "2026-02-16T12:57:54.893796",
+      "updatedAt": "2026-02-16T13:05:10.572091"
+    },
+    {
+      "id": "TASK_1199",
+      "orderId": "ORDER_147",
+      "projectId": "ai_pm_manager",
+      "title": "git_release.pyのEXCLUDE_PATTERNS強化",
+      "description": "git_release.pyのEXCLUDE_PATTERNSリストに、明らかに不正なパス（ドライブレター「D:」を含む、オクタルエスケープシーケンス「\\357\\」を含む等）を除外する正規表現パターンを追加する。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T13:05:04.983217",
+      "completedAt": "2026-02-16T13:10:02.622754",
+      "createdAt": "2026-02-16T12:57:55.448704",
+      "updatedAt": "2026-02-16T13:10:02.622760"
+    },
+    {
+      "id": "TASK_1200",
+      "orderId": "ORDER_147",
+      "projectId": "ai_pm_manager",
+      "title": "BUG_011（git_quoted_path_escape）をbugs tableに登録",
+      "description": "bugs tableにBUG_011を登録する。bug_id='BUG_011', name='git_quoted_path_escape', severity='Medium', status='ACTIVE', pattern='gitのquotedパス出力（git status --porcelain等）がオクタルエスケープシーケンス（\\NNN）を含む場合、そのままパスとして使用すると\"pathspec not found\"エラーになる', prevention='_decode_git_quoted_path()関数等でデコードしてから使用する。git status --porcelain -z（NUL区切り）を使用すればquotingされない。'を設定。",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker E",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-16T13:02:17.331424",
+      "completedAt": "2026-02-16T13:02:49.574377",
+      "createdAt": "2026-02-16T12:57:55.960394",
+      "updatedAt": "2026-02-16T13:02:49.574385"
+    }
+  ]
+}

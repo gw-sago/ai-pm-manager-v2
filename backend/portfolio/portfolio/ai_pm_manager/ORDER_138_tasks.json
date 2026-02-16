@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_138",
+  "count": 2,
+  "tasks": [
+    {
+      "id": "TASK_1158",
+      "orderId": "ORDER_138",
+      "projectId": "ai_pm_manager",
+      "title": "バックエンドAPI追加（レビュー履歴取得メソッド + IPC定義）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Opus",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T19:20:42.426614",
+      "completedAt": "2026-02-10 10:38:29",
+      "createdAt": "2026-02-10T19:19:30.009919",
+      "updatedAt": "2026-02-10 10:38:29"
+    },
+    {
+      "id": "TASK_1159",
+      "orderId": "ORDER_138",
+      "projectId": "ai_pm_manager",
+      "title": "TaskDetailPanelにレビュー履歴・差し戻し情報を表示（UI実装）",
+      "description": null,
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Auto",
+      "recommendedModel": "Opus",
+      "dependsOn": [
+        "TASK_1158"
+      ],
+      "startedAt": "2026-02-10 10:38:56",
+      "completedAt": "2026-02-10 10:45:39",
+      "createdAt": "2026-02-10T19:19:35.209996",
+      "updatedAt": "2026-02-10 10:45:39"
+    }
+  ]
+}

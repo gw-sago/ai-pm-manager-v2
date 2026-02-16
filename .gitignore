@@ -63,6 +63,8 @@ temp/
 data/*.db
 data/*.sqlite
 data/*.db-journal
+backend/aipm.db
+backend/nul
 
 # Environment
 .env

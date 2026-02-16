@@ -1,0 +1,78 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_114",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_1012",
+      "orderId": "ORDER_114",
+      "projectId": "ai_pm_manager",
+      "title": "parallel_launcherに常駐モード（--daemon）とポーリングループを実装",
+      "description": "parallel_launcher.pyに--daemonオプションを追加し、N秒間隔でDBをポーリングしてQUEUEDタスクを検知・Worker起動する常駐ループを実装。全タスクがCOMPLETED/DONEになったらループ終了。ORDER単位でライフサイクル管理。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-10T11:24:03.560294",
+      "completedAt": "2026-02-10T11:41:12.509738",
+      "createdAt": "2026-02-10T11:22:33.657435",
+      "updatedAt": "2026-02-10T11:41:12.509760"
+    },
+    {
+      "id": "TASK_1013",
+      "orderId": "ORDER_114",
+      "projectId": "ai_pm_manager",
+      "title": "Worker死活監視とスタック時リカバリ処理を実装",
+      "description": "parallel_launcher.pyに定期チェック機能を追加: (1) 実行中WorkerのPID生存確認、(2) ログファイル更新時刻チェック（N分以上更新なし→スタック判定）。スタック検知時にプロセスkill、file_lock解放、ステータスQUEUED復旧、change_historyエラー記録を実行。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1012"
+      ],
+      "startedAt": "2026-02-10T11:41:29.408675",
+      "completedAt": "2026-02-10T11:44:01.597738",
+      "createdAt": "2026-02-10T11:22:34.049784",
+      "updatedAt": "2026-02-10T11:44:01.597760"
+    },
+    {
+      "id": "TASK_1014",
+      "orderId": "ORDER_114",
+      "projectId": "ai_pm_manager",
+      "title": "親プロセス自身のヘルスチェック（ハートビート）機構を実装",
+      "description": "parallel_launcher.pyの常駐ループ内で、DBまたはファイルにハートビート（タイムスタンプ）を定期更新。外部から親プロセスの生死を検知可能にする。execute_task.py側にも必要に応じてハートビート書き込みロジックを連携。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1012"
+      ],
+      "startedAt": "2026-02-10T11:44:20.381182",
+      "completedAt": "2026-02-10T11:46:01.360316",
+      "createdAt": "2026-02-10T11:22:34.168861",
+      "updatedAt": "2026-02-10T11:46:01.360340"
+    },
+    {
+      "id": "TASK_1015",
+      "orderId": "ORDER_114",
+      "projectId": "ai_pm_manager",
+      "title": "Electron連携: 常駐モード起動とポーリング特化",
+      "description": "ScriptExecutionService.tsを改修し、Electronアプリからparallel_launcherを常駐モード（--daemon）で起動するように変更。既存のポーリング処理をUI更新専用に特化（タスクステータス取得のみ）。CLIからの実行時も同じ常駐モードを使用して一貫性を確保。",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Auto",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_1012"
+      ],
+      "startedAt": "2026-02-10T11:46:18.791334",
+      "completedAt": "2026-02-10T11:48:52.525657",
+      "createdAt": "2026-02-10T11:22:34.289517",
+      "updatedAt": "2026-02-10T11:48:52.525682"
+    }
+  ]
+}

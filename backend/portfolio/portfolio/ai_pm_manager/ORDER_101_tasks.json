@@ -1,0 +1,78 @@
+{
+  "success": true,
+  "projectId": "ai_pm_manager",
+  "orderId": "ORDER_101",
+  "count": 4,
+  "tasks": [
+    {
+      "id": "TASK_968",
+      "orderId": "ORDER_101",
+      "projectId": "ai_pm_manager",
+      "title": "ScriptExecutionServiceの非同期起動実装",
+      "description": "tryExecuteWorkerViaParallelLauncherを非同期起動に変更。parallel_launcher.py呼び出し後、awaitせずに起動タスク数・IDリストを即座に返す。レスポンス形式を{ taskIds: string[], count: number, message: string }に変更",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker A",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [],
+      "startedAt": "2026-02-09T15:50:05.445578",
+      "completedAt": "2026-02-09T16:06:57.731660",
+      "createdAt": "2026-02-09T15:49:53.083372",
+      "updatedAt": "2026-02-09T16:06:57.731690"
+    },
+    {
+      "id": "TASK_969",
+      "orderId": "ORDER_101",
+      "projectId": "ai_pm_manager",
+      "title": "DBステータスポーリング機構の実装",
+      "description": "ScriptExecutionServiceにポーリング用メソッド追加（getTaskStatuses）。IPCハンドラー経由でフロントエンドから呼び出し可能にする。setIntervalで5-10秒間隔のポーリングを実装し、タスクステータス変化を検知してUI更新",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker B",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_968"
+      ],
+      "startedAt": "2026-02-09T16:07:26.379040",
+      "completedAt": "2026-02-09T16:13:06.602843",
+      "createdAt": "2026-02-09T15:49:53.357046",
+      "updatedAt": "2026-02-09T16:13:06.602873"
+    },
+    {
+      "id": "TASK_970",
+      "orderId": "ORDER_101",
+      "projectId": "ai_pm_manager",
+      "title": "進捗表示UIとポーリング制御の実装",
+      "description": "並列実行中タスク一覧の表示コンポーネント実装。ポーリング開始/停止ロジック追加。個別タスクの完了/失敗をトースト通知。全タスク完了時にポーリング停止と完了通知を表示。長時間IN_PROGRESSタスクの警告表示",
+      "status": "COMPLETED",
+      "priority": "P0",
+      "assignee": "Worker C",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_969"
+      ],
+      "startedAt": "2026-02-09T16:13:31.376267",
+      "completedAt": "2026-02-09T16:38:09.631932",
+      "createdAt": "2026-02-09T15:49:53.476228",
+      "updatedAt": "2026-02-09T16:38:09.631959"
+    },
+    {
+      "id": "TASK_971",
+      "orderId": "ORDER_101",
+      "projectId": "ai_pm_manager",
+      "title": "エラーハンドリングとリカバリ連携",
+      "description": "ポーリングでタスク異常状態を検出（タイムアウト、FAILED状態）。Phase 1リカバリ機構との連携確認。プロセス異常終了時のQUEUED復帰動作をテスト。エラー時のUI表示と通知を実装",
+      "status": "COMPLETED",
+      "priority": "P1",
+      "assignee": "Worker D",
+      "recommendedModel": "Sonnet",
+      "dependsOn": [
+        "TASK_970"
+      ],
+      "startedAt": "2026-02-09T16:38:36.264050",
+      "completedAt": "2026-02-09T16:46:55.389092",
+      "createdAt": "2026-02-09T15:49:53.673335",
+      "updatedAt": "2026-02-09T16:46:55.389117"
+    }
+  ]
+}
