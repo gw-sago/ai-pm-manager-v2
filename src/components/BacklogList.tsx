@@ -20,6 +20,7 @@ import { BacklogFilterBar, type ProjectOption } from './BacklogFilterBar';
 import type { BacklogFilters } from '../main/services/DashboardService';
 import type { BacklogItem } from '../preload';
 import { useBacklogActions } from '../hooks/useOrderActions';
+import { BacklogAddForm } from './BacklogAddForm';
 
 // =============================================================================
 // 型定義
@@ -1301,55 +1302,74 @@ interface BacklogAddModalProps {
 }
 
 const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, projectId }) => {
-  // BacklogAddFormコンポーネントが存在するかチェック
-  const BacklogAddFormModule = React.useMemo(() => {
-    try {
-      // 動的インポートは非同期なので、ここでは存在チェックのみ
-      // 実際のコンポーネントはTASK_1160で実装される想定
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
+  // クロスプロジェクト時のプロジェクト選択状態
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
+  const [projects, setProjects] = useState<{ name: string }[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(!projectId);
 
+  // projectId未指定時はプロジェクト一覧を取得
+  useEffect(() => {
+    if (projectId) return;
+    let cancelled = false;
+    setLoadingProjects(true);
+    window.electronAPI.getProjects().then((result) => {
+      if (cancelled) return;
+      if (result.projects) {
+        setProjects(result.projects.map((p) => ({ name: p.name })));
+      }
+      setLoadingProjects(false);
+    }).catch(() => {
+      if (!cancelled) setLoadingProjects(false);
+    });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  // projectIdが指定されている、またはプロジェクトが選択済みの場合 → BacklogAddFormを表示
+  if (selectedProjectId) {
+    return (
+      <BacklogAddForm
+        projectId={selectedProjectId}
+        onClose={onClose}
+        onSuccess={onComplete}
+      />
+    );
+  }
+
+  // プロジェクト未選択時 → プロジェクト選択UI
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
-        {/* ヘッダー */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">新規バックログ追加</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full m-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">プロジェクトを選択</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        {/* コンテンツ */}
-        <div className="p-4">
-          {BacklogAddFormModule ? (
-            // TASK_1160で実装されるBacklogAddFormを表示
-            <div>BacklogAddForm placeholder</div>
+        <div className="p-6">
+          {loadingProjects ? (
+            <p className="text-sm text-gray-500 text-center py-4">読み込み中...</p>
+          ) : projects.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">プロジェクトが見つかりません</p>
           ) : (
-            // BacklogAddFormが未実装の場合のプレースホルダー
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">BacklogAddFormコンポーネントは準備中です</p>
-              <p className="text-xs text-gray-500">TASK_1160で実装予定</p>
-              <div className="mt-4">
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600 mb-3">バックログを追加するプロジェクトを選択してください</p>
+              {projects.map((p) => (
                 <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  key={p.name}
+                  onClick={() => setSelectedProjectId(p.name)}
+                  className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
                 >
-                  閉じる
+                  <span className="font-medium text-gray-800">{p.name}</span>
                 </button>
-              </div>
+              ))}
             </div>
           )}
         </div>
