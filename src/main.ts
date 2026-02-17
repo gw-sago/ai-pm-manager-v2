@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import {
   initDatabase,
@@ -45,6 +46,67 @@ if (started) {
   app.quit();
 }
 
+/**
+ * ORDER_164: パッケージ版起動時にresources/内リソースをSquirrelルートに展開
+ * 展開対象: backend/, python-embed/, .claude/, CLAUDE.md, data/schema_v2.sql
+ * 保護対象: data/aipm.db, PROJECTS/（永続データは上書きしない）
+ */
+function deployResources(): void {
+  if (!app.isPackaged) return;
+
+  const squirrelRoot = path.resolve(path.dirname(process.execPath), '..');
+  const resourcesDir = process.resourcesPath;
+  console.log('[Main] Deploying resources to Squirrel root:', squirrelRoot);
+
+  // ディレクトリごと削除→コピーする対象
+  const dirTargets = ['backend', 'python-embed', '.claude'];
+  for (const dir of dirTargets) {
+    const src = path.join(resourcesDir, dir);
+    const dest = path.join(squirrelRoot, dir);
+    if (!fs.existsSync(src)) {
+      console.log(`[Main] Deploy skip (not found): ${src}`);
+      continue;
+    }
+    try {
+      if (fs.existsSync(dest)) {
+        fs.rmSync(dest, { recursive: true, force: true });
+      }
+      fs.cpSync(src, dest, { recursive: true });
+      console.log(`[Main] Deployed: ${src} -> ${dest}`);
+    } catch (err) {
+      console.error(`[Main] Deploy error for ${dir}:`, err);
+    }
+  }
+
+  // 単体ファイルコピー: CLAUDE.md
+  const claudeMdSrc = path.join(resourcesDir, 'CLAUDE.md');
+  if (fs.existsSync(claudeMdSrc)) {
+    try {
+      fs.copyFileSync(claudeMdSrc, path.join(squirrelRoot, 'CLAUDE.md'));
+      console.log('[Main] Deployed: CLAUDE.md');
+    } catch (err) {
+      console.error('[Main] Deploy error for CLAUDE.md:', err);
+    }
+  }
+
+  // data/schema_v2.sql のみコピー（data/aipm.db は保護）
+  const dataDir = path.join(squirrelRoot, 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  const schemaSrc = path.join(resourcesDir, 'data', 'schema_v2.sql');
+  if (fs.existsSync(schemaSrc)) {
+    try {
+      fs.copyFileSync(schemaSrc, path.join(dataDir, 'schema_v2.sql'));
+      console.log('[Main] Deployed: data/schema_v2.sql');
+    } catch (err) {
+      console.error('[Main] Deploy error for schema_v2.sql:', err);
+    }
+  }
+
+  console.log('[Main] Resource deployment completed');
+}
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -72,6 +134,18 @@ app.on('ready', async () => {
   const configService = getConfigService();
   configService.ensureProjectsDirectory();
   console.log('[Main] Framework path:', configService.getActiveFrameworkPath());
+
+  // ORDER_164: パッケージ版起動時にresources/内リソースをSquirrelルートに展開
+  try {
+    deployResources();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[Main] Resource deployment failed:', msg);
+    dialog.showErrorBox(
+      'Resource Deployment Error',
+      `Failed to deploy resources.\n\nError: ${msg}\n\nSome features may not work correctly.`
+    );
+  }
 
   // Initialize database (data/aipm.db に一元化)
   // ORDER_157: DB自動初期化機能追加 - DBファイルが存在しない場合は自動作成
@@ -164,6 +238,17 @@ app.on('ready', async () => {
         }
       })(),
     };
+  });
+
+  // ORDER_164: ターミナル起動IPCハンドラ
+  ipcMain.handle('terminal:open', () => {
+    const cwd = configService.getActiveFrameworkPath();
+    console.log('[Main] Opening terminal at:', cwd);
+    spawn('cmd.exe', ['/c', 'start', 'cmd.exe'], {
+      cwd,
+      detached: true,
+      stdio: 'ignore',
+    });
   });
 
   createWindow();

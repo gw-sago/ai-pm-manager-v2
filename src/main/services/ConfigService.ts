@@ -3,18 +3,21 @@
  *
  * アプリケーション設定の永続化を担当するサービス
  *
- * V2パス設計（ORDER_002: DB一元化完了）:
+ * V2パス設計（ORDER_002: DB一元化完了, ORDER_164: Squirrelルート展開）:
  * - backendPath: Pythonスクリプト（読み取り専用）
  *   - 開発時: リポジトリ/backend/
- *   - パッケージ時: resources/backend/
+ *   - パッケージ時: Squirrelルート/backend/（resources/から展開済み）
  * - schemaPath: DBスキーマ（読み取り専用）
  *   - 開発時: リポジトリ/data/schema_v2.sql
- *   - パッケージ時: resources/data/schema_v2.sql
+ *   - パッケージ時: Squirrelルート/data/schema_v2.sql（展開済み）
  * - frameworkPath: PROJECTS配下・DB（読み書き）
  *   - 開発時: リポジトリ/
- *   - パッケージ時: exe実行ディレクトリ（= exeと同階層にdata/, PROJECTS/を配置）
+ *   - パッケージ時: Squirrelルート（exeの1つ上）
  * - dbPath: DB本体（読み書き）→ 常にframeworkPath/data/aipm.db
  * - configPath: UI設定（config.json）→ %APPDATA%/.aipm/（ユーザー固有）
+ * - pythonPath: Python実行ファイル
+ *   - 開発時: 'python'（システムPATH）
+ *   - パッケージ時: Squirrelルート/python-embed/python.exe（展開済み）
  */
 
 import * as fs from 'node:fs';
@@ -73,11 +76,14 @@ export class ConfigService {
     this.configPath = path.join(aipmDir, 'config.json');
 
     if (app.isPackaged) {
-      // パッケージ時: frameworkPath = exe実行ディレクトリ
-      // data/aipm.db, PROJECTS/ はexeと同じフォルダに配置する想定
-      this._frameworkPath = path.dirname(process.execPath);
-      // パッケージ時: backendPath = resources/backend (読み取り専用)
-      this._backendPath = path.join(process.resourcesPath, 'backend');
+      // パッケージ時: frameworkPath = Squirrelルート（app-X.X.X の親）
+      // Squirrel構造: %LOCALAPPDATA%\ai_pm_manager_v2\app-1.0.0\exe
+      // exeの1つ上 = Squirrelルート → data/, PROJECTS/ をここに配置
+      // バージョン更新時もデータが引き継がれる
+      // ORDER_164: deployResources()がresources/→Squirrelルートに展開済み
+      this._frameworkPath = path.resolve(path.dirname(process.execPath), '..');
+      // パッケージ時: backendPath = Squirrelルート/backend（展開済み）
+      this._backendPath = path.join(this._frameworkPath, 'backend');
     } else {
       // 開発時: frameworkPath = リポジトリルート
       this._frameworkPath = app.getAppPath();
@@ -173,11 +179,16 @@ export class ConfigService {
    */
   getSchemaPath(): string {
     if (app.isPackaged) {
-      const primaryPath = path.join(process.resourcesPath, 'data', 'schema_v2.sql');
-      if (fs.existsSync(primaryPath)) {
-        return primaryPath;
+      // ORDER_164: Squirrelルート/data/schema_v2.sql（展開済み）を優先
+      const deployedPath = path.join(this._frameworkPath, 'data', 'schema_v2.sql');
+      if (fs.existsSync(deployedPath)) {
+        return deployedPath;
       }
-      // フォールバック: framework/data/配下
+      // フォールバック: resources/data/配下
+      const resourcePath = path.join(process.resourcesPath, 'data', 'schema_v2.sql');
+      if (fs.existsSync(resourcePath)) {
+        return resourcePath;
+      }
       return path.join(process.resourcesPath, 'framework', 'data', 'schema_v2.sql');
     } else {
       // 開発時: data/（優先）→ framework/data/（フォールバック）
@@ -242,6 +253,20 @@ export class ConfigService {
    */
   getConfigPath(): string {
     return this.configPath;
+  }
+
+  /**
+   * Pythonインタプリタのパスを取得
+   *
+   * - パッケージ時: Squirrelルート/python-embed/python.exe（展開済み）
+   * - 開発時: 'python'（システムPATH上のPython）
+   */
+  getPythonPath(): string {
+    if (app.isPackaged) {
+      // ORDER_164: Squirrelルートに展開済みのpython-embedを参照
+      return path.join(this._frameworkPath, 'python-embed', 'python.exe');
+    }
+    return process.platform === 'win32' ? 'python' : 'python3';
   }
 }
 

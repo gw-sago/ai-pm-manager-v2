@@ -2022,6 +2022,12 @@ export interface ElectronAPI {
     error: string | null;
     dbPath: string | null;
   }>;
+
+  // ORDER_164: ターミナル起動
+  /**
+   * frameworkPathをカレントディレクトリとしてターミナルを開く
+   */
+  openTerminal: () => Promise<void>;
 }
 
 /**
@@ -2330,6 +2336,10 @@ const electronAPI: ElectronAPI = {
   // ORDER_157: DB初期化ステータス
   getDbInitStatus: () =>
     ipcRenderer.invoke('db:get-init-status'),
+
+  // ORDER_164: ターミナル起動
+  openTerminal: () =>
+    ipcRenderer.invoke('terminal:open'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

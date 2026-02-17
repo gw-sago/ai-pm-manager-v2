@@ -10,10 +10,14 @@ module.exports = {
     // PythonバックエンドとスキーマファイルをextraResourceとして同梱
     // ORDER_157: framework/dataディレクトリごと同梱（schema_v2.sqlのみ含む）
     // ORDER_159: backendは読み取り専用、framework/dataはスキーマ配布用
-    // パッケージ後: resources/backend/, resources/data/schema_v2.sql
+    // ORDER_164: python-embed, .claude/, CLAUDE.md追加（起動時Squirrelルートに展開）
+    // パッケージ後: resources/{backend,python-embed,.claude,CLAUDE.md,data/schema_v2.sql}
     extraResource: [
       path.join(__dirname, 'backend'),
       path.join(__dirname, 'framework', 'data'),
+      path.join(__dirname, 'python-embed'),
+      path.join(__dirname, '.claude'),
+      path.join(__dirname, 'CLAUDE.md'),
     ],
     // 無視パターンからnode_modules/better-sqlite3とchokidarを除外
     ignore: (file) => {
