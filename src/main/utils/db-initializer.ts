@@ -3,7 +3,8 @@
  *
  * ORDER_157: DB自動初期化機能
  * ORDER_159: スキーマパス取得をConfigService経由に統一
- * 初回起動時に%APPDATA%/ai-pm-manager-v2/.aipm/にaipm.dbを自動作成する
+ * ORDER_160: コメント修正（AppData参照を削除）
+ * DBファイルが存在しない場合に、指定パス（frameworkPath/data/aipm.db）へ自動作成する
  */
 
 import * as fs from 'node:fs';
