@@ -880,6 +880,78 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] Project info IPC handlers registered (ORDER_156 / TASK_1233)');
 
+  // === プロジェクト作成・削除IPCハンドラ (ORDER_002 / BACKLOG_001) ===
+
+  /**
+   * プロジェクト作成
+   */
+  ipcMain.handle(
+    'project:create-project',
+    async (_event, projectId: string, name?: string): Promise<{
+      success: boolean;
+      project?: object;
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] プロジェクト作成リクエスト: ${projectId}`);
+      try {
+        const aipmDbService = getAipmDbService();
+        const result = await aipmDbService.createProject(projectId, name);
+        if (result.success) {
+          // メニュー更新通知を送信
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('menu:update');
+            }
+          });
+        }
+        return result;
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト作成エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * プロジェクト削除
+   */
+  ipcMain.handle(
+    'project:delete-project',
+    async (_event, projectId: string, force?: boolean): Promise<{
+      success: boolean;
+      deletedCounts?: { orders: number; tasks: number; backlogs: number };
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] プロジェクト削除リクエスト: ${projectId} (force=${force})`);
+      try {
+        const aipmDbService = getAipmDbService();
+        const result = await aipmDbService.deleteProject(projectId, force);
+        if (result.success) {
+          // メニュー更新通知を送信
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('menu:update');
+            }
+          });
+        }
+        return result;
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト削除エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Project create/delete IPC handlers registered (ORDER_002 / BACKLOG_001)');
+
   console.log('[Project] IPC handlers registered');
 }
 

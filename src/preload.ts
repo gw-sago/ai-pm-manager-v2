@@ -2028,6 +2028,42 @@ export interface ElectronAPI {
    * frameworkPathをカレントディレクトリとしてターミナルを開く
    */
   openTerminal: () => Promise<void>;
+
+  // ============================================================
+  // プロジェクト作成・削除（ORDER_002 / BACKLOG_001）
+  // ============================================================
+
+  /**
+   * プロジェクトを新規作成
+   * @param projectId プロジェクトID（英数字+アンダースコア、先頭は英字）
+   * @param name プロジェクト表示名（省略時はprojectIdを使用）
+   * @returns 作成結果
+   */
+  createProject: (projectId: string, name?: string) => Promise<{
+    success: boolean;
+    project?: {
+      id: string;
+      name: string;
+      path: string;
+      status: string;
+      isActive: boolean;
+      createdAt: string;
+      updatedAt: string;
+    };
+    error?: string;
+  }>;
+
+  /**
+   * プロジェクトを削除
+   * @param projectId プロジェクトID
+   * @param force アクティブORDERがあっても強制削除
+   * @returns 削除結果
+   */
+  deleteProject: (projectId: string, force?: boolean) => Promise<{
+    success: boolean;
+    deletedCounts?: { orders: number; tasks: number; backlogs: number };
+    error?: string;
+  }>;
 }
 
 /**
@@ -2340,6 +2376,12 @@ const electronAPI: ElectronAPI = {
   // ORDER_164: ターミナル起動
   openTerminal: () =>
     ipcRenderer.invoke('terminal:open'),
+
+  // プロジェクト作成・削除（ORDER_002 / BACKLOG_001）
+  createProject: (projectId: string, name?: string) =>
+    ipcRenderer.invoke('project:create-project', projectId, name),
+  deleteProject: (projectId: string, force?: boolean) =>
+    ipcRenderer.invoke('project:delete-project', projectId, force),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

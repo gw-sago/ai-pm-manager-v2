@@ -1,6 +1,203 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ProjectCard } from './ProjectCard';
 import type { Project, ProjectListResult, ProjectStateChangedEvent, DataSource, Supervisor } from '../preload';
+
+// ============================================================
+// プロジェクト作成モーダル（ORDER_002 / BACKLOG_001）
+// ============================================================
+const CreateProjectModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}> = ({ isOpen, onClose, onCreated }) => {
+  const [projectId, setProjectId] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setProjectId('');
+      setProjectName('');
+      setError(null);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectId.trim()) {
+      setError('プロジェクトIDを入力してください');
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(projectId.trim())) {
+      setError('IDは英字で始まり、英数字とアンダースコアのみ使用できます');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.createProject(
+        projectId.trim(),
+        projectName.trim() || undefined,
+      );
+      if (result.success) {
+        onCreated();
+        onClose();
+      } else {
+        setError(result.error || '作成に失敗しました');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-lg shadow-xl w-96 p-5">
+        <h3 className="text-base font-semibold text-gray-900 mb-4">
+          プロジェクト作成
+        </h3>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              プロジェクトID <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              placeholder="My_Project"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              disabled={isSubmitting}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              英字で始まり、英数字とアンダースコアが使用可能
+            </p>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              表示名
+            </label>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="（省略時はIDと同じ）"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              disabled={isSubmitting}
+            />
+          </div>
+          {error && (
+            <div className="mb-3 p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+              {error}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              disabled={isSubmitting}
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? '作成中...' : '作成'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// プロジェクト削除確認ダイアログ（ORDER_002 / BACKLOG_001）
+// ============================================================
+const DeleteProjectDialog: React.FC<{
+  projectId: string | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}> = ({ projectId, onClose, onDeleted }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setError(null);
+  }, [projectId]);
+
+  const handleDelete = async () => {
+    if (!projectId) return;
+    setIsDeleting(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.deleteProject(projectId, true);
+      if (result.success) {
+        onDeleted();
+        onClose();
+      } else {
+        setError(result.error || '削除に失敗しました');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!projectId) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-lg shadow-xl w-96 p-5">
+        <h3 className="text-base font-semibold text-red-700 mb-3">
+          プロジェクト削除
+        </h3>
+        <p className="text-sm text-gray-700 mb-2">
+          プロジェクト <strong>{projectId}</strong> を削除しますか？
+        </p>
+        <p className="text-xs text-red-600 mb-4">
+          関連するORDER、タスク、バックログも全て削除されます。この操作は取り消せません。
+        </p>
+        {error && (
+          <div className="mb-3 p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+            {error}
+          </div>
+        )}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            disabled={isDeleting}
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="px-3 py-1.5 text-sm text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+            disabled={isDeleting}
+          >
+            {isDeleting ? '削除中...' : '削除'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ProjectListProps {
   /**
@@ -258,6 +455,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   const [projectSupervisorMap, setProjectSupervisorMap] = useState<Map<string, string>>(new Map());
   // ORDER_060: Supervisor展開状態
   const [expandedSupervisors, setExpandedSupervisors] = useState<Set<string>>(new Set());
+  // ORDER_002: プロジェクト作成モーダル
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // ORDER_002: プロジェクト削除ダイアログ
+  const [deleteTargetProjectId, setDeleteTargetProjectId] = useState<string | null>(null);
 
   /**
    * プロジェクト一覧を取得
@@ -546,15 +747,26 @@ export const ProjectList: React.FC<ProjectListProps> = ({
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             プロジェクト
           </h3>
-          <button
-            onClick={() => fetchProjects(false)}
-            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            title="再読み込み"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+              title="プロジェクト作成"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => fetchProjects(false)}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              title="再読み込み"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Supervisor階層表示（ORDER_060追加） */}
@@ -602,14 +814,24 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                 {isExpanded && (
                   <div className="ml-4 space-y-0.5">
                     {supProjects.map((project) => (
-                      <ProjectCard
-                        key={project.name}
-                        project={project}
-                        isSelected={selectedProjectName === project.name}
-                        onClick={() => handleProjectClick(project)}
-                        compact
-                        dataSource={dataSource}
-                      />
+                      <div key={project.name} className="group relative">
+                        <ProjectCard
+                          project={project}
+                          isSelected={selectedProjectName === project.name}
+                          onClick={() => handleProjectClick(project)}
+                          compact
+                          dataSource={dataSource}
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteTargetProjectId(project.name); }}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title={`${project.name} を削除`}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -626,14 +848,24 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                 </div>
               )}
               {standaloneProjects.map((project) => (
-                <ProjectCard
-                  key={project.name}
-                  project={project}
-                  isSelected={selectedProjectName === project.name}
-                  onClick={() => handleProjectClick(project)}
-                  compact
-                  dataSource={dataSource}
-                />
+                <div key={project.name} className="group relative">
+                  <ProjectCard
+                    project={project}
+                    isSelected={selectedProjectName === project.name}
+                    onClick={() => handleProjectClick(project)}
+                    compact
+                    dataSource={dataSource}
+                  />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteTargetProjectId(project.name); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={`${project.name} を削除`}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -643,6 +875,24 @@ export const ProjectList: React.FC<ProjectListProps> = ({
         <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-400 text-center">
           {projects.length} 件
         </div>
+
+        {/* モーダル（ORDER_002 / BACKLOG_001） */}
+        <CreateProjectModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreated={() => fetchProjects(false)}
+        />
+        <DeleteProjectDialog
+          projectId={deleteTargetProjectId}
+          onClose={() => setDeleteTargetProjectId(null)}
+          onDeleted={() => {
+            // 削除したプロジェクトが選択中だった場合、選択解除
+            if (selectedProjectName === deleteTargetProjectId) {
+              setSelectedProjectName(null);
+            }
+            fetchProjects(false);
+          }}
+        />
       </div>
     );
   }

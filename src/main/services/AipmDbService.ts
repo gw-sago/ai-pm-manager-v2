@@ -1753,6 +1753,113 @@ export class AipmDbService {
       };
     }
   }
+
+  /**
+   * プロジェクトを新規作成（ORDER_002 / TASK_005）
+   * @param projectId プロジェクトID
+   * @param name プロジェクト表示名（省略時はprojectIdを使用）
+   * @returns 作成結果
+   */
+  async createProject(
+    projectId: string,
+    name?: string,
+  ): Promise<{ success: boolean; project?: AipmProject; error?: string }> {
+    const configService = getConfigService();
+    const backendPath = configService.getBackendPath();
+
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+
+    const createScriptPath = path.join(backendPath, 'project', 'create.py');
+    if (!fs.existsSync(createScriptPath)) {
+      return { success: false, error: `create.py not found: ${createScriptPath}` };
+    }
+
+    try {
+      const args = [createScriptPath, projectId, '--json'];
+      if (name) {
+        args.push('--name', name);
+      }
+
+      const { stdout } = await execFileAsync('python', args, {
+        cwd: path.dirname(createScriptPath),
+        timeout: 30000,
+      });
+
+      const result = JSON.parse(stdout);
+      console.log(`[AipmDbService] Project created: ${result.id}`);
+
+      return {
+        success: true,
+        project: {
+          id: result.id,
+          name: result.name,
+          path: result.path,
+          status: result.status,
+          currentOrderId: result.current_order_id || null,
+          isActive: !!result.is_active,
+          createdAt: result.created_at,
+          updatedAt: result.updated_at,
+        },
+      };
+    } catch (error: unknown) {
+      const err = error as { stderr?: string; message?: string };
+      const errorMsg = err.stderr || err.message || String(error);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * プロジェクトを削除（ORDER_002 / TASK_005）
+   * @param projectId プロジェクトID
+   * @param force アクティブORDERがあっても強制削除
+   * @returns 削除結果
+   */
+  async deleteProject(
+    projectId: string,
+    force = false,
+  ): Promise<{ success: boolean; deletedCounts?: { orders: number; tasks: number; backlogs: number }; error?: string }> {
+    const configService = getConfigService();
+    const backendPath = configService.getBackendPath();
+
+    if (!backendPath) {
+      return { success: false, error: 'Backend path not configured' };
+    }
+
+    const deleteScriptPath = path.join(backendPath, 'project', 'delete.py');
+    if (!fs.existsSync(deleteScriptPath)) {
+      return { success: false, error: `delete.py not found: ${deleteScriptPath}` };
+    }
+
+    try {
+      const args = [deleteScriptPath, projectId, '--json'];
+      if (force) {
+        args.push('--force');
+      }
+
+      const { stdout } = await execFileAsync('python', args, {
+        cwd: path.dirname(deleteScriptPath),
+        timeout: 30000,
+      });
+
+      const result = JSON.parse(stdout);
+
+      if (!result.success) {
+        return { success: false, error: result.message || 'Deletion failed' };
+      }
+
+      console.log(`[AipmDbService] Project deleted: ${projectId}`);
+      return {
+        success: true,
+        deletedCounts: result.deleted_counts,
+      };
+    } catch (error: unknown) {
+      const err = error as { stderr?: string; message?: string };
+      const errorMsg = err.stderr || err.message || String(error);
+      return { success: false, error: errorMsg };
+    }
+  }
 }
 
 // シングルトンインスタンス
