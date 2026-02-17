@@ -10,7 +10,7 @@ Changes:
 2. Add `target_modules` column to `orders` table (TEXT, nullable)
 
 Usage:
-    python backend/migrate/add_module_locks.py [--check] [--migrate] [--dry-run]
+    python backend/migrations/add_module_locks.py [--check] [--migrate] [--dry-run]
 
 Options:
     --check     Check if migration is needed (default action)
@@ -338,7 +338,7 @@ def main():
         needs_migration = not status['has_module_locks_table'] or not status['has_target_modules_column']
         if needs_migration:
             print("\nTo migrate, run:")
-            print("  python backend/migrate/add_module_locks.py --migrate")
+            print("  python backend/migrations/add_module_locks.py --migrate")
 
         sys.exit(0)
 

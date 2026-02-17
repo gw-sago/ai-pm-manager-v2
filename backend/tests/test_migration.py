@@ -23,7 +23,7 @@ import pytest
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from migrate.composite_key_migration import (
+from migrations.composite_key_migration import (
     is_composite_key_migrated,
     run_migration,
     check_migration_status,

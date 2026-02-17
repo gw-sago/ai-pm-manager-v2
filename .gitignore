@@ -58,11 +58,15 @@ tmp/
 temp/
 *.log
 *.tmp
+backend/tmp_*
+tmp_*
 
 # Data
 data/*.db
 data/*.sqlite
 data/*.db-journal
+data/*.backup_*
+*.backup_*
 backend/aipm.db
 backend/nul
 
@@ -70,6 +74,18 @@ backend/nul
 .env
 .env.local
 .env.*.local
+
+# Generated files
+backend/portfolio/
+backend/aipm-portfolio.html
+
+# Windows junk
+nul
+Thumbs.db
+desktop.ini
+
+# Test files (untracked)
+backend/test_*.py
 
 # Build artifacts
 *.exe

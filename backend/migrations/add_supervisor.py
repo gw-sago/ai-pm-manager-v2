@@ -13,7 +13,7 @@ Modified Tables:
 - projects: Add supervisor_id column
 
 Usage:
-    python backend/migrate/add_supervisor.py [--check] [--migrate] [--dry-run]
+    python backend/migrations/add_supervisor.py [--check] [--migrate] [--dry-run]
 
 Options:
     --check     Check if migration is needed (default action)
@@ -463,7 +463,7 @@ def main():
         else:
             print("\n[PENDING] Migration needed")
             print("\nTo migrate, run:")
-            print("  python backend/migrate/add_supervisor.py --migrate")
+            print("  python backend/migrations/add_supervisor.py --migrate")
 
         sys.exit(0)
 

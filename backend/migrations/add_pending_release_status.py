@@ -16,7 +16,7 @@ Uses MigrationRunner for safety:
 - Transaction management
 
 Usage:
-    python backend/migrate/add_pending_release_status.py [--dry-run] [--force]
+    python backend/migrations/add_pending_release_status.py [--dry-run] [--force]
 """
 
 import sqlite3

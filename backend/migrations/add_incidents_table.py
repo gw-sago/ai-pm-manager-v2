@@ -21,7 +21,7 @@ Uses MigrationRunner for safety:
 - Transaction management
 
 Usage:
-    python backend/migrate/add_incidents_table.py [--dry-run] [--force]
+    python backend/migrations/add_incidents_table.py [--dry-run] [--force]
 """
 
 import sqlite3

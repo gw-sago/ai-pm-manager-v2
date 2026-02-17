@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-AI PM Framework - Add markdown_created Column Migration Script
+AI PM Framework - Add is_active Column Migration Script
 Version: 1.0.0
 
-Adds the `markdown_created` column to the `tasks` table to track Markdown file creation status.
+Adds the `is_active` column to the `projects` table for active/inactive project switching.
 
 Target Table:
-- tasks: Add `markdown_created` column (INTEGER 0/1, DEFAULT 0, NOT NULL)
+- projects: Add `is_active` column (INTEGER 0/1, DEFAULT 1, NOT NULL)
 
 Usage:
-    python backend/migrate/add_markdown_created.py [--check] [--migrate] [--dry-run]
+    python backend/migrations/add_is_active.py [--check] [--migrate] [--dry-run]
 
 Options:
     --check     Check if migration is needed (default action)
@@ -38,16 +38,16 @@ def get_column_info(cursor, table_name: str) -> list:
     return cursor.fetchall()
 
 
-def has_markdown_created_column(cursor) -> bool:
+def has_is_active_column(cursor) -> bool:
     """
-    Check if the tasks table has the markdown_created column.
+    Check if the projects table has the is_active column.
 
     Returns:
-        True if markdown_created column exists, False otherwise.
+        True if is_active column exists, False otherwise.
     """
-    columns = get_column_info(cursor, 'tasks')
+    columns = get_column_info(cursor, 'projects')
     column_names = [col[1] for col in columns]
-    return 'markdown_created' in column_names
+    return 'is_active' in column_names
 
 
 def create_backup(db_path: str) -> str:
@@ -58,9 +58,9 @@ def create_backup(db_path: str) -> str:
     return backup_path
 
 
-def migrate_add_markdown_created(cursor, dry_run: bool = False) -> bool:
+def migrate_add_is_active(cursor, dry_run: bool = False) -> bool:
     """
-    Add markdown_created column to tasks table.
+    Add is_active column to projects table.
 
     Args:
         cursor: SQLite cursor
@@ -70,28 +70,35 @@ def migrate_add_markdown_created(cursor, dry_run: bool = False) -> bool:
         True if migration was performed, False if skipped.
     """
     # Check if already migrated
-    if has_markdown_created_column(cursor):
-        print("  tasks: markdown_created column already exists (skipped)")
+    if has_is_active_column(cursor):
+        print("  projects: is_active column already exists (skipped)")
         return False
 
     if dry_run:
-        print("  tasks: Would add markdown_created column (INTEGER DEFAULT 0 NOT NULL)")
+        print("  projects: Would add is_active column (INTEGER DEFAULT 1 NOT NULL)")
         return True
 
     # SQLite supports ALTER TABLE ADD COLUMN
     # The column will be added with DEFAULT value for existing rows
     cursor.execute("""
-        ALTER TABLE tasks
-        ADD COLUMN markdown_created INTEGER NOT NULL DEFAULT 0
+        ALTER TABLE projects
+        ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
     """)
 
-    print("  tasks: Added markdown_created column successfully")
+    # Verify all existing projects have is_active = 1
+    cursor.execute("SELECT COUNT(*) FROM projects WHERE is_active != 1")
+    count = cursor.fetchone()[0]
+    if count > 0:
+        print(f"  [WARNING] {count} projects have is_active != 1, updating...")
+        cursor.execute("UPDATE projects SET is_active = 1 WHERE is_active != 1")
+
+    print("  projects: Added is_active column successfully")
     return True
 
 
 def run_migration(db_path: str, dry_run: bool = False, force: bool = False) -> bool:
     """
-    Run the markdown_created column migration.
+    Run the is_active column migration.
 
     Args:
         db_path: Path to the database file
@@ -110,15 +117,15 @@ def run_migration(db_path: str, dry_run: bool = False, force: bool = False) -> b
 
     try:
         # Check current status
-        already_migrated = has_markdown_created_column(cursor)
+        already_migrated = has_is_active_column(cursor)
 
-        print("\n=== Add markdown_created Column Migration ===")
+        print("\n=== Add is_active Column Migration ===")
         print(f"Database: {db_path}")
         print(f"\nColumn Status:")
-        print(f"  markdown_created: {'Exists' if already_migrated else 'Missing'}")
+        print(f"  is_active: {'Exists' if already_migrated else 'Missing'}")
 
         if already_migrated:
-            print("\n[INFO] tasks table already has markdown_created column.")
+            print("\n[INFO] projects table already has is_active column.")
             return True
 
         if dry_run:
@@ -143,7 +150,7 @@ def run_migration(db_path: str, dry_run: bool = False, force: bool = False) -> b
 
         # Run migration
         print("\nMigrating:")
-        migrate_add_markdown_created(cursor, dry_run)
+        migrate_add_is_active(cursor, dry_run)
 
         # Commit transaction
         if not dry_run:
@@ -154,18 +161,13 @@ def run_migration(db_path: str, dry_run: bool = False, force: bool = False) -> b
 
         # Verify migration
         if not dry_run:
-            if has_markdown_created_column(cursor):
+            if has_is_active_column(cursor):
                 # Show current state
-                cursor.execute("SELECT COUNT(*) FROM tasks")
-                count = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM tasks WHERE markdown_created = 0")
-                count_false = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM tasks WHERE markdown_created = 1")
-                count_true = cursor.fetchone()[0]
-                print(f"\n[VERIFIED] tasks table now has markdown_created column:")
-                print(f"  Total tasks: {count}")
-                print(f"  markdown_created=0 (FALSE): {count_false}")
-                print(f"  markdown_created=1 (TRUE): {count_true}")
+                cursor.execute("SELECT id, name, is_active FROM projects")
+                projects = cursor.fetchall()
+                print(f"\n[VERIFIED] {len(projects)} projects with is_active column:")
+                for proj in projects:
+                    print(f"  - {proj[0]}: {proj[1]} (is_active={proj[2]})")
             else:
                 print("\n[ERROR] Migration verification failed.")
                 return False
@@ -200,21 +202,17 @@ def check_migration_status(db_path: str) -> dict:
     cursor = conn.cursor()
 
     try:
-        has_column = has_markdown_created_column(cursor)
+        has_column = has_is_active_column(cursor)
 
-        # Get task count if column exists
-        task_info = {}
+        # Get project count if column exists
+        project_info = []
         if has_column:
-            cursor.execute("SELECT COUNT(*) FROM tasks")
-            task_info['total'] = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM tasks WHERE markdown_created = 0")
-            task_info['false_count'] = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM tasks WHERE markdown_created = 1")
-            task_info['true_count'] = cursor.fetchone()[0]
+            cursor.execute("SELECT id, name, is_active FROM projects")
+            project_info = cursor.fetchall()
 
         return {
-            'has_markdown_created': has_column,
-            'task_info': task_info
+            'has_is_active': has_column,
+            'projects': project_info
         }
     finally:
         conn.close()
@@ -222,7 +220,7 @@ def check_migration_status(db_path: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Add markdown_created column to tasks table'
+        description='Add is_active column to projects table'
     )
     parser.add_argument(
         '--check',
@@ -270,20 +268,19 @@ def main():
             print(f"Error: {status['error']}")
             sys.exit(1)
 
-        print("\n=== markdown_created Column Migration Status ===")
+        print("\n=== is_active Column Migration Status ===")
         print(f"Database: {db_path}")
         print(f"\nColumn Status:")
-        print(f"  markdown_created: {'Exists' if status['has_markdown_created'] else 'Missing'}")
+        print(f"  is_active: {'Exists' if status['has_is_active'] else 'Missing'}")
 
-        if status['has_markdown_created']:
-            info = status['task_info']
-            print(f"\nTask Statistics:")
-            print(f"  Total tasks: {info['total']}")
-            print(f"  markdown_created=0 (FALSE): {info['false_count']}")
-            print(f"  markdown_created=1 (TRUE): {info['true_count']}")
+        if status['has_is_active']:
+            print(f"\nProjects ({len(status['projects'])}):")
+            for proj in status['projects']:
+                status_str = "Active" if proj[2] == 1 else "Inactive"
+                print(f"  - {proj[0]}: {proj[1]} ({status_str})")
         else:
             print("\nTo migrate, run:")
-            print("  python backend/migrate/add_markdown_created.py --migrate")
+            print("  python backend/migrations/add_is_active.py --migrate")
 
         sys.exit(0)
 

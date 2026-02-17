@@ -12,7 +12,7 @@ Target Tables:
 - task_dependencies: Added project_id column
 
 Usage:
-    python backend/migrate/composite_key_migration.py [--check] [--backup] [--dry-run]
+    python backend/migrations/composite_key_migration.py [--check] [--backup] [--dry-run]
 
 Options:
     --check     Check if migration is needed (default action)
@@ -562,7 +562,7 @@ def main():
 
         if not status['overall']:
             print("\nTo migrate, run:")
-            print("  python backend/migrate/composite_key_migration.py --migrate")
+            print("  python backend/migrations/composite_key_migration.py --migrate")
 
         sys.exit(0)
 

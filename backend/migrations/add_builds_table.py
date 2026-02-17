@@ -7,7 +7,7 @@ Projects with build artifacts (e.g., Electron apps) can record
 build success/failure history in the DB.
 
 Usage:
-    python backend/migrate/add_builds_table.py [--dry-run] [--force]
+    python backend/migrations/add_builds_table.py [--dry-run] [--force]
 """
 
 import sqlite3

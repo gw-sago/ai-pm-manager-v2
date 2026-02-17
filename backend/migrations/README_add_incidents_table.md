@@ -80,7 +80,7 @@ The migration creates 6 indexes for performance optimization:
 Test the migration without making changes:
 
 ```bash
-python backend/migrate/add_incidents_table.py --dry-run --verbose
+python backend/migrations/add_incidents_table.py --dry-run --verbose
 ```
 
 ### Execute Migration
@@ -88,7 +88,7 @@ python backend/migrate/add_incidents_table.py --dry-run --verbose
 Run the migration with automatic backup:
 
 ```bash
-python backend/migrate/add_incidents_table.py
+python backend/migrations/add_incidents_table.py
 ```
 
 ### Force Execution (During Worker Activity)
@@ -96,7 +96,7 @@ python backend/migrate/add_incidents_table.py
 If workers are running and you need to proceed:
 
 ```bash
-python backend/migrate/add_incidents_table.py --force
+python backend/migrations/add_incidents_table.py --force
 ```
 
 ### Options

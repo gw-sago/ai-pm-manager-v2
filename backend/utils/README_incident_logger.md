@@ -192,7 +192,7 @@ python backend/tests/test_incident_logger.py
 To create the `incidents` table:
 
 ```bash
-python backend/migrate/add_incidents_table.py
+python backend/migrations/add_incidents_table.py
 ```
 
 ## Notes
