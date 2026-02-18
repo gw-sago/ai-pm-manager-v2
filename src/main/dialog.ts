@@ -5,7 +5,7 @@
  * AI PM Frameworkとしての妥当性を検証します。
  */
 
-import { dialog, BrowserWindow, ipcMain } from 'electron';
+import { app, dialog, BrowserWindow, ipcMain } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -74,8 +74,14 @@ export function validateAIPMDirectory(dirPath: string): DirectoryValidationResul
   }
 
   // PROJECTS/ ディレクトリの存在確認（必須）
-  const projectsPath = path.join(dirPath, 'PROJECTS');
-  if (fs.existsSync(projectsPath) && fs.statSync(projectsPath).isDirectory()) {
+  // ORDER_001: PROJECTS/ は userDataPath 配下に移動済み。両方をチェックする。
+  const projectsPathLocal = path.join(dirPath, 'PROJECTS');
+  const projectsPathUserData = path.join(app.getPath('userData'), 'PROJECTS');
+  const projectsPath = fs.existsSync(projectsPathUserData) ? projectsPathUserData
+    : fs.existsSync(projectsPathLocal) ? projectsPathLocal
+    : null;
+
+  if (projectsPath && fs.statSync(projectsPath).isDirectory()) {
     hasProjectsDir = true;
 
     // プロジェクト一覧を取得
