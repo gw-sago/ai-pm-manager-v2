@@ -92,6 +92,17 @@ def auto_initialize_database(
 
     # Check if database already exists
     if check_database_exists(db_path, verbose=verbose):
+        # 既存DBのマスターデータ（status_transitions等）を補完
+        try:
+            from utils.ensure_master_data import ensure_master_data
+            result = ensure_master_data(
+                db_path=db_path, schema_path=schema_path, verbose=verbose
+            )
+            if verbose and result.get("added", 0) > 0:
+                print(f"マスターデータを補完しました: {result['added']}件追加")
+        except Exception as e:
+            if verbose:
+                print(f"マスターデータ補完をスキップ: {e}")
         return True, f"既存のデータベースを使用: {db_path}"
 
     # Database doesn't exist - create new one
