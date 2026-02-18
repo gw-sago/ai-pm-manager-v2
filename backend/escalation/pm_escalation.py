@@ -237,9 +237,9 @@ class PMEscalationHandler:
             再設計結果のdict、AI利用不可の場合None
         """
         try:
-            from claude_runner import create_runner
+            from utils.claude_cli import create_runner
         except ImportError:
-            logger.warning("claude_runner が利用できません。フォールバック処理を実行。")
+            logger.warning("claude_cli が利用できません。フォールバック処理を実行。")
             return None
 
         runner = create_runner(

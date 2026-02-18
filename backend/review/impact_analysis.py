@@ -56,13 +56,13 @@ except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
 
-# claude_runner インポート（オプション）
+# claude_cli インポート（ORDER_168: claude_runner → claude_cli移行）
 try:
-    from claude_runner import create_runner, ClaudeRunner, ClaudeResult
+    from utils.claude_cli import create_runner, ClaudeRunner, ClaudeResult
     CLAUDE_RUNNER_AVAILABLE = True
 except ImportError:
     CLAUDE_RUNNER_AVAILABLE = False
-    logger.warning("claude_runner が利用できません。影響分析はスキップされます。")
+    logger.warning("claude_cli が利用できません。影響分析はスキップされます。")
 
 
 @dataclass
