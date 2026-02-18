@@ -2618,7 +2618,8 @@ export class ScriptExecutionService extends EventEmitter {
     if (!frameworkPath) return [];
 
     const results: WorkerLogFileInfo[] = [];
-    const resultDir = path.join(frameworkPath, 'PROJECTS', projectId, 'RESULT');
+    const configService = getConfigService();
+    const resultDir = path.join(configService.getProjectsBasePath(), projectId, 'RESULT');
 
     if (!fs.existsSync(resultDir)) return [];
 

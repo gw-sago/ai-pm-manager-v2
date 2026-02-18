@@ -11,6 +11,7 @@ import { watch, type FSWatcher } from 'chokidar';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { EventEmitter } from 'node:events';
+import { getConfigService } from './ConfigService';
 
 /**
  * File change event payload
@@ -78,7 +79,8 @@ export class FileWatcherService extends EventEmitter {
       };
     }
 
-    const projectsDir = path.join(frameworkPath, 'PROJECTS');
+    const configService = getConfigService();
+    const projectsDir = configService.getProjectsBasePath();
     if (!fs.existsSync(projectsDir)) {
       return {
         success: false,
@@ -158,7 +160,7 @@ export class FileWatcherService extends EventEmitter {
       isWatching: this.isWatching,
       frameworkPath: this.frameworkPath,
       watchPattern: this.frameworkPath
-        ? path.join(this.frameworkPath, 'PROJECTS', '*', 'STATE.md')
+        ? path.join(getConfigService().getProjectsBasePath(), '*', 'STATE.md')
         : null,
       projectCount: this.projectCount,
       startedAt: this.startedAt,

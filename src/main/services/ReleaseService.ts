@@ -383,7 +383,8 @@ export class ReleaseService {
     const frameworkPath = this.getFrameworkPath();
     if (!frameworkPath) return null;
 
-    return path.join(frameworkPath, 'PROJECTS', projectName, 'RELEASE_LOG.md');
+    const configService = getConfigService();
+    return path.join(configService.getProjectsBasePath(), projectName, 'RELEASE_LOG.md');
   }
 
   /**

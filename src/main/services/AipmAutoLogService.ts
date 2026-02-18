@@ -150,7 +150,8 @@ export class AipmAutoLogService extends EventEmitter {
 
     if (orderId) {
       // ORDER別ログ
-      return path.join(frameworkPath, 'PROJECTS', projectName, 'RESULT', orderId, 'LOGS');
+      const configService = getConfigService();
+      return path.join(configService.getProjectsBasePath(), projectName, 'RESULT', orderId, 'LOGS');
     } else {
       // プロジェクト共通ログ
       return path.join(frameworkPath, 'logs', 'aipm_auto', projectName);
@@ -261,7 +262,7 @@ export class AipmAutoLogService extends EventEmitter {
     allFiles.push(...this.listLogFiles(projectName));
 
     // RESULT配下のORDER別ログを探索
-    const resultDir = path.join(frameworkPath, 'PROJECTS', projectName, 'RESULT');
+    const resultDir = path.join(getConfigService().getProjectsBasePath(), projectName, 'RESULT');
     if (fs.existsSync(resultDir)) {
       try {
         const orderDirs = fs.readdirSync(resultDir, { withFileTypes: true });

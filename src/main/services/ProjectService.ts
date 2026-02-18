@@ -125,10 +125,10 @@ export class ProjectService extends EventEmitter {
       const projects: Project[] = dbProjects.map((dbProject) => {
         // プロジェクトのIDをnameとして使用（フォルダ名と一致、backlog/list.pyのproject_idとも一致）
         const projectId = dbProject.id;
-        // dbProject.pathは相対パス（例: "PROJECTS/ai_pm_manager"）なので、frameworkPathと結合
+        // dbProject.pathは相対パス（例: "PROJECTS/ai_pm_manager"）なので、userDataPathと結合
         const projectPath = dbProject.path
-          ? path.join(frameworkPath, dbProject.path)
-          : path.join(frameworkPath, 'PROJECTS', projectId);
+          ? path.join(configService.getUserDataPath(), dbProject.path)
+          : path.join(configService.getProjectsBasePath(), projectId);
         const stateFilePath = path.join(projectPath, 'STATE.md');
         const hasStateFile = fs.existsSync(stateFilePath);
 
@@ -185,7 +185,7 @@ export class ProjectService extends EventEmitter {
    * 指定されたフレームワークパスからプロジェクト一覧を取得
    */
   getProjectsFromPath(frameworkPath: string): ProjectListResult {
-    const projectsDir = path.join(frameworkPath, 'PROJECTS');
+    const projectsDir = configService.getProjectsBasePath();
 
     if (!fs.existsSync(projectsDir)) {
       return {
@@ -249,7 +249,7 @@ export class ProjectService extends EventEmitter {
     const dbState = this.getProjectStateFromDb(projectName);
     if (dbState) {
       // DBからの取得成功 - STATE.md有無に関わらずDB由来データを返却
-      const stateFilePath = path.join(frameworkPath, 'PROJECTS', projectName, 'STATE.md');
+      const stateFilePath = path.join(configService.getProjectsBasePath(), projectName, 'STATE.md');
       const hasStateFile = fs.existsSync(stateFilePath);
       if (!hasStateFile) {
         console.log(`[ProjectService] STATE.md not found for ${projectName}, but returning DB-derived data (FR-005)`);
@@ -526,7 +526,7 @@ export class ProjectService extends EventEmitter {
       return null;
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // RESULT/ORDER_XXX/04_QUEUE/ の下を検索
     const resultDir = path.join(projectPath, 'RESULT');
@@ -614,7 +614,7 @@ export class ProjectService extends EventEmitter {
       return null;
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // RESULT/ORDER_XXX/05_REPORT/ の下を検索
     const resultDir = path.join(projectPath, 'RESULT');
@@ -671,7 +671,7 @@ export class ProjectService extends EventEmitter {
       return null;
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // RESULT/ORDER_XXX/07_REVIEW/ の下を検索
     const resultDir = path.join(projectPath, 'RESULT');
@@ -720,7 +720,7 @@ export class ProjectService extends EventEmitter {
       return null;
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // ORDERS/ORDER_XXX.md を検索
     const ordersDir = path.join(projectPath, 'ORDERS');
@@ -775,6 +775,31 @@ export class ProjectService extends EventEmitter {
   }
 
   /**
+   * PROJECT_INFO.md ファイルの内容を取得
+   * @param projectName プロジェクト名
+   * @returns ファイル内容（見つからない場合はnull）
+   */
+  getProjectInfoFileContent(projectName: string): string | null {
+    const configService = getConfigService();
+    const frameworkPath = configService.getActiveFrameworkPath();
+
+    if (!frameworkPath) {
+      return null;
+    }
+
+    const projectInfoPath = path.join(configService.getProjectsBasePath(), projectName, 'PROJECT_INFO.md');
+    if (fs.existsSync(projectInfoPath)) {
+      try {
+        return fs.readFileSync(projectInfoPath, 'utf-8');
+      } catch (error) {
+        console.error(`[ProjectService] Failed to read PROJECT_INFO.md for ${projectName}:`, error);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * 成果物ファイル一覧を取得
    * @param projectName プロジェクト名
    * @param orderId ORDER ID (例: "ORDER_010")
@@ -788,7 +813,7 @@ export class ProjectService extends EventEmitter {
       return [];
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // RESULT/ORDER_XXX/06_ARTIFACTS/ を検索
     const artifactsDir = path.join(projectPath, 'RESULT', orderId, '06_ARTIFACTS');
@@ -859,7 +884,7 @@ export class ProjectService extends EventEmitter {
       return null;
     }
 
-    const projectPath = path.join(frameworkPath, 'PROJECTS', projectName);
+    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
 
     // 06_ARTIFACTS と 08_ARTIFACTS の両方を試す
     const artifactsDirs = [

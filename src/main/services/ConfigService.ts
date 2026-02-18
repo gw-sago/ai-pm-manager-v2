@@ -228,6 +228,24 @@ export class ConfigService {
   }
 
   /**
+   * ユーザーデータパスを取得（DB, PROJECTS等の永続データのルート）
+   * パス: %APPDATA%/ai-pm-manager-v2/
+   */
+  getUserDataPath(): string {
+    return this._userDataPath;
+  }
+
+  /**
+   * PROJECTSディレクトリのベースパスを取得
+   *
+   * ORDER_001: userDataPath配下。全サービスはこのメソッドでPROJECTSパスを取得すること。
+   * パス: %APPDATA%/ai-pm-manager-v2/PROJECTS/
+   */
+  getProjectsBasePath(): string {
+    return path.join(this._userDataPath, 'PROJECTS');
+  }
+
+  /**
    * PROJECTSディレクトリを確保
    *
    * ORDER_001: app.getPath('userData') 配下に移動。
