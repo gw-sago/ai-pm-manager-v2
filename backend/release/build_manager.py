@@ -36,10 +36,10 @@ setup_utf8_output()
 
 BUILD_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ai_pm_manager": {
-        "build_dir": "D:/your_workspace/ai-pm-manager",
+        "build_dir": "D:/your_workspace/ai-pm-manager-v2",
         "pre_build": "npx tsc --noEmit",
-        "build_command": "npm run build",
-        "artifact_path": "out/ai-pm-manager-win32-x64/ai-pm-manager.exe",
+        "build_command": "npx electron-forge package",
+        "artifact_path": "out/ai-pm-manager-v2-win32-x64/ai-pm-manager-v2.exe",
         "build_type": "electron",
     },
 }
