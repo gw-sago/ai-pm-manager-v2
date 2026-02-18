@@ -68,11 +68,21 @@ CLI操作で使用可能なコマンド:
 
 ## 開発環境
 
-### ビルド
-```bash
-# ビルド（パッケージング）
-npx electron-forge package
+### ソースコードとデプロイ先
+- **ソースコード**: `d:\your_workspace\ai-pm-manager-v2\`
+- **デプロイ先（実行環境）**: `c:\Users\s_sago.G-WISE\AppData\Local\ai_pm_manager_v2\`
 
+### 「ビルドお願いします」ルール
+ユーザーが「ビルド」「ビルドお願いします」と言った場合、以下を**すべて自動実行**する:
+1. デプロイ先の `data/aipm.db` と `PROJECTS/` を一時ディレクトリ（`$TEMP/aipm_backup_YYYYMMDD_HHMMSS/`）にバックアップ
+2. ソースリポジトリでインストーラービルド: `cd /d/your_workspace/ai-pm-manager-v2 && npx electron-forge make`
+3. 生成されたSetup.exeを実行してインストール
+4. バックアップしたDBとPROJECTSをデプロイ先にリストア
+
+**重要**: Squirrelインストーラーはデプロイ先を丸ごと上書きするため、バックアップ＆リストアが必須。一時ディレクトリを使うことでソースリポジトリに依存しない。
+
+### その他コマンド
+```bash
 # 開発モード
 npm start
 
@@ -82,7 +92,7 @@ npm run typecheck
 
 ### 出力
 ```
-out/ai-pm-manager-v2-win32-x64/ai-pm-manager-v2.exe
+out/make/squirrel.windows/x64/ai-pm-manager-v2-0.1.0 Setup.exe
 ```
 
 ## 制約事項

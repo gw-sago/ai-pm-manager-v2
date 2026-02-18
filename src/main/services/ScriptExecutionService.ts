@@ -2966,8 +2966,12 @@ export class ScriptExecutionService extends EventEmitter {
       return this.createErrorResult('pm', projectId, orderId, 'Framework path not configured');
     }
 
-    // retry_order.py のパスを取得
-    const retryScriptPath = path.join(frameworkPath, 'scripts', 'aipm-db', 'order', 'retry_order.py');
+    // retry_order.py のパスを取得（getBackendPath()ベース）
+    const backendPath = this.getBackendPath();
+    if (!backendPath) {
+      return this.createErrorResult('pm', projectId, orderId, 'Backend path not configured');
+    }
+    const retryScriptPath = path.join(backendPath, 'order', 'retry_order.py');
     if (!fs.existsSync(retryScriptPath)) {
       return this.createErrorResult('pm', projectId, orderId, 'retry_order.py not found');
     }

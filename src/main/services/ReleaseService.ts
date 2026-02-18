@@ -130,14 +130,6 @@ export class ReleaseService {
   }
 
   /**
-   * Pythonコマンドを取得
-   * ORDER_108 / TASK_994
-   */
-  private getPythonCommand(): string {
-    return process.platform === 'win32' ? 'python' : 'python3';
-  }
-
-  /**
    * バックエンドパスを取得（Pythonスクリプト用）
    * ORDER_159: frameworkPath/backendPath分離
    */
@@ -290,7 +282,7 @@ export class ReleaseService {
       return { success: false, orderId, projectId: projectName, error: 'release_order.py not found' };
     }
 
-    const pythonCommand = this.getPythonCommand();
+    const pythonCommand = getConfigService().getPythonPath();
     const args = [scriptPath, projectName, orderId, '--json'];
 
     console.log(`[ReleaseService] Executing release: ${projectName} ${orderId}`);
@@ -348,7 +340,7 @@ export class ReleaseService {
       return { success: false, orderId, projectId: projectName, error: 'release_order.py not found' };
     }
 
-    const pythonCommand = this.getPythonCommand();
+    const pythonCommand = getConfigService().getPythonPath();
     const args = [scriptPath, projectName, orderId, '--dry-run', '--json'];
 
     console.log(`[ReleaseService] Executing release dry-run: ${projectName} ${orderId}`);
