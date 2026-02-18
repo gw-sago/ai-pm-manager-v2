@@ -341,11 +341,93 @@ class PMProcessor:
                 logger.warning(f"インシデント記録に失敗: {inc_err}")
             raise PMProcessError(f"要件定義生成中にエラーが発生: {e}")
 
+    def _get_known_bugs(self) -> str:
+        """既知バグパターンをDBとPROJECT_INFO.mdから取得"""
+        sections = []
+
+        # 1. DBからACTIVEなバグパターンを取得
+        try:
+            from bugs.list import list_bugs
+            bugs = list_bugs(
+                project_id=self.project_id,
+                status="ACTIVE",
+            )
+            if bugs:
+                bug_lines = ["### DBバグパターン（ACTIVEのみ）"]
+                for bug in bugs[:10]:  # 最大10件
+                    severity = bug.get("severity", "Medium")
+                    bug_lines.append(
+                        f"- **{bug['id']}** [{severity}]: {bug['title']}"
+                    )
+                    if bug.get("solution"):
+                        solution = bug["solution"]
+                        if len(solution) > 150:
+                            solution = solution[:150] + "..."
+                        bug_lines.append(f"  解決策: {solution}")
+                sections.append("\n".join(bug_lines))
+        except Exception as e:
+            logger.warning(f"バグパターン取得失敗: {e}")
+
+        # 2. PROJECT_INFO.mdから開発ルールとバグ修正履歴を取得
+        try:
+            project_info_path = self.project_dir / "PROJECT_INFO.md"
+            if project_info_path.exists():
+                content = project_info_path.read_text(encoding="utf-8")
+                rules_section = self._extract_section(content, "開発ルール")
+                bugs_section = self._extract_section(content, "バグ修正履歴")
+
+                if rules_section:
+                    sections.append(f"### PROJECT_INFO.md 開発ルール\n{rules_section}")
+                if bugs_section:
+                    sections.append(f"### PROJECT_INFO.md バグ修正履歴\n{bugs_section}")
+        except Exception as e:
+            logger.warning(f"PROJECT_INFO.md読み込み失敗: {e}")
+
+        if not sections:
+            return ""
+
+        return "## 既知バグパターン・開発ルール\n\n" + "\n\n".join(sections)
+
+    def _extract_section(self, content: str, section_name: str) -> str:
+        """Markdownコンテンツから指定セクションを抽出"""
+        lines = content.split("\n")
+        in_section = False
+        section_level = 0
+        result_lines = []
+
+        for line in lines:
+            if line.startswith("#") and section_name in line:
+                in_section = True
+                section_level = len(line) - len(line.lstrip("#"))
+                continue
+            elif in_section:
+                # 同レベル以上の見出しが来たらセクション終了
+                if line.startswith("#"):
+                    current_level = len(line) - len(line.lstrip("#"))
+                    if current_level <= section_level:
+                        break
+                result_lines.append(line)
+
+        return "\n".join(result_lines).strip()
+
     def _build_requirements_prompt(self, order_content: str) -> str:
         """要件定義生成用プロンプトを構築"""
         # SpecGeneratorが利用可能ならAC生成指示付きの改善プロンプトを使用
         if self.spec_generator:
             return self.spec_generator.enhance_prompt(order_content)
+
+        # 既知バグパターン情報を取得
+        known_bugs_section = self._get_known_bugs()
+        bugs_instruction = ""
+        if known_bugs_section:
+            bugs_instruction = f"""
+
+## 参考情報: 既知の問題パターン
+以下の既知バグパターン・開発ルールを考慮してタスク設計してください。
+関連する問題がある場合は、タスク説明に注意事項として含めてください。
+
+{known_bugs_section}
+"""
 
         # フォールバック: 元のプロンプト（SpecGenerator未導入時）
         return f"""【重要】以下のORDER内容のみを分析してJSON形式で出力してください。
@@ -386,7 +468,8 @@ class PMProcessor:
 - JSONのみを出力（説明文、質問、確認は一切不要）
 - 上記ORDER内容から要件を抽出してタスク分解する
 - tasksは実装に必要な具体的作業を2-5個程度に分割
-- target_filesには各タスクが変更対象とするファイルパスを配列で指定（省略可能）"""
+- target_filesには各タスクが変更対象とするファイルパスを配列で指定（省略可能）
+{bugs_instruction}"""
 
     def _extract_json_from_response(self, response: str) -> str:
         """AI応答からJSONを抽出（コードブロック対応）"""
@@ -578,7 +661,6 @@ class PMProcessor:
             "ALTER TABLE",  # ALTER TABLEは一般的に破壊的
             "TRUNCATE",
             "DELETE FROM",  # DELETEは一般的に破壊的
-            "REVIEW_QUEUE",  # review_queue関連
             "テーブル削除",
             "テーブル廃止",
             "カラム削除",
@@ -957,8 +1039,12 @@ class PMProcessor:
                 lines.append(f"- {dep}")
             lines.append("")
 
-        # 既知バグパターン参照を追加
-        lines.append("**既知バグパターン**: 実装前に必ず既知バグパターン（DBのbugsテーブル）を確認してください")
+        # 既知バグパターン参照を追加（実際のパターンを注入）
+        known_bugs = self._get_known_bugs()
+        if known_bugs:
+            lines.append(known_bugs)
+        else:
+            lines.append("**既知バグパターン**: 実装前に必ず既知バグパターン（DBのbugsテーブル）を確認してください")
         lines.append("")
 
         lines.append("---")

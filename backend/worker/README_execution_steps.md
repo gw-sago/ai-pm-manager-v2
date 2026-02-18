@@ -8,16 +8,15 @@
 
 ### 1. Worker実行ステップの定義
 
-execute_task.pyの実行フローを8つのステップに分類:
+execute_task.pyの実行フローを7つのステップに分類:
 
 1. **get_task_info** - タスク情報取得
 2. **assign_worker** - Worker割当
 3. **file_lock** - ファイルロック取得
 4. **execute_task** - AI実行（claude -p）
 5. **create_report** - レポート作成
-6. **add_review_queue** - レビュー待ち
-7. **update_status_done** - 完了処理（DONE遷移）
-8. **auto_review** - 自動レビュー
+6. **update_status_done** - 完了処理（DONE遷移）
+7. **auto_review** - 自動レビュー
 
 ### 2. API関数
 
@@ -42,7 +41,7 @@ print(step_info["progress_percent"])     # 50
     "current_step": str,              # ステップ名
     "current_step_display": str,      # ステップ表示名（日本語）
     "step_index": int,                # ステップインデックス（0-based）
-    "total_steps": int,               # 総ステップ数（8）
+    "total_steps": int,               # 総ステップ数（7）
     "progress_percent": int,          # 進捗率（0-100）
     "status": str,                    # タスクステータス
     "assignee": str,                  # 担当Worker
@@ -78,7 +77,7 @@ for task_id, step_info in results.items():
 from worker.get_execution_steps import format_execution_step_display
 
 display = format_execution_step_display(step_info)
-print(display)  # "[4/8] AI実行中 (50%)"
+print(display)  # "[4/7] AI実行中 (57%)"
 ```
 
 ## ステップ推定ロジック
@@ -89,7 +88,7 @@ print(display)  # "[4/8] AI実行中 (50%)"
    - `IN_PROGRESS` 以外の場合は実行中でないと判定
 
 2. **change_historyテーブルの最新レコード**
-   - `status_change` で DONE遷移 → `add_review_queue`
+   - `status_change` で DONE遷移 → `update_status_done`
    - `assignee_change` → `file_lock`
    - その他の場合 → `assign_worker` または `execute_task`
 
@@ -109,7 +108,7 @@ python backend/worker/get_execution_steps.py ai_pm_manager TASK_1034
   "current_step": "execute_task",
   "current_step_display": "AI実行",
   "step_index": 3,
-  "total_steps": 8,
+  "total_steps": 7,
   "progress_percent": 50,
   "status": "IN_PROGRESS",
   "assignee": "Worker-001",

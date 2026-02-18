@@ -22,17 +22,15 @@ Example:
     python backend/review/process_review.py AI_PM_PJ TASK_602 --dry-run
     python backend/review/process_review.py AI_PM_PJ TASK_602 --auto-approve
 
-内部処理（ORDER_124更新版）:
+内部処理:
 1. タスク・REPORT情報取得（status='DONE' AND reviewed_at IS NULL）
-2. レビュー開始（review_queueは使用しない）
+2. レビュー開始（tasks.reviewed_atで管理）
 3. claude -p でレビュー実施（完了条件確認）
 4. 判定結果に応じてDB更新
    - APPROVED: reviewed_at設定 → タスク→COMPLETED
    - REJECTED: reviewed_at設定 → タスク→REWORK
    - ESCALATED: reviewed_at設定 → エスカレーション記録
 5. REVIEWファイル作成
-
-※ ORDER_124: review_queueテーブルを使用せず、tasks.reviewed_atでレビュー管理
 """
 
 import argparse
@@ -292,15 +290,14 @@ class ReviewProcessor:
         self._log_step("read_report", "success", f"{report_file} ({content_length}文字)")
 
     def _step_start_review(self) -> None:
-        """Step 2: レビュー開始（review_queueは使用しない）"""
+        """Step 2: レビュー開始"""
         self._log_step("start_review", "start", "")
 
         if self.dry_run:
             self._log_step("start_review", "dry_run", "レビュー開始（ドライラン）")
             return
 
-        # ORDER_124: review_queueを使用せず、tasks.reviewed_atでレビュー管理
-        # タスクステータスはDONEのままでレビュー実施
+        # tasks.reviewed_atでレビュー管理。タスクステータスはDONEのままでレビュー実施
         self._log_step("start_review", "success", "レビュー開始（tasks.status=DONE, reviewed_at=NULL）")
 
     def _step_execute_review(self) -> str:
@@ -354,10 +351,77 @@ class ReviewProcessor:
 
         return verdict
 
+    def _get_known_bugs_for_review(self) -> str:
+        """レビュー時に参照するバグパターンを取得"""
+        sections = []
+
+        # 1. DBからACTIVEなバグパターンを取得
+        try:
+            from bugs.list import list_bugs
+            bugs = list_bugs(
+                project_id=self.project_id,
+                status="ACTIVE",
+            )
+            if bugs:
+                bug_lines = ["### 既知バグパターン"]
+                for bug in bugs[:10]:  # 最大10件
+                    severity = bug.get("severity", "Medium")
+                    bug_lines.append(
+                        f"- **{bug['id']}** [{severity}]: {bug['title']}"
+                    )
+                    if bug.get("solution"):
+                        solution = bug["solution"]
+                        if len(solution) > 150:
+                            solution = solution[:150] + "..."
+                        bug_lines.append(f"  解決策: {solution}")
+                sections.append("\n".join(bug_lines))
+        except Exception as e:
+            logger.warning(f"バグパターン取得失敗: {e}")
+
+        # 2. PROJECT_INFO.mdから開発ルールを取得
+        try:
+            project_info_path = self.project_dir / "PROJECT_INFO.md"
+            if project_info_path.exists():
+                content = project_info_path.read_text(encoding="utf-8")
+                rules_section = self._extract_section(content, "開発ルール")
+                if rules_section:
+                    sections.append(f"### 開発ルール（PROJECT_INFO.md）\n{rules_section}")
+        except Exception as e:
+            logger.warning(f"PROJECT_INFO.md読み込み失敗: {e}")
+
+        if not sections:
+            return ""
+
+        return "\n\n".join(sections)
+
+    def _extract_section(self, content: str, section_name: str) -> str:
+        """Markdownコンテンツから指定セクションを抽出"""
+        lines = content.split("\n")
+        in_section = False
+        section_level = 0
+        result_lines = []
+
+        for line in lines:
+            if line.startswith("#") and section_name in line:
+                in_section = True
+                section_level = len(line) - len(line.lstrip("#"))
+                continue
+            elif in_section:
+                if line.startswith("#"):
+                    current_level = len(line) - len(line.lstrip("#"))
+                    if current_level <= section_level:
+                        break
+                result_lines.append(line)
+
+        return "\n".join(result_lines).strip()
+
     def _build_review_prompt(self) -> str:
         """レビュー用プロンプトを構築（REWORK回数に応じて基準を調整）"""
         task_title = self.task_info.get("title", "Untitled") if self.task_info else "Unknown"
         task_desc = self.task_info.get("description", "") if self.task_info else ""
+
+        # 既知バグパターン情報を取得
+        known_bugs = self._get_known_bugs_for_review()
 
         # REWORK回数を取得
         rework_count = self._get_rework_count()
@@ -416,7 +480,13 @@ JSON形式で以下の構造を返してください:
 - APPROVED: 完了条件達成、品質問題なし
 - REJECTED: 完了条件未達または品質問題あり（要修正）
 - ESCALATED: 判断困難、ユーザー確認が必要
+{f"""
+## 既知バグパターン・開発ルール（品質チェック参考）
+以下の既知問題に該当する箇所がないか確認してください。
+違反がある場合はissuesに記載してください。
 
+{known_bugs}
+""" if known_bugs else ""}
 JSONのみを出力し、説明文は含めないでください。"""
 
     def _parse_verdict(self, ai_response: str) -> str:
@@ -443,7 +513,6 @@ JSONのみを出力し、説明文は含めないでください。"""
         """Step 4: 判定結果に応じてDB更新"""
         self._log_step("update_status", "start", verdict)
 
-        # ORDER_124: review_queueを使用せず、tasks.reviewed_atでレビュー管理
         if verdict == ReviewVerdict.APPROVED:
             self._update_approved()
         elif verdict == ReviewVerdict.REJECTED:

@@ -49,15 +49,11 @@ Example:
    - BLOCKEDタスクが実際に未完了の依存を持つか
    - 依存タスクが全て完了しているのにBLOCKEDなタスクがないか
 
-5. レビューキュー整合性
-   - review_queue に対応するタスクが存在するか
-   - review_queue のステータスとタスクステータスが整合しているか
-
-6. バックログ整合性
+5. バックログ整合性
    - related_order_id が存在するORDERを参照しているか
    - BACKLOG→ORDER→TASKの連鎖が整合しているか
 
-7. アーティファクトファイル整合性
+6. アーティファクトファイル整合性
    - 完了済みタスク(DONE/COMPLETED)の06_ARTIFACTSディレクトリが存在するか
    - 完了済みタスクのREPORTファイル(05_REPORT/REPORT_{task_number}.md)が存在するか
 """
@@ -141,7 +137,6 @@ class DBConsistencyChecker:
             self._check_status_transitions(conn)
             self._check_composite_keys(conn)
             self._check_task_dependencies(conn)
-            self._check_review_queue(conn)
             self._check_backlog(conn)
             self._check_artifact_files(conn)
 
@@ -495,49 +490,6 @@ class DBConsistencyChecker:
                 category="DEPENDENCY",
                 severity="INFO",
                 message=f"TASK {row['id']} (status={row['status']}) に未完了の依存があるがBLOCKEDでない",
-                details={"task_id": row['id'], "project_id": row['project_id'], "status": row['status']}
-            ))
-
-    def _check_review_queue(self, conn) -> None:
-        """レビューキューの整合性チェック"""
-        self.stats["total_checks"] += 1
-
-        # レビューキューにあるが対応タスクが存在しない
-        orphan_reviews = fetch_all(
-            conn,
-            """
-            SELECT rq.task_id, rq.project_id, rq.status
-            FROM review_queue rq
-            LEFT JOIN tasks t ON rq.task_id = t.id AND rq.project_id = t.project_id
-            WHERE t.id IS NULL
-            """
-        )
-
-        for row in orphan_reviews:
-            self.add_issue(ConsistencyIssue(
-                category="REVIEW",
-                severity="ERROR",
-                message=f"review_queue が存在しないタスク {row['task_id']} を参照",
-                details={"task_id": row['task_id'], "project_id": row['project_id'], "status": row['status']}
-            ))
-
-        # タスクがDONEだがレビューキューにない
-        missing_reviews = fetch_all(
-            conn,
-            """
-            SELECT t.id, t.project_id, t.status
-            FROM tasks t
-            LEFT JOIN review_queue rq ON t.id = rq.task_id AND t.project_id = rq.project_id
-            WHERE t.status = 'DONE'
-            AND rq.task_id IS NULL
-            """
-        )
-
-        for row in missing_reviews:
-            self.add_issue(ConsistencyIssue(
-                category="REVIEW",
-                severity="INFO",
-                message=f"TASK {row['id']} がDONEだがreview_queueにエントリがない",
                 details={"task_id": row['id'], "project_id": row['project_id'], "status": row['status']}
             ))
 

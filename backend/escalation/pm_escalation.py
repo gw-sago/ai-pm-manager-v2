@@ -196,13 +196,14 @@ class PMEscalationHandler:
         """REWORK履歴（差し戻しコメント）を取得"""
         conn = get_connection()
         try:
+            # review_queueは廃止済み。task_historyからREJECTEDの履歴を取得
             reviews = fetch_all(
                 conn,
                 """
-                SELECT comment, reviewed_at, status
-                FROM review_queue
-                WHERE task_id = ? AND project_id = ? AND status = 'REJECTED'
-                ORDER BY reviewed_at DESC
+                SELECT details as comment, created_at as reviewed_at, 'REJECTED' as status
+                FROM task_history
+                WHERE task_id = ? AND project_id = ? AND action = 'status_change' AND details LIKE '%REWORK%'
+                ORDER BY created_at DESC
                 """,
                 (self.task_id, self.project_id)
             )

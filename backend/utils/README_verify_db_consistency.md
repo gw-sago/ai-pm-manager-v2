@@ -99,20 +99,7 @@ change_historyテーブルの状態遷移履歴が、status_transitionsテーブ
 ℹ️ [DEPENDENCY] TASK TASK_251 (status=IN_PROGRESS) に未完了の依存があるがBLOCKEDでない
 ```
 
-### 6. レビューキュー整合性 (REVIEW)
-
-review_queueテーブルとtasksテーブルの整合性を検証します。
-
-- review_queueが存在しないタスクを参照していないか → エラー
-- DONEステータスのタスクがreview_queueにないか → 情報
-
-**検出例:**
-```
-❌ [REVIEW] review_queue が存在しないタスク TASK_999 を参照
-ℹ️ [REVIEW] TASK TASK_616 がDONEだがreview_queueにエントリがない
-```
-
-### 7. バックログ整合性 (BACKLOG)
+### 6. バックログ整合性 (BACKLOG)
 
 backlog_itemsとordersの連携の整合性を検証します。
 

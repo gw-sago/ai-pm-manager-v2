@@ -51,8 +51,8 @@ python backend/order/list.py $PROJECT_NAME --active --json
 # タスク一覧取得（特定ORDER）
 python backend/task/list.py $PROJECT_NAME --order ORDER_XXX --json
 
-# レビューキュー取得
-python backend/queue/list.py $PROJECT_NAME --json
+# レビュー待ちタスク取得（DONE & reviewed_at IS NULL）
+python backend/task/list.py $PROJECT_NAME --status DONE --json
 
 # Worker配置状況（実行中タスク）
 python backend/task/list.py $PROJECT_NAME --status IN_PROGRESS --json
@@ -103,7 +103,7 @@ DBスクリプト実行に失敗した場合、または DB が存在しない�
 | 状態サマリ | `order/list.py --summary` | エラー表示 |
 | ORDER一覧 | `order/list.py --active` | エラー表示 |
 | タスク一覧 | `task/list.py --order` | エラー表示 |
-| レビューキュー | `queue/list.py` | エラー表示 |
+| レビュー待ち | `task/list.py --status DONE` | エラー表示 |
 | Worker配置 | `task/list.py --status IN_PROGRESS` | エラー表示 |
 | 中断タスク | `task/list.py --status INTERRUPTED` | エラー表示 |
 
@@ -264,7 +264,7 @@ python scripts/sync/check_integrity.py {PROJECT_NAME} --fix
 修復済み: 3件
 - TASK_297: status QUEUED → DONE
 - TASK_298: status QUEUED → COMPLETED
-- TASK_298: review_queue 追加
+- TASK_298: status更新
 ```
 
 ### 0.8.5 表示条件とスキップ
@@ -372,38 +372,11 @@ python backend/task/list.py PROJECT_NAME --status INTERRUPTED --json
 }
 ```
 
-#### キュー一覧取得
+#### レビュー待ちタスク取得
 
 ```bash
-# 実行可能なタスク一覧を取得
-python backend/queue/list.py PROJECT_NAME --json
-
-# 特定ORDERのキューを取得
-python backend/queue/list.py PROJECT_NAME --order ORDER_036 --json
-```
-
-**出力形式（--json指定時）**:
-```json
-{
-  "queue": [
-    {
-      "id": "TASK_197",
-      "order_id": "ORDER_036",
-      "title": "テストスイート実装",
-      "priority": "P1",
-      "dependencies_met": true,
-      "blocked_by": []
-    }
-  ],
-  "blocked": [
-    {
-      "id": "TASK_199",
-      "order_id": "ORDER_036",
-      "title": "統合テスト",
-      "blocked_by": ["TASK_197", "TASK_198"]
-    }
-  ]
-}
+# レビュー待ちタスク一覧を取得（DONE & reviewed_at IS NULL）
+python backend/task/list.py PROJECT_NAME --status DONE --json
 ```
 
 ### スクリプト実行の前提条件

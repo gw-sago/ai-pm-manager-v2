@@ -190,7 +190,6 @@ def _reverse_operation(conn: sqlite3.Connection, op: Operation) -> Dict[str, Any
         "order": ["status", "priority"],
         "task": ["status", "assignee", "priority"],
         "backlog": ["status", "priority"],
-        "review": ["status", "reviewer", "priority"],
     }
 
     if op.entity_type not in reversible:
@@ -205,13 +204,12 @@ def _reverse_operation(conn: sqlite3.Connection, op: Operation) -> Dict[str, Any
         "order": "orders",
         "task": "tasks",
         "backlog": "backlog_items",
-        "review": "review_queue",
     }
 
     table = table_map[op.entity_type]
 
     # 現在の値を確認
-    id_column = "task_id" if op.entity_type == "review" else "id"
+    id_column = "id"
     check_query = f"SELECT {op.field_name} FROM {table} WHERE {id_column} = ?"
     current_row = fetch_one(conn, check_query, (op.entity_id,))
 
@@ -351,7 +349,7 @@ def main():
     )
     parser.add_argument(
         "--entity-type",
-        choices=["project", "order", "task", "backlog", "review"],
+        choices=["project", "order", "task", "backlog"],
         help="エンティティ種別でフィルタ"
     )
     parser.add_argument(

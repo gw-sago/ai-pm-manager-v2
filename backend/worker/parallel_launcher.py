@@ -171,17 +171,13 @@ def find_orphaned_done_tasks(
         conn.close()
 
 
-def register_orphaned_tasks_to_review_queue(
+def detect_orphaned_done_tasks_count(
     orphaned_tasks: Optional[List[Dict[str, Any]]] = None,
     *,
     project_id: Optional[str] = None,
 ) -> int:
     """
     Detect orphaned DONE tasks (status='DONE' AND reviewed_at IS NULL).
-
-    This function no longer registers tasks into review_queue.
-    Instead, it simply detects and returns the count of orphaned tasks.
-    The review process now directly queries tasks with reviewed_at IS NULL.
 
     Args:
         orphaned_tasks: List of orphaned task dicts as returned by
@@ -191,7 +187,7 @@ def register_orphaned_tasks_to_review_queue(
             detection query. Ignored when ``orphaned_tasks`` is provided.
 
     Returns:
-        Number of orphaned DONE tasks detected (not registered).
+        Number of orphaned DONE tasks detected.
     """
     # If no task list supplied, detect orphaned tasks ourselves
     if orphaned_tasks is None:
@@ -201,7 +197,6 @@ def register_orphaned_tasks_to_review_queue(
         logger.info("[orphan-detect] No orphaned DONE tasks found")
         return 0
 
-    # Simply return the count - no review_queue registration needed
     count = len(orphaned_tasks)
     logger.info(
         f"[orphan-detect] Found {count} orphaned DONE task(s) awaiting review "

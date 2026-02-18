@@ -524,8 +524,8 @@ def load_dashboard_context(
                 conn,
                 """
                 SELECT COUNT(*) as count
-                FROM review_queue
-                WHERE project_id = ? AND status IN ('PENDING', 'IN_REVIEW')
+                FROM tasks
+                WHERE project_id = ? AND status = 'DONE' AND reviewed_at IS NULL
                 """,
                 (project_id,)
             )
@@ -631,25 +631,23 @@ def load_dashboard_context(
             conn,
             """
             SELECT
-                rq.id,
-                rq.task_id,
-                rq.project_id,
-                rq.status,
-                rq.priority,
-                rq.submitted_at,
-                rq.reviewer,
+                t.id as task_id,
+                t.project_id,
+                t.status,
+                t.priority,
+                t.updated_at as submitted_at,
+                NULL as reviewer,
                 t.title as task_title,
-                julianday('now') - julianday(rq.submitted_at) as hours_pending
-            FROM review_queue rq
-            LEFT JOIN tasks t ON rq.task_id = t.id AND rq.project_id = t.project_id
-            WHERE rq.status IN ('PENDING', 'IN_REVIEW')
+                julianday('now') - julianday(t.updated_at) as hours_pending
+            FROM tasks t
+            WHERE t.status = 'DONE' AND t.reviewed_at IS NULL
             ORDER BY
-                CASE rq.priority
+                CASE t.priority
                     WHEN 'P0' THEN 0
                     WHEN 'P1' THEN 1
                     WHEN 'P2' THEN 2
                 END,
-                rq.submitted_at ASC
+                t.updated_at ASC
             """
         )
 
@@ -665,10 +663,8 @@ def load_dashboard_context(
             if proj_id:
                 review_by_project[proj_id] = review_by_project.get(proj_id, 0) + 1
 
-            if review["status"] == "PENDING":
-                total_pending += 1
-            elif review["status"] == "IN_REVIEW":
-                total_in_review += 1
+            # reviewed_atがNULLのDONEタスクは全てレビュー待ち（PENDING相当）
+            total_pending += 1
 
             if review["priority"] == "P0":
                 p0_count += 1

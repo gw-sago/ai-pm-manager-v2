@@ -100,19 +100,9 @@ def run_tests():
         )
         record_transition(conn, "task", "TASK_TC001", "IN_PROGRESS", "DONE", "Worker A")
 
-        execute_query(
-            conn,
-            """INSERT INTO review_queue (task_id, status, priority)
-            VALUES ('TASK_TC001', 'PENDING', 'P1')""",
-        )
-
         validate_transition(conn, "task", "DONE", "COMPLETED", "PM")
         execute_query(
             conn, "UPDATE tasks SET status = 'COMPLETED' WHERE id = 'TASK_TC001'"
-        )
-        execute_query(
-            conn,
-            "UPDATE review_queue SET status = 'APPROVED' WHERE task_id = 'TASK_TC001'",
         )
         conn.commit()
 
@@ -133,28 +123,15 @@ def run_tests():
             """INSERT INTO tasks (id, order_id, title, status, assignee)
             VALUES ('TASK_TC002', 'ORDER_001', 'Rework Task', 'DONE', 'Worker A')""",
         )
-        execute_query(
-            conn,
-            """INSERT INTO review_queue (task_id, status, priority)
-            VALUES ('TASK_TC002', 'PENDING', 'P1')""",
-        )
 
         validate_transition(conn, "task", "DONE", "REWORK", "PM")
         execute_query(
             conn, "UPDATE tasks SET status = 'REWORK' WHERE id = 'TASK_TC002'"
         )
-        execute_query(
-            conn,
-            "UPDATE review_queue SET status = 'REJECTED' WHERE task_id = 'TASK_TC002'",
-        )
 
         validate_transition(conn, "task", "REWORK", "DONE", "Worker")
         execute_query(
             conn, "UPDATE tasks SET status = 'DONE' WHERE id = 'TASK_TC002'"
-        )
-        execute_query(
-            conn,
-            "UPDATE review_queue SET status = 'PENDING', priority = 'P0' WHERE task_id = 'TASK_TC002'",
         )
 
         validate_transition(conn, "task", "DONE", "COMPLETED", "PM")
@@ -164,9 +141,7 @@ def run_tests():
         conn.commit()
 
         task = fetch_one(conn, "SELECT * FROM tasks WHERE id = 'TASK_TC002'")
-        review = fetch_one(conn, "SELECT * FROM review_queue WHERE task_id = 'TASK_TC002'")
         assert task["status"] == "COMPLETED"
-        assert review["priority"] == "P0"
         print("  PASSED")
         passed += 1
     except Exception as e:

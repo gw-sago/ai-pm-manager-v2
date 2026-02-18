@@ -624,12 +624,7 @@ while running_tasks or has_queued_tasks():
 
 1. **REPORT/TASK読み込み**
 
-2. **レビューステータス更新**
-   ```bash
-   python backend/queue/update.py $PROJECT_NAME TASK_{TASK_ID} IN_REVIEW --reviewer PM
-   ```
-
-3. **レビュー実施（AI判断）**
+2. **レビュー実施（AI判断）**
    - 完了条件達成確認
    - 成果物品質確認
 
@@ -648,9 +643,6 @@ while running_tasks or has_queued_tasks():
 #### APPROVED（承認）の場合
 
 ```bash
-# DB更新
-python backend/queue/update.py $PROJECT_NAME TASK_{TASK_ID} APPROVED --reviewer PM
-
 # タスクステータス更新
 python backend/task/update.py $PROJECT_NAME TASK_{TASK_ID} --status COMPLETED
 ```
@@ -689,9 +681,6 @@ else:
 ```bash
 # タスクステータスをREWORKに更新
 python backend/task/update.py $PROJECT_NAME TASK_{TASK_ID} --status REWORK
-
-# レビューキューをREJECTEDに更新
-python backend/queue/update.py $PROJECT_NAME TASK_{TASK_ID} REJECTED --comment "{reason}"
 ```
 
 → Step 4.4へ戻る（差し戻し理由を含めて再実行）
@@ -1135,9 +1124,6 @@ python backend/backlog/update.py $PROJECT_NAME {BACKLOG_ID} --status DONE
 | `task/get.py` | タスク詳細取得 |
 | `task/create.py` | タスク作成 |
 | `task/update.py` | タスク状態更新 |
-| `queue/add.py` | レビューキュー追加 |
-| `queue/update.py` | レビューキュー更新 |
-| `task/update.py` | タスクステータス更新 |
 | `backlog/list.py` | BACKLOG一覧取得 |
 | `backlog/update.py` | BACKLOG状態更新 |
 | `render/state.py` | プロジェクト状態のレンダリング |

@@ -3,7 +3,7 @@ description: Worker役としてTASKを実行
 argument-hint: PROJECT_NAME TASK_ID [--script]
 ---
 
-> **DB中心アーキテクチャ対応**: タスク状態更新・レビューキュー追加はDBスクリプト経由で実行されます。
+> **DB中心アーキテクチャ対応**: タスク状態更新はDBスクリプト経由で実行されます。
 
 Workerとして指定されたプロジェクトの TASK を実行します。
 
@@ -46,9 +46,8 @@ python backend/worker/execute_task.py $PROJECT_NAME TASK_$TASK_ID --model opus
 2. Worker割当・ステータス更新（IN_PROGRESS）
 3. claude -p でタスク実行
 4. REPORT作成
-5. レビューキュー追加
-6. ステータス更新（DONE）
-7. 自動レビュー実行 → COMPLETED（※デフォルト有効、--no-reviewで無効化可）
+5. ステータス更新（DONE）
+6. 自動レビュー実行 → COMPLETED（※デフォルト有効、--no-reviewで無効化可）
 
 **重要**: Worker完了時に自動レビューを実行し、COMPLETEDまで進めます。
 これにより後続のBLOCKEDタスクが自動解除されます。
@@ -620,25 +619,89 @@ DEV環境で作業する場合は、以下の手順でセットアップして�
    同一ファイルに対する再警告はスキップ可能
 ```
 
+### 1.9.8 Roamingパスガードレール（Localパス書き込み防止）
+
+WorkerがPROJECTS/配下のファイルを読み書きする際、必ず**Roaming絶対パス**を使用してください。
+
+#### 1.9.8.1 背景
+
+- cwdが`AppData\Local`（インストール先）のため、相対パス`PROJECTS/...`はLocalに解決される
+- Squirrelインストーラーの更新でLocalが上書きされ、永続データが消失する
+- 永続データ（PROJECTS/, DB等）は必ず`AppData\Roaming`配下に配置する設計
+
+#### 1.9.8.2 Roamingパスの取得方法
+
+```bash
+# Roaming配下のプロジェクトパスを取得
+python backend/config/resolve_path.py $PROJECT_NAME --json
+```
+
+出力例:
+```json
+{
+  "base": "C:\\Users\\...\\AppData\\Roaming\\ai-pm-manager-v2\\PROJECTS\\ai_pm_manager_v2",
+  "orders": "C:\\Users\\...\\AppData\\Roaming\\ai-pm-manager-v2\\PROJECTS\\ai_pm_manager_v2\\ORDERS",
+  "result": "C:\\Users\\...\\AppData\\Roaming\\ai-pm-manager-v2\\PROJECTS\\ai_pm_manager_v2\\RESULT"
+}
+```
+
+#### 1.9.8.3 パスルール
+
+| ルールID | 説明 |
+|----------|------|
+| RP-001 | PROJECTS/配下のファイルはRoaming絶対パスで参照する |
+| RP-002 | 相対パス `PROJECTS/$PROJECT_NAME/...` は禁止（Localに解決される） |
+| RP-003 | Read/Write/Editツール使用時、パスに`AppData\Local`が含まれていないか確認 |
+| RP-004 | ファイルパスに`AppData\Roaming`が含まれていることを確認 |
+
+#### 1.9.8.4 検出ロジック
+
+```
+Roamingパス検証:
+1. 編集対象のファイルパスを取得
+2. 以下の条件をチェック:
+   a. パスに「AppData\Local」が含まれる → 警告（Localへの書き込み）
+   b. パスに「AppData\Roaming」が含まれる → 許可
+   c. 相対パスで「PROJECTS/」から始まる → 警告（Localに解決される可能性）
+3. 警告検出時:
+   → resolve_path.py で正しいRoamingパスを取得して使用
+```
+
+#### 1.9.8.5 警告表示
+
+```
+【ガードレール検出】Localパスへの書き込み
+
+対象パス: {検出されたファイルパス}
+
+このパスはAppData\Local配下です。Squirrelインストーラーの更新で
+上書きされるため、AppData\Roaming配下に書き込んでください。
+
+正しいパス（Roaming）:
+  {Roaming版のパス}
+
+パスを変換して作業を続行します。
+```
+
 ---
 
 ## 1.10. 差し戻しタスク確認（Phase 2: PM+Worker並行稼働対応）
 
-タスク開始前にレビューキューを確認し、差し戻しタスク（REJECTED）がある場合は優先的に通知します。
+タスク開始前に差し戻しタスク（REWORKステータス）がある場合は優先的に通知します。
 
-### 1.10.1 レビューキュー確認
+### 1.10.1 差し戻しタスク確認
 
-DBスクリプト経由でレビューキューを確認し、差し戻しタスクを検索：
+DBスクリプト経由で差し戻しタスクを検索：
 
 ```bash
-# 差し戻しタスクの確認
-python backend/queue/list.py $PROJECT_NAME --status REJECTED --json
+# 差し戻しタスクの確認（REWORKステータスのタスク）
+python backend/task/list.py $PROJECT_NAME --status REWORK --json
 ```
 
 ```
 差し戻しタスク検索:
-1. DBからレビューキューを取得（ステータスがREJECTEDのエントリ）
-2. 該当エントリがあれば差し戻し通知を表示
+1. DBからREWORKステータスのタスクを取得
+2. 該当タスクがあれば差し戻し通知を表示
 ```
 
 ### 1.10.2 差し戻し通知表示
@@ -650,7 +713,7 @@ python backend/queue/list.py $PROJECT_NAME --status REJECTED --json
 以下のタスクがPMから差し戻されました：
 
 - TASK_XXX: {タスク名}
-  差し戻し理由: {レビューキューの備考または関連REVIEW_XXX.mdを参照}
+  差し戻し理由: {関連REVIEW_XXX.mdを参照}
 
 差し戻しタスクを優先的に対応しますか？ [Y/n]
 ```
@@ -684,7 +747,7 @@ REVIEW状態判定:
 1. DBからプロジェクトステータスを確認
 2. ステータスがREVIEWの場合:
    - Phase 1: 「レビュー完了を待ってください」と表示し待機
-   - Phase 2: 通常通りタスク実行可能（レビューキュー確認後）
+   - Phase 2: 通常通りタスク実行可能（差し戻しタスク確認後）
 3. レビュー中の自タスクは編集不可（競合防止ルール）
 ```
 
@@ -1225,16 +1288,15 @@ Task ID: TASK_$TASK_ID
 
 **スクリプト呼び出し時の自動記録**:
 - `task/update.py` 呼び出し時、変更履歴がDBに記録される
-- `queue/add.py` 呼び出し時、レビューキュー追加履歴がDBに記録される
 
 ```
 更新履歴への追加フォーマット:
-| {日付} | Worker {識別子} | TASK_$TASK_ID完了：{タスク名}（{実施内容要約}）、{主要成果物}作成、レビューキューに追加 |
+| {日付} | Worker {識別子} | TASK_$TASK_ID完了：{タスク名}（{実施内容要約}）、{主要成果物}作成 |
 ```
 
 **例**:
 ```markdown
-| 2026-01-20 | Worker A | TASK_167完了：aipm-worker.md完了サマリ出力強化（Step 6.5追加、DB更新ロジック追加）、DEV環境コマンド更新、レビューキューに追加 |
+| 2026-01-20 | Worker A | TASK_167完了：aipm-worker.md完了サマリ出力強化（Step 6.5追加、DB更新ロジック追加）、DEV環境コマンド更新 |
 ```
 
 ### 6.5.4 DB更新（完了状態への遷移）
@@ -1256,7 +1318,7 @@ DB更新内容:
 2. 完了サマリを生成
 3. REPORT_$TASK_ID.mdに「完了サマリ」セクション追加
 4. DB更新履歴に追加（自動記録）
-5. Step 6.6（レビューキュー更新）へ進む
+5. Step 6.6（タスクステータスDONE更新）へ進む
 ```
 
 ### 6.5.6 サマリ生成が不要な場合
@@ -1266,110 +1328,54 @@ DB更新内容:
 
 ---
 
-## 6.6. レビューキュー更新（**必須** - スキップ不可）【DB経由】
+## 6.6. タスクステータスDONE更新（**必須** - スキップ不可）【DB経由】
 
 > **重要**: このステップは**必須**です。スキップ不可。
-> レビューキューに追加されていないタスクは「完了」とみなされません。
+> ステータスがDONEに更新されていないタスクは「完了」とみなされません。
 
-タスク完了時、DBのレビューキューにエントリを**必ず**追加します。
+タスク完了時、DBのタスクステータスを**必ず**DONEに更新します。
 
-### 6.6.1 レビューキュー追加手順（DBスクリプト経由）【必須】
+### 6.6.1 タスクステータス更新手順（DBスクリプト経由）【必須】
 
-タスク完了報告記入後、以下のスクリプトでレビューキューを**必ず**更新：
+タスク完了報告記入後、以下のスクリプトでタスクステータスを**必ず**更新：
 
 **スクリプト呼び出し**:
 
 ```bash
-# レビューキューにタスクを追加（ステータスも自動でDONEに更新）
-python PROJECTS/$PROJECT_NAME/DEV/aipm-db/queue/add.py $PROJECT_NAME TASK_$TASK_ID
-```
-
-または、Claude Code環境からは以下のコマンドで実行:
-
-```bash
-cd PROJECTS/$PROJECT_NAME/DEV && python -m aipm-db.queue.add $PROJECT_NAME TASK_$TASK_ID
-```
-
-**差し戻し再提出の場合**:
-
-```bash
-cd PROJECTS/$PROJECT_NAME/DEV && python -m aipm-db.queue.add $PROJECT_NAME TASK_$TASK_ID \
-  --resubmit \
-  --comment "再提出"
+# タスクステータスをDONEに更新
+python backend/task/update.py $PROJECT_NAME TASK_$TASK_ID --status DONE
 ```
 
 **処理結果**:
-- DBのreview_queueテーブルにエントリが追加される
-- タスクステータスが自動で「DONE」に更新される
-- 優先度が自動判定される（通常: P1、差し戻し再提出: P0）
+- タスクステータスが「DONE」に更新される
 - 状態遷移履歴がDBに記録される
 
-**従来方式との対応**:
-
-| 従来（Edit/Write） | DB方式（スクリプト） |
-|--------------------|---------------------|
-| Markdownを直接編集 | `queue/add.py` を呼び出し |
-| レビューキュー行を追加 | DB INSERT |
-| タスク行ステータスをDONEに更新 | 自動更新 |
-
-### 6.6.2 優先度決定ロジック（自動判定）
-
-優先度はスクリプトが自動判定します：
-
-```
-優先度の決定（queue/add.py内で自動実行）:
-IF タスクステータスがREWORKからの完了 THEN
-    優先度 = P0 (差戻)
-    備考 = 再提出
-ELSE
-    優先度 = P1
-    備考 = -
-```
-
-**明示的に優先度を指定する場合**:
-
-```bash
-# P0（最優先）で追加
-python -m aipm-db.queue.add $PROJECT_NAME TASK_$TASK_ID --priority P0
-
-# P2（低優先）で追加
-python -m aipm-db.queue.add $PROJECT_NAME TASK_$TASK_ID --priority P2
-```
-
-### 6.6.3 DB更新例（スクリプト実行後）
-
-スクリプト実行により、DB更新とMarkdown自動生成が実行されます。
+### 6.6.2 DB更新例（スクリプト実行後）
 
 **スクリプト実行**:
 ```bash
-python -m aipm-db.queue.add AI_PM_PJ TASK_143
-```
-
-**実行結果（コンソール出力）**:
-```
-[OK] レビューキューに追加しました (ID: 5, 優先度: P1)
+python backend/task/update.py AI_PM_PJ TASK_143 --status DONE --json
 ```
 
 **DB更新結果**:
 - タスクステータス: DONE
-- レビューキュー: PENDING (P1)
 
-### 6.6.4 エラー処理（DBスクリプトが利用できない場合）【必須対応】
+### 6.6.3 エラー処理（DBスクリプトが利用できない場合）【必須対応】
 
 **DBスクリプトが利用できない場合**：
-- aipm-dbディレクトリが存在しない
+- backendディレクトリが存在しない
 - データベースが初期化されていない
 - スクリプト実行エラー
 
 **エラー時の動作**（スキップ不可）:
-1. **タスク完了を保留**（レビューキュー追加なしに完了とみなさない）
+1. **タスク完了を保留**（ステータスDONE更新なしに完了とみなさない）
 2. エラーメッセージを表示
 3. DBスクリプトの修復を促す
 4. **タスクステータスはIN_PROGRESSのまま維持**
 
 **エラーメッセージ**：
 ```
-【エラー】レビューキュー追加に失敗しました。
+【エラー】タスクステータス更新に失敗しました。
 
 DBスクリプトが利用できないため、タスク完了処理を保留します。
 タスクステータス: IN_PROGRESS（変更なし）
@@ -1379,21 +1385,7 @@ DBスクリプトが利用できないため、タスク完了処理を保留し
 2. 修復後、再度タスク完了処理を実行してください
    /aipm-worker $PROJECT_NAME $TASK_ID
 
-レビューキュー追加なしにタスクは「完了」とみなされません。
-```
-
-> **注意**: 以前のバージョンでは「タスク完了処理は保留」としていましたが、
-> 現在は**レビューキュー追加は必須**であり、追加されるまでタスクは完了しません。
-
-### 6.6.5 次タスク完了時の差し戻し通知
-
-タスク完了後、レビューキューに他の差し戻しタスク（REJECTED）がある場合は以下を表示：
-
-```
-【注意】レビューキューに差し戻しタスクがあります。
-- TASK_XXX（P0）
-
-次に差し戻しタスクを対応することを推奨します。
+ステータスDONE更新なしにタスクは「完了」とみなされません。
 ```
 
 ---
@@ -1575,7 +1567,6 @@ Task ID: TASK_150
 
 DB更新:
 - タスクステータス: DONE
-- レビューキュー: TASK_150 を追加（PENDING, P1）
 
 REPORT_150.md を作成しました。
 パス: PROJECTS/AI_PM_PJ/RESULT/ORDER_XXX/05_REPORT/REPORT_150.md
@@ -1584,7 +1575,7 @@ REPORT_150.md を作成しました。
 PMレビューを実施してください：
 /aipm-review AI_PM_PJ 150
 ```
-→ タスク完了時に完了サマリを生成し、DBを更新してレビューキューに追加
+→ タスク完了時に完了サマリを生成し、DBを更新
 
 ### 11. REVIEW状態での作業例（Phase 2）
 ```
@@ -1735,21 +1726,18 @@ DBに記録しました。
 ```
 → 作業完了時、チェックポイントをスクリプト経由でDBに記録する
 
-### 18. DB方式でのレビューキュー追加例
+### 18. DB方式でのタスク完了例
 ```
 /aipm-worker AI_PM_PJ 192
 Worker:
 【作業完了】TASK_192 を完了しました。
 
 【DBスクリプト実行】
-レビューキュー追加:
-$ python -m aipm-db.queue.add AI_PM_PJ TASK_192
-
-[OK] レビューキューに追加しました (ID: 7, 優先度: P1)
+タスクステータス更新:
+$ python backend/task/update.py AI_PM_PJ TASK_192 --status DONE
 
 DB更新が完了しました。
 - タスクステータス: DONE
-- レビューキュー: PENDING (P1)
 
 REPORT_192.md を作成しました。
 パス: PROJECTS/AI_PM_PJ/RESULT/ORDER_036/05_REPORT/REPORT_192.md
@@ -1758,7 +1746,7 @@ REPORT_192.md を作成しました。
 PMレビューを実施してください：
 /aipm-review AI_PM_PJ 192
 ```
-→ タスク完了時、DBスクリプト経由でレビューキューに追加される
+→ タスク完了時、DBスクリプト経由でタスクステータスをDONEに更新
 
 ### 19. DB方式での差し戻し再提出例
 ```
@@ -1767,16 +1755,13 @@ Worker:
 【作業完了】TASK_192 を完了しました（修正完了）。
 
 【DBスクリプト実行】
-レビューキュー追加（差し戻し再提出）:
-$ python -m aipm-db.queue.add AI_PM_PJ TASK_192 --resubmit --comment "再提出"
-
-[OK] レビューキューに追加しました (ID: 8, 優先度: P0)
+タスクステータス更新（差し戻し再提出）:
+$ python backend/task/update.py AI_PM_PJ TASK_192 --status DONE
 
 DB更新が完了しました。
 - タスクステータス: DONE
-- レビューキュー: PENDING (P0 - 再提出)
 ```
-→ 差し戻しタスクの再提出時、自動でP0（最優先）に設定される
+→ 差し戻しタスクの再提出時もtask/update.pyでDONEに更新
 
 ### 20. バグ修正タスクでの横展開チェック例
 ```
@@ -1903,9 +1888,6 @@ REPORT記載:
 | `task/update.py` | タスクステータス更新 | タスク開始時、完了時、中断時 |
 | `task/get.py` | タスク情報取得 | タスク情報確認時 |
 | `task/list.py` | タスク一覧取得 | 依存関係確認時 |
-| `queue/add.py` | レビューキュー追加 | タスク完了時 |
-| `queue/update.py` | レビューキュー更新 | PMレビュー時（aipm-reviewが使用） |
-| `queue/list.py` | レビューキュー一覧 | 差し戻しタスク確認時 |
 | `session/checkpoint.py` | チェックポイント記録 | 作業完了時（Step 3.5） |
 | `worker/assign.py` | Worker識別子割当 | タスク開始時（Step 1.7） |
 
@@ -1918,14 +1900,11 @@ cd PROJECTS/$PROJECT_NAME/DEV
 # タスクステータス更新
 python -m aipm-db.task.update $PROJECT_NAME TASK_$TASK_ID --status IN_PROGRESS --role Worker
 
-# レビューキュー追加
-python -m aipm-db.queue.add $PROJECT_NAME TASK_$TASK_ID
-
 # タスク情報取得
 python -m aipm-db.task.get $PROJECT_NAME TASK_$TASK_ID --json
 
-# レビューキュー一覧（差し戻しタスク確認）
-python -m aipm-db.queue.list $PROJECT_NAME --status REJECTED
+# 差し戻しタスク確認（REWORKステータス）
+python -m aipm-db.task.list $PROJECT_NAME --status REWORK
 
 # チェックポイント記録
 python -m aipm-db.session.checkpoint $PROJECT_NAME --step "ステップ名" --next "次のアクション" --memo "メモ"

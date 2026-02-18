@@ -33,7 +33,6 @@ EXECUTION_STEPS = [
     "file_lock",          # ファイルロック取得
     "execute_task",       # AI実行
     "create_report",      # REPORT作成
-    "add_review_queue",   # レビューキュー追加
     "update_status_done", # ステータス更新（DONE）
     "auto_review",        # 自動レビュー
 ]
@@ -45,7 +44,6 @@ STEP_DISPLAY_NAMES = {
     "file_lock": "ファイルロック",
     "execute_task": "AI実行",
     "create_report": "レポート作成",
-    "add_review_queue": "レビュー待ち",
     "update_status_done": "完了処理",
     "auto_review": "自動レビュー",
 }
@@ -210,7 +208,7 @@ def _infer_current_step(
 
         # DONE遷移があればレビュー待ちステップ
         if action == "status_change" and "DONE" in details:
-            return "add_review_queue"
+            return "update_status_done"
 
         # Worker割当があればfile_lockステップ
         if action == "assignee_change" or "assignee" in details.lower():
@@ -228,8 +226,7 @@ def _infer_current_step(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # パターン3: レビューキューに追加されているかチェック（これも別途クエリが必要）
-    # ここでは簡易推定として、DONE直前ならcreate_reportステップと推定
+    # パターン3: DONE直前ならcreate_reportステップと推定
     for record in history_dicts:
         if "report" in record.get("details", "").lower():
             return "create_report"

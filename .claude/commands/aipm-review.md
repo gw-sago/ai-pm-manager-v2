@@ -41,7 +41,7 @@ python backend/review/process_review.py AI_PM_PJ TASK_605 --auto-approve
 process_review.py
   │
   ├─ Step 1: タスク・REPORT情報取得
-  ├─ Step 2: IN_REVIEW更新 ←── queue/update.py
+  ├─ Step 2: IN_REVIEW更新
   ├─ Step 3: claude -p でレビュー実施 ←── claude_runner.py
   ├─ Step 4: 判定結果に応じてDB更新
   │   ├─ APPROVED → タスク=COMPLETED
@@ -105,15 +105,6 @@ DB利用可能判定:
 
 DBが利用可能な場合、以下のスクリプトでレビューキュー情報を取得：
 
-**レビューキュー一覧取得**:
-```bash
-# レビューキュー一覧（PENDING/IN_REVIEW）
-python backend/queue/list.py $PROJECT_NAME --status PENDING --json
-
-# サマリ情報（件数・優先度別集計）
-python backend/queue/list.py $PROJECT_NAME --summary --json
-```
-
 **タスク情報取得**:
 ```bash
 # 特定タスクの情報取得
@@ -159,10 +150,8 @@ DBスクリプト実行に失敗した場合、または DB が存在しない�
 
 | 機能 | DBモード | フォールバック（従来方式） |
 |------|---------|-------------------------|
-| レビューキュー取得 | `queue/list.py --status PENDING` | エラー終了（DB必須） |
 | タスク情報取得 | `task/get.py` | TASK_XXX.md を Glob → Read |
-| レビューステータス更新 | `queue/update.py` | エラー終了（DB必須） |
-| タスクステータス更新 | `queue/update.py`（連動） | エラー終了（DB必須） |
+| タスクステータス更新 | `task/update.py` | エラー終了（DB必須） |
 | BACKLOG更新 | `backlog/update.py` | エラー終了（DB必須） |
 
 ---
@@ -187,30 +176,15 @@ DBスクリプト実行に失敗した場合、または DB が存在しない�
 
 以下の手順を実行：
 
-#### 1. レビューキュー取得（スクリプト呼び出し）
+#### 1. レビュー待ちタスク取得（スクリプト呼び出し）
 
 ```bash
-python backend/queue/list.py $PROJECT_NAME --json
+python backend/task/list.py $PROJECT_NAME --status DONE --json
 ```
 
 **取得される情報**:
-- 全ORDERのレビューキューを統合
-- PENDINGステータスのタスクを抽出
+- ステータスがDONE（レビュー待ち）のタスクを抽出
 - 優先度順（P0 > P1 > P2）＋ 提出日時順（FIFO）でソート
-
-**出力例**:
-```json
-[
-  {"task_id": "TASK_003", "priority": "P0", "review_status": "PENDING", ...},
-  {"task_id": "TASK_001", "priority": "P1", "review_status": "PENDING", ...}
-]
-```
-
-#### 2. サマリ取得（オプション）
-
-```bash
-python backend/queue/list.py $PROJECT_NAME --summary --json
-```
 
 #### 3. 一覧表示
    ```
@@ -248,10 +222,10 @@ python backend/queue/list.py $PROJECT_NAME --summary --json
 
 以下の手順を実行：
 
-#### 1. レビューキューからの取得（スクリプト呼び出し）
+#### 1. レビュー待ちタスクからの取得（スクリプト呼び出し）
 
 ```bash
-python backend/queue/list.py $PROJECT_NAME --status PENDING --json
+python backend/task/list.py $PROJECT_NAME --status DONE --json
 ```
 
 優先度順（P0 > P1 > P2）でソート済みのリストを取得。
@@ -259,13 +233,6 @@ python backend/queue/list.py $PROJECT_NAME --status PENDING --json
 #### 2. 最優先タスク選択
 
 スクリプト出力の最初のエントリが最優先タスク。
-
-**サマリ取得**（次の1件情報）:
-```bash
-python backend/queue/list.py $PROJECT_NAME --summary --json
-```
-
-返却される`next_task`フィールドが最優先タスク。
 
 #### 3. キューが空の場合
 
@@ -318,12 +285,10 @@ python backend/queue/list.py $PROJECT_NAME --summary --json
      c. 「通常のレビューフロー」（Step 1〜9）を**完全に実行**
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         【必須】Step 7（DB更新）を**必ず**実行すること
-        ・承認時: queue/update.py → APPROVED
+        ・承認時: task/update.py → COMPLETED
           → タスクステータス: DONE → COMPLETED
-          → レビューキュー: 削除
-        ・差し戻し時: queue/update.py → REJECTED
+        ・差し戻し時: task/update.py → REWORK
           → タスクステータス: DONE → REWORK
-          → レビューキュー: REJECTEDで残る
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      d. DB更新確認（各タスク完了時）
         - 更新成功: 「DB更新完了: TASK_XXX → COMPLETED/REWORK」
@@ -554,36 +519,7 @@ python backend/queue/list.py $PROJECT_NAME --summary --json
 - REPORT読み込みで取得したファイルパスからORDERディレクトリを特定
 - 対応する `TASK_$REPORT_ID.md` を同じORDERディレクトリの `04_QUEUE/TASK_$REPORT_ID.md` から読み込む
 
-### 3. レビューステータス更新（IN_REVIEW）
-
-レビュー開始時にレビューキューのステータスを更新：
-
-#### 3.1 スクリプト呼び出し
-
-以下のPythonスクリプトを実行してレビュー開始状態に遷移：
-
-```bash
-python backend/queue/update.py $PROJECT_NAME $TASK_ID IN_REVIEW --reviewer PM --json
-```
-
-**成功時の出力例**:
-```json
-{
-  "success": true,
-  "queue_id": 5,
-  "task_id": "TASK_188",
-  "old_review_status": "PENDING",
-  "new_review_status": "IN_REVIEW",
-  "message": "レビュー状態を更新しました: PENDING → IN_REVIEW"
-}
-```
-
-#### 3.2 後方互換性（DBが存在しない場合）
-
-- スクリプトがエラーを返した場合はエラー終了（DBスクリプトの修復が必要）
-- データベースが存在しない場合は警告なしでスキップ
-
-### 4. レビュー実施
+### 3. レビュー実施
 - 完了条件がすべて達成されているか確認
 - 成果物の品質確認
 - エスカレーション事項の確認
@@ -728,67 +664,61 @@ python backend/queue/update.py $PROJECT_NAME $TASK_ID IN_REVIEW --reviewer PM --
 - `PROJECTS/$PROJECT_NAME/RESULT/ORDER_XXX/07_REVIEW/REVIEW_$REPORT_ID.md` を作成
 - レビュー結果、承認/差し戻し理由、改善提案を記載
 
-### 7. DB更新（タスクステータス + レビューキュー）
+### 7. DB更新（タスクステータス）
 
-レビュー結果に応じてデータベースを更新。スクリプト呼び出しでタスクステータスとレビューキューを同時更新。
+レビュー結果に応じてデータベースを更新。スクリプト呼び出しでタスクステータスを更新。
 
 #### 7.1 レビュー結果とスクリプトの対応
 
-| レビュー結果 | スクリプト呼び出し | タスクステータス | レビューステータス |
-|-------------|------------------|----------------|------------------|
-| 承認（OK） | `python backend/queue/update.py $PROJECT_NAME $TASK_ID APPROVED --reviewer PM --comment "完了条件達成"` | COMPLETED | APPROVED |
-| 差し戻し（NG） | `python backend/queue/update.py $PROJECT_NAME $TASK_ID REJECTED --reviewer PM --comment "差し戻し理由"` | REWORK | REJECTED |
-| エスカレーション（ESC） | （スクリプト呼び出しなし、IN_REVIEWのまま維持） | ESCALATED | IN_REVIEW |
+| レビュー結果 | スクリプト呼び出し | タスクステータス |
+|-------------|------------------|----------------|
+| 承認（OK） | `python backend/task/update.py $PROJECT_NAME $TASK_ID --status COMPLETED --reviewed-at now` | COMPLETED |
+| 差し戻し（NG） | `python backend/task/update.py $PROJECT_NAME $TASK_ID --status REWORK --reviewed-at now` | REWORK |
+| エスカレーション（ESC） | `python backend/task/update.py $PROJECT_NAME $TASK_ID --status ESCALATED` | ESCALATED |
 
 #### 7.2 承認時のスクリプト実行
 
 ```bash
-python backend/queue/update.py $PROJECT_NAME $TASK_ID APPROVED --reviewer PM --comment "完了条件達成" --json
+python backend/task/update.py $PROJECT_NAME $TASK_ID --status COMPLETED --reviewed-at now --json
 ```
 
 **成功時の出力例**:
 ```json
 {
   "success": true,
-  "queue_id": 5,
   "task_id": "TASK_188",
-  "old_review_status": "IN_REVIEW",
-  "new_review_status": "APPROVED",
   "old_task_status": "DONE",
   "new_task_status": "COMPLETED",
-  "message": "レビュー状態を更新しました: IN_REVIEW → APPROVED"
+  "message": "タスクステータスを更新しました: DONE → COMPLETED"
 }
 ```
 
 **スクリプトが自動実行する処理**:
 - タスクステータス: DONE → COMPLETED
-- レビューステータス: IN_REVIEW → APPROVED
+- reviewed_at の記録
 - 完了日時の記録
 - 状態遷移履歴の記録
 
 #### 7.3 差し戻し時のスクリプト実行
 
 ```bash
-python backend/queue/update.py $PROJECT_NAME $TASK_ID REJECTED --reviewer PM --comment "差し戻し理由を記載" --json
+python backend/task/update.py $PROJECT_NAME $TASK_ID --status REWORK --reviewed-at now --json
 ```
 
 **成功時の出力例**:
 ```json
 {
   "success": true,
-  "queue_id": 5,
   "task_id": "TASK_188",
-  "old_review_status": "IN_REVIEW",
-  "new_review_status": "REJECTED",
   "old_task_status": "DONE",
   "new_task_status": "REWORK",
-  "message": "レビュー状態を更新しました: IN_REVIEW → REJECTED"
+  "message": "タスクステータスを更新しました: DONE → REWORK"
 }
 ```
 
 **スクリプトが自動実行する処理**:
 - タスクステータス: DONE → REWORK
-- レビューステータス: IN_REVIEW → REJECTED
+- reviewed_at の記録
 - 差し戻しコメントの記録
 - 状態遷移履歴の記録
 
@@ -796,7 +726,6 @@ python backend/queue/update.py $PROJECT_NAME $TASK_ID REJECTED --reviewer PM --c
 
 DB更新後、以下が自動更新されます：
 - タスク一覧のステータス
-- レビューキュー
 - 進捗サマリ（完了タスク数、レビュー待ちタスク数）
 
 #### 7.5 後方互換性
@@ -913,7 +842,6 @@ ORDER完了時、成果物にリリース対象ファイルが含まれるかを
 
 このORDERにはリリースが必要な成果物が含まれています：
 - DEV/.claude/commands/aipm-review.md
-- DEV/backend/queue/update.py
 
 【リリース手順】
 1. 成果物をDEV環境から本番環境にコピー
@@ -953,7 +881,7 @@ ORDER完了時、成果物にリリース対象ファイルが含まれるかを
 REVIEW_XXX.md を作成しました。
 パス: PROJECTS/$PROJECT_NAME/RESULT/ORDER_XXX/07_REVIEW/REVIEW_$REPORT_ID.md
 
-レビューキュー更新: TASK_XXX → APPROVED/REJECTED（キューから削除/修正待ち）
+タスクステータス更新: TASK_XXX → COMPLETED/REWORK
 BACKLOG更新: BACKLOG_XXX → DONE（ORDER完了）    ← 該当時のみ表示
 
 【次のアクション】
@@ -977,7 +905,6 @@ ORDER内の全タスクが完了し、リリース対象ファイルがある場
 
 【リリース対象ファイル】
 - .claude/commands/aipm-review.md
-- backend/queue/update.py
 
 【次のステップ: リリース実行】
 リリースを実施してください:
