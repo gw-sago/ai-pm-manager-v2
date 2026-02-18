@@ -221,11 +221,12 @@ def create_result_directories(project_name: str, order_id: str) -> bool:
         bool: 作成成功したかどうか
     """
     base_path = Path(f"PROJECTS/{project_name}/RESULT/{order_id}")
+    base_path.mkdir(parents=True, exist_ok=True)
+    # 01_GOAL.md, 02_REQUIREMENTS.md, 03_STAFFING.md はフラットファイルとして
+    # process_order.py が生成するため、ここではディレクトリを作らない。
+    # 複数ファイルを格納するディレクトリのみ事前作成する。
     subdirs = [
-        "01_GOAL",
-        "02_REQUIREMENTS",
-        "03_STAFFING",
-        "04_TASK",
+        "04_QUEUE",
         "05_REPORT",
         "06_ARTIFACTS",
         "07_REVIEW",

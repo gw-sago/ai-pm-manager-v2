@@ -12,6 +12,7 @@ D案アーキテクチャ（ORDER_168）:
 """
 
 import logging
+import os
 import subprocess
 import shutil
 from dataclasses import dataclass
@@ -62,31 +63,35 @@ class ClaudeRunner:
         Returns:
             ClaudeResult: 実行結果
         """
+        # プロンプトはstdin経由で渡す（Windows cmd.exe経由での日本語文字化け防止）
         cmd = [
             self._claude_path,
             "-p",
             "--dangerously-skip-permissions",
-            prompt,
         ]
 
         # モデル指定（claude CLIの --model オプション）
         if self.model:
-            cmd.insert(3, f"--model={self.model}")
+            cmd.append(f"--model={self.model}")
 
         # max_turns指定
         if self.max_turns and self.max_turns > 0:
-            cmd.insert(3, f"--max-turns={self.max_turns}")
+            cmd.append(f"--max-turns={self.max_turns}")
 
         logger.info(f"[claude_cli] Executing: claude -p (model={self.model}, timeout={self.timeout_seconds}s)")
 
         try:
+            # CLAUDECODE環境変数を除去してネストセッションエラーを防止
+            env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
             result = subprocess.run(
                 cmd,
+                input=prompt,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout_seconds,
                 encoding="utf-8",
                 errors="replace",
+                env=env,
             )
 
             if result.returncode == 0:

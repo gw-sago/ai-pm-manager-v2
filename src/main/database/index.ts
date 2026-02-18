@@ -11,7 +11,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import { getConfigService } from '../services/ConfigService';
-import { autoInitializeDatabase } from '../utils/db-initializer';
+import { autoInitializeDatabase, ensureSchemaAndSeedData } from '../utils/db-initializer';
 
 // シングルトンインスタンス
 let dbInstance: Database.Database | null = null;
@@ -70,6 +70,9 @@ export function initDatabase(customPath?: string): Database.Database {
   dbInstance.pragma('foreign_keys = ON');
 
   console.log(`[Database] Connected to: ${currentDbPath}`);
+
+  // 不足テーブル・初期データ（status_transitions等）を補完
+  ensureSchemaAndSeedData(dbInstance);
 
   return dbInstance;
 }

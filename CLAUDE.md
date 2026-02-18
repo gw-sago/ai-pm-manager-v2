@@ -74,12 +74,10 @@ CLI操作で使用可能なコマンド:
 
 ### 「ビルドお願いします」ルール
 ユーザーが「ビルド」「ビルドお願いします」と言った場合、以下を**すべて自動実行**する:
-1. デプロイ先の `data/aipm.db` と `PROJECTS/` を一時ディレクトリ（`$TEMP/aipm_backup_YYYYMMDD_HHMMSS/`）にバックアップ
-2. ソースリポジトリでインストーラービルド: `cd /d/your_workspace/ai-pm-manager-v2 && npx electron-forge make`
-3. 生成されたSetup.exeを実行してインストール
-4. バックアップしたDBとPROJECTSをデプロイ先にリストア
+1. ソースリポジトリでインストーラービルド: `cd /d/your_workspace/ai-pm-manager-v2 && npx electron-forge make`
+2. 生成されたSetup.exeを実行してインストール
 
-**重要**: Squirrelインストーラーはデプロイ先を丸ごと上書きするため、バックアップ＆リストアが必須。一時ディレクトリを使うことでソースリポジトリに依存しない。
+**補足**: Squirrelインストーラーはバージョンディレクトリ（app-X.X.X/）のみ差し替え、data/aipm.db と PROJECTS/ には触れない。deployResources()（main.ts）がbackend/等のリソースのみ展開し、永続データを保護する。バックアップ&リストアは不要。
 
 ### その他コマンド
 ```bash

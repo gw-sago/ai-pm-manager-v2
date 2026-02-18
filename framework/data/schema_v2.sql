@@ -162,10 +162,10 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
 -- 5. BACKLOG_ITEMS TABLE
 -- ============================================================================
 -- Manages backlog items
--- Note: Primary key is single (id) as backlog IDs are already project-scoped by convention
+-- Note: Primary key is composite (id, project_id) to allow per-project BACKLOG numbering
 
 CREATE TABLE IF NOT EXISTS backlog_items (
-    id TEXT PRIMARY KEY,                          -- Backlog ID (e.g., BACKLOG_029)
+    id TEXT NOT NULL,                              -- Backlog ID (e.g., BACKLOG_029)
     project_id TEXT NOT NULL,                     -- Parent project
     title TEXT NOT NULL,                          -- Backlog item title
     description TEXT,                             -- Description
@@ -178,6 +178,9 @@ CREATE TABLE IF NOT EXISTS backlog_items (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,                        -- Completion timestamp
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    -- Primary key (composite)
+    PRIMARY KEY (id, project_id),
 
     -- Foreign keys
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -367,7 +370,7 @@ CREATE TRIGGER IF NOT EXISTS trigger_backlog_items_updated_at
 AFTER UPDATE ON backlog_items
 FOR EACH ROW
 BEGIN
-    UPDATE backlog_items SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+    UPDATE backlog_items SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id AND project_id = OLD.project_id;
 END;
 
 -- Bugs updated_at trigger
@@ -434,7 +437,7 @@ SELECT
     o.title as order_title,
     o.status as order_status
 FROM backlog_items b
-LEFT JOIN orders o ON b.converted_to_order_id = o.id;
+LEFT JOIN orders o ON b.converted_to_order_id = o.id AND b.project_id = o.project_id;
 
 -- ============================================================================
 -- INITIAL DATA: STATUS TRANSITIONS
@@ -457,7 +460,7 @@ INSERT OR IGNORE INTO status_transitions (entity_type, from_status, to_status, a
     ('task', 'DONE', 'REWORK', 'PM', 'Reject task - needs rework'),
     ('task', 'IN_PROGRESS', 'REWORK', 'PM', 'Reject during progress - needs rework'),
     ('task', 'REWORK', 'DONE', 'Worker', 'Complete rework'),
-    ('task', 'REWORK', 'IN_PROGRESS', 'Worker', 'Resume rework'),
+    -- REWORK → IN_PROGRESS は廃止: リワーク中はREWORKのまま作業し、完了時にDONEへ遷移
 
     -- REJECTED workflow
     ('task', 'REWORK', 'REJECTED', 'System', 'Reject count exceeded - mark as REJECTED'),
@@ -541,6 +544,49 @@ CREATE TABLE IF NOT EXISTS builds (
 CREATE INDEX IF NOT EXISTS idx_builds_project_id ON builds(project_id);
 CREATE INDEX IF NOT EXISTS idx_builds_order_id ON builds(order_id);
 CREATE INDEX IF NOT EXISTS idx_builds_status ON builds(status);
+
+-- ============================================================================
+-- FILE_LOCKS TABLE
+-- ============================================================================
+-- Manages file locks for parallel task execution to prevent conflicts
+-- Used by parallel_detector and parallel_launcher to coordinate concurrent workers
+
+CREATE TABLE IF NOT EXISTS file_locks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (project_id, file_path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_locks_project_id ON file_locks(project_id);
+CREATE INDEX IF NOT EXISTS idx_file_locks_task_id ON file_locks(task_id);
+
+-- ============================================================================
+-- INCIDENTS TABLE
+-- ============================================================================
+-- Records incidents during task execution for retry/escalation decisions
+-- Used by self-healing and recovery systems
+
+CREATE TABLE IF NOT EXISTS incidents (
+    incident_id TEXT PRIMARY KEY,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    project_id TEXT NOT NULL,
+    order_id TEXT,
+    task_id TEXT,
+    category TEXT NOT NULL,
+    severity TEXT DEFAULT 'Medium',
+    description TEXT,
+    root_cause TEXT,
+    affected_records TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_incidents_project_id ON incidents(project_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_task_id ON incidents(task_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_category ON incidents(category);
 
 -- ============================================================================
 -- END OF SCHEMA

@@ -145,30 +145,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   /**
-   * 設定ボタンクリック時のハンドラ（ORDER_152: 設定画面削除により無効化）
-   */
-  const handleSettingsClick = () => {
-    console.log('[Layout] Settings clicked (disabled in ORDER_152)');
-  };
-
-  /**
-   * 設定画面を閉じるハンドラ（ORDER_152: 設定画面削除により無効化）
-   */
-  const handleSettingsClose = () => {
-    console.log('[Layout] Settings close (disabled in ORDER_152)');
-  };
-
-  /**
-   * フレームワークパス変更時のハンドラ（ORDER_152: 設定画面削除により保持のみ）
-   * 初期設定時のフォールバック用に保持
-   */
-  const handleFrameworkPathChange = async (newPath: string) => {
-    console.log('[Layout] Framework path changed:', newPath);
-    // setActiveFrameworkPath(newPath); // ORDER_152: 未使用のため削除
-    setFrameworkConfigState('configured');
-  };
-
-  /**
    * サイドバーからのSupervisor選択時のハンドラ（ORDER_060追加）
    */
   const handleSupervisorSelect = useCallback((supervisor: Supervisor) => {
@@ -392,8 +368,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header（ORDER_152: 設定ボタンは残すが機能は無効化） */}
-      <Header onSettingsClick={handleSettingsClick} />
+      <Header />
 
       {/* Main area with sidebar */}
       <div className="flex flex-1 overflow-hidden">
@@ -405,8 +380,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           onProjectSelect={handleProjectSelect}
           selectedOrderId={selectedOrder?.id}
           onOrderSelect={handleOrderSelect}
-          onSettingsClick={handleSettingsClick}
-          isSettingsOpen={false}
           selectedSupervisor={selectedSupervisor}
           onSupervisorSelect={handleSupervisorSelect}
         />
@@ -416,9 +389,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           selectedProject={selectedProject}
           selectedOrder={selectedOrder}
           frameworkConfigState={frameworkConfigState}
-          isSettingsOpen={false}
-          onSettingsClose={handleSettingsClose}
-          onFrameworkPathChange={handleFrameworkPathChange}
           onBacklogItemClick={handleBacklogItemClick}
           onOrderIdClick={handleOrderIdClick}
           selectedSupervisor={selectedSupervisor}

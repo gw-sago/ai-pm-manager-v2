@@ -1912,9 +1912,9 @@ export function getOrderResultFile(
   filename: string,
 ): OrderResultFile {
   const configService = getConfigService();
-  const frameworkPath = configService.getActiveFrameworkPath();
+  const userDataPath = configService.getUserDataPath();
 
-  if (!frameworkPath) {
+  if (!userDataPath) {
     return {
       filename,
       path: '',
@@ -1924,7 +1924,7 @@ export function getOrderResultFile(
   }
 
   const filePath = path.join(
-    frameworkPath,
+    userDataPath,
     'PROJECTS',
     projectId,
     'RESULT',
@@ -1932,7 +1932,28 @@ export function getOrderResultFile(
     filename,
   );
 
-  if (!fs.existsSync(filePath)) {
+  // フォールバック: フラットファイル(01_GOAL.md)が無い場合、ディレクトリ構造(01_GOAL/GOAL.md)を探す
+  let resolvedPath = filePath;
+  if (!fs.existsSync(resolvedPath)) {
+    const baseName = path.parse(filename).name; // e.g. "01_GOAL"
+    const dirPath = path.join(
+      userDataPath,
+      'PROJECTS',
+      projectId,
+      'RESULT',
+      orderId,
+      baseName,
+    );
+    if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+      // ディレクトリ内の.mdファイルを探す
+      const mdFiles = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+      if (mdFiles.length > 0) {
+        resolvedPath = path.join(dirPath, mdFiles[0]);
+      }
+    }
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
     return {
       filename,
       path: filePath,
@@ -1942,18 +1963,18 @@ export function getOrderResultFile(
   }
 
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
     return {
       filename,
-      path: filePath,
+      path: resolvedPath,
       content,
       exists: true,
     };
   } catch (error) {
-    console.error(`[AipmDbService] Failed to read file ${filePath}:`, error);
+    console.error(`[AipmDbService] Failed to read file ${resolvedPath}:`, error);
     return {
       filename,
-      path: filePath,
+      path: resolvedPath,
       content: '',
       exists: false,
     };
@@ -1971,14 +1992,14 @@ export function getOrderReportList(
   orderId: string,
 ): string[] {
   const configService = getConfigService();
-  const frameworkPath = configService.getActiveFrameworkPath();
+  const userDataPath = configService.getUserDataPath();
 
-  if (!frameworkPath) {
+  if (!userDataPath) {
     return [];
   }
 
   const reportDir = path.join(
-    frameworkPath,
+    userDataPath,
     'PROJECTS',
     projectId,
     'RESULT',
@@ -2013,9 +2034,9 @@ export function getOrderReport(
   reportFilename: string,
 ): OrderResultFile {
   const configService = getConfigService();
-  const frameworkPath = configService.getActiveFrameworkPath();
+  const userDataPath = configService.getUserDataPath();
 
-  if (!frameworkPath) {
+  if (!userDataPath) {
     return {
       filename: reportFilename,
       path: '',
@@ -2025,7 +2046,7 @@ export function getOrderReport(
   }
 
   const filePath = path.join(
-    frameworkPath,
+    userDataPath,
     'PROJECTS',
     projectId,
     'RESULT',

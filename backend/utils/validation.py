@@ -37,12 +37,13 @@ VALID_STATUSES = {
         "CANCELLED", "INTERRUPTED"
     ],
     "order": [
-        "PLANNING", "IN_PROGRESS", "REVIEW", "COMPLETED",
-        "ON_HOLD", "CANCELLED"
+        "PLANNING", "PLANNING_FAILED", "IN_PROGRESS", "REVIEW", "PENDING_RELEASE",
+        "COMPLETED", "ON_HOLD", "CANCELLED"
     ],
     "task": [
         "QUEUED", "BLOCKED", "IN_PROGRESS", "DONE", "REWORK",
-        "COMPLETED", "INTERRUPTED"
+        "COMPLETED", "INTERRUPTED", "IN_REVIEW", "CANCELLED",
+        "SKIPPED", "REJECTED", "ESCALATED", "WAITING_INPUT"
     ],
     "backlog": ["TODO", "IN_PROGRESS", "DONE", "CANCELED", "EXTERNAL"],
     "review": ["PENDING", "IN_REVIEW", "APPROVED", "REJECTED"],
@@ -592,27 +593,40 @@ def get_next_order_number_with_retry(
     return get_next_order_number(conn, project_id)
 
 
-def get_next_task_number(conn: sqlite3.Connection, order_id: str) -> str:
+def get_next_task_number(conn: sqlite3.Connection, order_id: str, project_id: str = None) -> str:
     """
-    次のタスク番号を取得
+    次のタスク番号を取得（プロジェクトスコープ）
 
     Args:
         conn: データベース接続
         order_id: ORDER ID
+        project_id: プロジェクトID（指定時はプロジェクト内で採番）
 
     Returns:
         次のタスクID（例: TASK_200）
     """
-    # 全タスクから最大番号を取得（割り込みタスクを除く、3桁以上対応）
-    row = fetch_one(
-        conn,
-        """
-        SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as max_num
-        FROM tasks
-        WHERE id GLOB 'TASK_[0-9]*'
-          AND id NOT GLOB 'TASK_*_INT*'
-        """,
-    )
+    if project_id:
+        row = fetch_one(
+            conn,
+            """
+            SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as max_num
+            FROM tasks
+            WHERE project_id = ?
+              AND id GLOB 'TASK_[0-9]*'
+              AND id NOT GLOB 'TASK_*_INT*'
+            """,
+            (project_id,),
+        )
+    else:
+        row = fetch_one(
+            conn,
+            """
+            SELECT MAX(CAST(SUBSTR(id, 6) AS INTEGER)) as max_num
+            FROM tasks
+            WHERE id GLOB 'TASK_[0-9]*'
+              AND id NOT GLOB 'TASK_*_INT*'
+            """,
+        )
 
     max_num = row["max_num"] if row and row["max_num"] else 0
     next_num = max_num + 1
@@ -624,6 +638,7 @@ def get_next_task_number_with_retry(
     conn: sqlite3.Connection,
     order_id: str,
     max_retries: int = 3,
+    project_id: str = None,
 ) -> str:
     """
     次のタスク番号を取得（UNIQUE制約違反時リトライ機構付き）
@@ -635,6 +650,7 @@ def get_next_task_number_with_retry(
         conn: データベース接続
         order_id: ORDER ID
         max_retries: 最大リトライ回数（デフォルト3）
+        project_id: プロジェクトID（指定時はプロジェクト内で採番）
 
     Returns:
         次のタスクID（例: TASK_200）
@@ -643,7 +659,7 @@ def get_next_task_number_with_retry(
         この関数は採番のみを行う。実際のINSERTは呼び出し側で行い、
         UNIQUE制約違反時はこの関数を再度呼び出して再採番する。
     """
-    return get_next_task_number(conn, order_id)
+    return get_next_task_number(conn, order_id, project_id)
 
 
 def get_next_interrupt_task_id(conn: sqlite3.Connection, base_task_id: str) -> str:

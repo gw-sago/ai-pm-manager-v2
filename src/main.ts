@@ -60,6 +60,8 @@ function deployResources(): void {
   console.log('[Main] Deploying resources to Squirrel root:', squirrelRoot);
 
   // ディレクトリごと削除→コピーする対象
+  // BUG: rmSyncがEBUSYで失敗すると中身だけ消えてコピーされない問題の対策
+  // → 削除失敗時もcpSync(force:true)で上書きコピーを試みる
   const dirTargets = ['backend', 'python-embed', '.claude'];
   for (const dir of dirTargets) {
     const src = path.join(resourcesDir, dir);
@@ -70,9 +72,13 @@ function deployResources(): void {
     }
     try {
       if (fs.existsSync(dest)) {
-        fs.rmSync(dest, { recursive: true, force: true });
+        try {
+          fs.rmSync(dest, { recursive: true, force: true });
+        } catch (rmErr) {
+          console.warn(`[Main] Deploy: rmSync failed for ${dir} (will overwrite):`, rmErr);
+        }
       }
-      fs.cpSync(src, dest, { recursive: true });
+      fs.cpSync(src, dest, { recursive: true, force: true });
       console.log(`[Main] Deployed: ${src} -> ${dest}`);
     } catch (err) {
       console.error(`[Main] Deploy error for ${dir}:`, err);

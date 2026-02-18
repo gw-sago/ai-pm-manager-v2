@@ -106,6 +106,15 @@ export function registerProjectHandlers(): void {
     }
   );
 
+  // PROJECT_INFO.mdファイル内容取得 (ORDER_002 / BACKLOG_002)
+  ipcMain.handle(
+    'project:get-project-info-file',
+    async (_event, projectName: string): Promise<string | null> => {
+      console.log(`[Project IPC] PROJECT_INFO.mdファイル取得リクエスト: ${projectName}`);
+      return projectService.getProjectInfoFileContent(projectName);
+    }
+  );
+
   // REVIEWファイル内容取得 (統合フォーマット: 実施内容+判定結果を含む)
   ipcMain.handle(
     'project:get-review-file',

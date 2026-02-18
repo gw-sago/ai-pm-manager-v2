@@ -71,6 +71,7 @@ try:
     )
     from task.update import update_task_status
     from utils.file_lock import FileLockManager
+    from config.db_config import get_project_paths
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -127,8 +128,8 @@ class ReviewProcessor:
         self.rework_model = rework_model or model
         self.max_rework = max_rework
 
-        # プロジェクトパス
-        self.project_dir = _project_root / "PROJECTS" / project_id
+        # プロジェクトパス（USER_DATA_PATH経由）
+        self.project_dir = get_project_paths(project_id)["base"]
 
         # 処理結果
         self.results: Dict[str, Any] = {

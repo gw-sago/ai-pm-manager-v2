@@ -142,28 +142,44 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   }, [order.id]);
 
   // ORDER詳細を取得
-  useEffect(() => {
-    const fetchOrderContent = async () => {
-      setLoading(true);
-      setError(null);
+  const fetchOrderContent = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const orderContent = await window.electronAPI.getOrderFile(projectName, order.id);
-        if (orderContent) {
-          setContent(orderContent);
-        } else {
-          setError(`ORDER詳細ファイルが見つかりません: ${order.id}.md`);
-        }
-      } catch (err) {
-        console.error('[OrderDetailPanel] Failed to fetch order content:', err);
-        setError('ORDER詳細の取得に失敗しました');
-      } finally {
-        setLoading(false);
+    try {
+      const orderContent = await window.electronAPI.getOrderFile(projectName, order.id);
+      if (orderContent) {
+        setContent(orderContent);
+      } else {
+        setError(`ORDER詳細ファイルが見つかりません: ${order.id}.md`);
       }
-    };
-
-    fetchOrderContent();
+    } catch (err) {
+      console.error('[OrderDetailPanel] Failed to fetch order content:', err);
+      setError('ORDER詳細の取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
   }, [projectName, order.id]);
+
+  useEffect(() => {
+    fetchOrderContent();
+  }, [fetchOrderContent]);
+
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更時にORDER詳細を自動更新
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      // 現在表示中のプロジェクトに関係するイベントのみ再フェッチ
+      if (event.projectId === projectName) {
+        console.log('[OrderDetailPanel] db:changed event received:', event.source, event.targetId);
+        fetchOrderContent();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [projectName, fetchOrderContent]);
 
   /**
    * TASK_1124: RESULT配下のMarkdownファイルを取得

@@ -82,6 +82,7 @@ def is_transition_allowed(
         - allowed_role が指定されている場合はその役割のみ実行可能
         - 同一ステータスへの遷移（from_status == to_status）は常に許可される
           これは冪等性を保証し、再実行や復帰処理を安全にするため
+        - role が "ANY" の場合は全ロールの遷移ルールを許可（ロール制限なし）
     """
     # 同一ステータスへの遷移は常に許可（変更なし）
     # これにより、IN_PROGRESS → IN_PROGRESS などの再実行が可能になる
@@ -89,7 +90,31 @@ def is_transition_allowed(
     if from_status == to_status:
         return True
 
-    # 遷移ルールを検索
+    # role='ANY' の場合はロール制限なしで遷移ルールを検索
+    # （呼び出し側が任意のロールを許可する場合）
+    if role == "ANY":
+        if from_status is None:
+            query = """
+            SELECT id FROM status_transitions
+            WHERE entity_type = ?
+            AND from_status IS NULL
+            AND to_status = ?
+            AND is_active = 1
+            """
+            params = (entity_type, to_status)
+        else:
+            query = """
+            SELECT id FROM status_transitions
+            WHERE entity_type = ?
+            AND from_status = ?
+            AND to_status = ?
+            AND is_active = 1
+            """
+            params = (entity_type, from_status, to_status)
+        row = fetch_one(conn, query, params)
+        return row is not None
+
+    # 遷移ルールを検索（特定ロール or DBのANYロールルール）
     if from_status is None:
         # 初期状態からの遷移
         query = """
@@ -320,7 +345,7 @@ def can_start_task(conn: sqlite3.Connection, current_status: str) -> bool:
         current_status: 現在のタスクステータス
 
     Returns:
-        bool: 開始可能ならTrue（QUEUEDまたはREWORKから IN_PROGRESS へ遷移可能）
+        bool: 開始可能ならTrue（QUEUED から IN_PROGRESS へ遷移可能）
     """
     return is_transition_allowed(
         conn, "task", current_status, "IN_PROGRESS", "Worker"

@@ -32,6 +32,7 @@ if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
 
 from utils.db import get_connection, DatabaseError
+from config.db_config import USER_DATA_PATH, get_project_paths
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ def _get_latest_checkpoint(project_id: str, task_id: str) -> Optional[str]:
     Returns:
         Checkpoint ID or None if not found
     """
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
 
     if not checkpoint_dir.exists():
         return None
@@ -193,16 +194,16 @@ def _restore_db_snapshot(checkpoint_id: str, verbose: bool = False) -> bool:
     Raises:
         RollbackError: Restore failed
     """
-    # DB paths
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    # DB paths（USER_DATA_PATH経由）
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
     checkpoint_db_path = checkpoint_dir / f"{checkpoint_id}.db"
-    main_db_path = _project_root / "data" / "aipm.db"
+    main_db_path = USER_DATA_PATH / "data" / "aipm.db"
 
     if not checkpoint_db_path.exists():
         raise RollbackError(f"Checkpoint DB not found: {checkpoint_db_path}")
 
     # Backup current DB before restore
-    backup_path = _project_root / "data" / f"aipm_before_rollback_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    backup_path = USER_DATA_PATH / "data" / f"aipm_before_rollback_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
 
     try:
         if main_db_path.exists():
@@ -258,7 +259,7 @@ def _restore_file_state(
     """
     # Try to find the file state record
     # It could be in any ORDER directory, so we search for it
-    projects_dir = _project_root / "PROJECTS" / project_id / "RESULT"
+    projects_dir = get_project_paths(project_id)["result"]
 
     if not projects_dir.exists():
         logger.debug(f"RESULT directory not found: {projects_dir}")

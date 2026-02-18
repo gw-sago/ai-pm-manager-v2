@@ -32,6 +32,12 @@ _current_dir = Path(__file__).resolve().parent
 _package_root = _current_dir.parent
 _project_root = _package_root.parent
 
+import sys
+if str(_package_root) not in sys.path:
+    sys.path.insert(0, str(_package_root))
+
+from config.db_config import USER_DATA_PATH, get_project_paths
+
 
 class SnapshotError(Exception):
     """スナップショット操作エラー"""
@@ -50,7 +56,7 @@ class SnapshotManager:
         self.project_id = project_id
         # BUG_001対策: ミュータブルデフォルト引数を使わずNoneで受けてから設定
         if snapshot_dir is None:
-            self.snapshot_dir = _project_root / "data" / "snapshots"
+            self.snapshot_dir = USER_DATA_PATH / "data" / "snapshots"
         else:
             self.snapshot_dir = Path(snapshot_dir)
 
@@ -425,13 +431,7 @@ class SnapshotManager:
         Returns:
             ファイルパスのリスト（文字列）
         """
-        result_dir = (
-            _project_root
-            / "PROJECTS"
-            / self.project_id
-            / "RESULT"
-            / order_id
-        )
+        result_dir = get_project_paths(self.project_id)["result"] / order_id
 
         if not result_dir.exists():
             logger.warning(

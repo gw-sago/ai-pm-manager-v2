@@ -41,6 +41,7 @@ if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
 
 from utils.db import get_connection, fetch_all, row_to_dict, rows_to_dicts
+from config.db_config import USER_DATA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -299,11 +300,11 @@ class FaultDetector:
         """
         faults: List[FaultReport] = []
 
-        # ログディレクトリ検索
+        # ログディレクトリ検索（USER_DATA_PATH経由）
         log_patterns = [
-            _project_root / "logs" / "**" / "*.log",
-            _project_root / "PROJECTS" / "**" / "RESULT" / "**" / "*.log",
-            _project_root / "PROJECTS" / "**" / "RESULT" / "**" / "worker_output.txt",
+            USER_DATA_PATH / "logs" / "**" / "*.log",
+            USER_DATA_PATH / "PROJECTS" / "**" / "RESULT" / "**" / "*.log",
+            USER_DATA_PATH / "PROJECTS" / "**" / "RESULT" / "**" / "worker_output.txt",
         ]
 
         # 検出パターン（正規表現）
@@ -319,7 +320,7 @@ class FaultDetector:
         threshold_time = datetime.now() - timedelta(hours=24)
 
         for pattern in log_patterns:
-            for log_file in _project_root.glob(str(pattern.relative_to(_project_root))):
+            for log_file in USER_DATA_PATH.glob(str(pattern.relative_to(USER_DATA_PATH))):
                 if not log_file.is_file():
                     continue
 
@@ -370,7 +371,7 @@ class FaultDetector:
                                 description=f"サブエージェントクラッシュ検出: {description}",
                                 root_cause=f"ログファイル {log_file.name} でエラーパターン検出",
                                 affected_records=json.dumps({
-                                    "log_file": str(log_file.relative_to(_project_root)),
+                                    "log_file": str(log_file.relative_to(USER_DATA_PATH)),
                                     "error_pattern": pattern
                                 }),
                                 metadata={
@@ -405,7 +406,7 @@ class FaultDetector:
         # 2. .tmpファイルの残存
         # 3. 不完全なJSONファイル
 
-        projects_dir = _project_root / "PROJECTS"
+        projects_dir = USER_DATA_PATH / "PROJECTS"
         if not projects_dir.exists():
             return faults
 
@@ -442,7 +443,7 @@ class FaultDetector:
                             description=f"空のREPORTファイル検出: {report_file.name}",
                             root_cause="ファイル書き込み中に処理が中断された可能性",
                             affected_records=json.dumps({
-                                "file_path": str(report_file.relative_to(_project_root)),
+                                "file_path": str(report_file.relative_to(USER_DATA_PATH)),
                                 "file_size": 0
                             }),
                             metadata={
@@ -467,7 +468,7 @@ class FaultDetector:
                             description=f"一時ファイルの残存検出: {tmp_file.name}",
                             root_cause="ファイル書き込み処理が正常終了しなかった可能性",
                             affected_records=json.dumps({
-                                "file_path": str(tmp_file.relative_to(_project_root)),
+                                "file_path": str(tmp_file.relative_to(USER_DATA_PATH)),
                             }),
                             metadata={
                                 "file_path": str(tmp_file),
@@ -496,7 +497,7 @@ class FaultDetector:
                             description=f"不正なJSONファイル検出: {json_file.name}",
                             root_cause=f"JSONパースエラー: {str(e)}",
                             affected_records=json.dumps({
-                                "file_path": str(json_file.relative_to(_project_root)),
+                                "file_path": str(json_file.relative_to(USER_DATA_PATH)),
                                 "error": str(e)
                             }),
                             metadata={

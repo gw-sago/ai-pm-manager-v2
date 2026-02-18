@@ -68,6 +68,7 @@ try:
         validate_transition, record_transition, TransitionError
     )
     from utils.incident_logger import log_incident
+    from config.db_config import get_project_paths
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -120,10 +121,11 @@ class PMProcessor:
         self.model = model
         self.stream_output = stream_output
 
-        # パス設定
-        self.project_dir = _project_root / "PROJECTS" / project_id
-        self.order_file = self.project_dir / "ORDERS" / f"{self.order_id}.md"
-        self.result_dir = self.project_dir / "RESULT" / self.order_id
+        # パス設定（USER_DATA_PATH経由）
+        _paths = get_project_paths(project_id)
+        self.project_dir = _paths["base"]
+        self.order_file = _paths["orders"] / f"{self.order_id}.md"
+        self.result_dir = _paths["result"] / self.order_id
 
         # 処理結果
         self.results: Dict[str, Any] = {

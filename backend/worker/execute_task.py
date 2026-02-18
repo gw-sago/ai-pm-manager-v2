@@ -78,6 +78,7 @@ try:
     from utils.path_validation import (
         safe_path_join, validate_path_components, PathValidationError
     )
+    from config.db_config import get_project_paths
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -160,8 +161,8 @@ class WorkerExecutor:
         self.allowed_tools = allowed_tools if allowed_tools is not None else DEFAULT_WORKER_ALLOWED_TOOLS.copy()
         self._resolved_profile: Optional[str] = None
 
-        # プロジェクトパス
-        self.project_dir = _project_root / "PROJECTS" / project_id
+        # プロジェクトパス（USER_DATA_PATH経由）
+        self.project_dir = get_project_paths(project_id)["base"]
 
         # 処理結果
         self.results: Dict[str, Any] = {
@@ -702,12 +703,14 @@ class WorkerExecutor:
         # 現在のステータスを取得
         current_status = self.task_info.get("status", "") if self.task_info else ""
 
-        # IN_PROGRESS再実行対応: 既にIN_PROGRESSの場合の安全な処理
-        if current_status == "IN_PROGRESS":
+        # IN_PROGRESS/REWORK再実行対応: ステータスを維持してassigneeのみ更新
+        # REWORK時はREWORKのまま作業し、完了時にDONEへ遷移する
+        if current_status in ("IN_PROGRESS", "REWORK"):
+            mode_str = "REWORK（リワーク）" if current_status == "REWORK" else "IN_PROGRESS（再実行）"
             self._log_step(
                 "assign_worker",
                 "info",
-                f"タスクは既にIN_PROGRESS状態 - 再実行モード (assignee={self.task_info.get('assignee')})"
+                f"タスクは{mode_str}状態 - ステータス維持モード (assignee={self.task_info.get('assignee')})"
             )
 
             # Workerが異なる場合は警告を出す（別Workerが実行中の可能性）
@@ -727,12 +730,12 @@ class WorkerExecutor:
                     self.task_id,
                     assignee=self.worker_id,
                     role="Worker",
-                    reason="IN_PROGRESS再実行 - Worker割当更新",
+                    reason=f"{current_status}維持 - Worker割当更新",
                 )
                 self._log_step(
                     "assign_worker",
                     "success",
-                    f"worker={self.worker_id} (再実行モード)"
+                    f"worker={self.worker_id} ({mode_str}モード)"
                 )
             except Exception as e:
                 # assignee更新失敗時も続行可能（既存のassigneeで実行）
@@ -746,14 +749,10 @@ class WorkerExecutor:
             self.results["is_reexecution"] = True
             return
 
-        # 通常のステータス更新（IN_PROGRESS以外 → IN_PROGRESS）
+        # 通常のステータス更新（QUEUED → IN_PROGRESS）
         from task.update import update_task
 
         try:
-            # リワークモードの場合、REWORK → IN_PROGRESS への遷移
-            if self.is_rework and current_status == "REWORK":
-                self._log_step("assign_worker", "info", "REWORK → IN_PROGRESS (リワーク開始)")
-
             update_task(
                 self.project_id,
                 self.task_id,
@@ -921,7 +920,6 @@ class WorkerExecutor:
             model=self.model,
             max_turns=50,
             timeout_seconds=self.timeout,
-            allowed_tools=self.allowed_tools,
         )
 
         # TASKファイルから詳細情報を取得

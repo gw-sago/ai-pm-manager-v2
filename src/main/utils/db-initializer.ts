@@ -84,6 +84,52 @@ export function initializeDatabaseFile(dbPath: string): boolean {
 }
 
 /**
+ * 既存DBに対してスキーマを再適用し、不足テーブル・初期データを補完する
+ *
+ * CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE により安全に実行可能。
+ * 既存データは上書きされない。
+ *
+ * @param db 接続済みのDatabaseインスタンス
+ */
+export function ensureSchemaAndSeedData(db: Database.Database): void {
+  const configService = getConfigService();
+  const schemaPath = configService.getSchemaPath();
+
+  if (!fs.existsSync(schemaPath)) {
+    console.warn('[DBInitializer] Schema file not found, skipping seed data check:', schemaPath);
+    return;
+  }
+
+  try {
+    // status_transitions の行数でマスターデータの有無を判定
+    const row = db.prepare('SELECT COUNT(*) as cnt FROM status_transitions').get() as { cnt: number } | undefined;
+    const transitionCount = row?.cnt ?? 0;
+
+    // テーブル一覧を取得して不足テーブルがないかも確認
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
+    const tableNames = new Set(tables.map(t => t.name));
+    const expectedTables = ['orders', 'tasks', 'backlog_items', 'status_transitions', 'file_locks', 'incidents', 'builds'];
+    const missingTables = expectedTables.filter(t => !tableNames.has(t));
+
+    if (transitionCount > 0 && missingTables.length === 0) {
+      console.log(`[DBInitializer] Schema OK: ${transitionCount} transitions, all tables present`);
+      return;
+    }
+
+    console.log(`[DBInitializer] Applying schema: transitions=${transitionCount}, missing=[${missingTables.join(',')}]`);
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+    db.exec(schema);
+
+    const newCount = (db.prepare('SELECT COUNT(*) as cnt FROM status_transitions').get() as { cnt: number })?.cnt ?? 0;
+    console.log(`[DBInitializer] Schema applied: ${newCount} transitions now`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[DBInitializer] Failed to ensure schema/seed data:', errorMessage);
+    // 起動をブロックしない（ベストエフォート）
+  }
+}
+
+/**
  * DB自動初期化のエントリーポイント
  *
  * @param dbPath 初期化するDBファイルのパス

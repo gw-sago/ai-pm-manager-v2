@@ -189,7 +189,7 @@ export function registerScriptHandlers(): void {
     }
   });
 
-  // 完了イベントをレンダラーに転送 + デスクトップ通知 + メニュー更新
+  // 完了イベントをレンダラーに転送 + デスクトップ通知 + メニュー更新 + DB変更通知
   scriptService.on('complete', (result: ExecutionResult) => {
     // レンダラーに転送
     const windows = BrowserWindow.getAllWindows();
@@ -200,6 +200,16 @@ export function registerScriptHandlers(): void {
       // PM/Worker/Review完了時にサイドバーのプロジェクト一覧・ORDER一覧を更新
       win.webContents.send('menu:update');
       console.log('[Script] menu:update event sent');
+
+      // ORDER_004 TASK_009: DB変更通知
+      // スクリプト実行完了時にDB変更を通知し、レンダラー側でデータを再取得させる
+      win.webContents.send('db:changed', {
+        source: result.type || 'unknown',
+        projectId: result.projectId || '',
+        targetId: result.targetId || '',
+        timestamp: new Date().toISOString(),
+      });
+      console.log('[Script] db:changed event sent:', { source: result.type, projectId: result.projectId, targetId: result.targetId });
     }
 
     // デスクトップ通知を表示
@@ -212,6 +222,14 @@ export function registerScriptHandlers(): void {
     const windows = BrowserWindow.getAllWindows();
     for (const win of windows) {
       win.webContents.send('script:task-status-changed', data);
+
+      // ORDER_004 TASK_009: タスクステータス変更時もDB変更を通知
+      win.webContents.send('db:changed', {
+        source: 'task-status-changed',
+        projectId: data.projectId || '',
+        targetId: data.taskId || '',
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // TASK_1103: タスク完了時に依存関係更新を通知
@@ -263,6 +281,14 @@ export function registerScriptHandlers(): void {
     for (const win of windows) {
       win.webContents.send('script:all-tasks-completed', data);
       win.webContents.send('menu:update');
+
+      // ORDER_004 TASK_009: 全タスク完了時もDB変更を通知
+      win.webContents.send('db:changed', {
+        source: 'all-tasks-completed',
+        projectId: data.projectId || '',
+        targetId: data.orderId || '',
+        timestamp: new Date().toISOString(),
+      });
     }
   });
 
@@ -280,6 +306,14 @@ export function registerScriptHandlers(): void {
     for (const win of windows) {
       win.webContents.send('script:task-crash', data);
       win.webContents.send('menu:update');
+
+      // ORDER_004 TASK_009: タスククラッシュ時もDB変更を通知
+      win.webContents.send('db:changed', {
+        source: 'task-crash',
+        projectId: data.projectId || '',
+        targetId: data.taskId || '',
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // デスクトップ通知を表示

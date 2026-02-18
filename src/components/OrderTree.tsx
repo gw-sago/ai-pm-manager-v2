@@ -137,6 +137,39 @@ export const OrderTree: React.FC<OrderTreeProps> = ({
     };
   }, [project]);
 
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更時にORDER一覧を自動更新
+  useEffect(() => {
+    if (!project) return;
+
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      // 現在表示中のプロジェクトに関係するイベントのみ再フェッチ
+      if (event.projectId === project.name) {
+        console.log('[OrderTree] db:changed event received for project:', event.projectId, 'source:', event.source);
+        // ORDER一覧を再取得
+        window.electronAPI.getProjectState(project.name)
+          .then((freshState) => {
+            if (freshState?.orders) {
+              const sortedOrders = [...freshState.orders].sort((a, b) => {
+                const aNum = parseInt(a.id.replace('ORDER_', ''), 10);
+                const bNum = parseInt(b.id.replace('ORDER_', ''), 10);
+                return bNum - aNum;
+              });
+              setOrders(sortedOrders);
+              console.log('[OrderTree] Orders refreshed via db:changed for:', project.name, 'count:', sortedOrders.length);
+            }
+          })
+          .catch((error) => {
+            console.error('[OrderTree] Failed to refresh orders via db:changed:', error);
+          });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [project]);
+
   /**
    * ORDER選択ハンドラ
    */

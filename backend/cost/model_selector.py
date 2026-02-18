@@ -5,9 +5,8 @@ AI PM Framework - Model Selection Module
 Automatically select the recommended Claude model based on task complexity score.
 
 Model selection rules:
-  - 0-30: "Haiku" (simple tasks: directory setup, config changes)
-  - 31-65: "Sonnet" (moderate: feature implementation, testing)
-  - 66-100: "Opus" (complex: architecture, optimization, migration)
+  - 0-30: "Sonnet" (simple tasks: directory setup, config changes, docs)
+  - 31-100: "Opus" (all other tasks: implementation, testing, architecture)
 
 Usage (CLI):
     # Select model from score
@@ -63,15 +62,17 @@ def select_model(complexity_score: int) -> str:
     Select recommended model based on complexity score.
 
     Rules:
-    - 0-30: "Haiku" (simple tasks: directory setup, config changes)
-    - 31-65: "Sonnet" (moderate: feature implementation, testing)
-    - 66-100: "Opus" (complex: architecture, optimization, migration)
+    - 0-30: "Sonnet" (simple tasks: directory setup, config changes, docs)
+    - 31-100: "Opus" (all other tasks: implementation, testing, architecture)
+
+    Rationale: Opus produces higher first-pass quality, reducing rework costs.
+    Only truly simple tasks (docs, config) use Sonnet.
 
     Args:
         complexity_score: Integer score from 0 to 100.
 
     Returns:
-        Model name: "Haiku", "Sonnet", or "Opus"
+        Model name: "Sonnet" or "Opus"
 
     Raises:
         ValueError: If complexity_score is out of range [0, 100]
@@ -83,8 +84,6 @@ def select_model(complexity_score: int) -> str:
         raise ValueError(f"complexity_score must be in range [0, 100], got {complexity_score}")
 
     if complexity_score <= 30:
-        return "Haiku"
-    elif complexity_score <= 65:
         return "Sonnet"
     else:
         return "Opus"

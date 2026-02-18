@@ -225,7 +225,7 @@ def create_task(
                         raise ValidationError(f"タスクIDが既に存在します: {task_id} (project: {project_id})", "task_id", task_id)
                     final_task_id = task_id
                 else:
-                    final_task_id = get_next_task_number(conn, order_id)
+                    final_task_id = get_next_task_number(conn, order_id, project_id)
 
                 # 依存タスクの存在確認
                 if depends_on:

@@ -655,6 +655,19 @@ export const ProjectList: React.FC<ProjectListProps> = ({
     };
   }, [fetchProjects, fetchSupervisors]);
 
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更・全タスク完了・タスククラッシュ時にプロジェクト一覧を自動更新
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      console.log('[ProjectList] db:changed event received:', event.source, event.projectId);
+      fetchProjects(true); // サイレントモードで更新（チラつき防止）
+      fetchSupervisors(); // Supervisor一覧も更新
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchProjects, fetchSupervisors]);
+
   // サイドバー折りたたみ時のレンダリング
   if (collapsed) {
     // ローディング中（初回ロードかつデータなしの場合のみスピナー表示）

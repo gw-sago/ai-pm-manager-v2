@@ -52,6 +52,7 @@ try:
         get_connection, fetch_one, fetch_all,
         row_to_dict, rows_to_dicts, DatabaseError
     )
+    from config.db_config import get_project_paths
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -441,9 +442,9 @@ if __name__ == "__main__":
     else:
         # デフォルトREPORTパスを推測
         report_num = args.task_id.replace("TASK_", "")
+        _paths = get_project_paths(args.project_id)
         report_file = (
-            _project_root / "PROJECTS" / args.project_id / "RESULT" /
-            args.order_id / "05_REPORT" / f"REPORT_{report_num}.md"
+            _paths["result"] / args.order_id / "05_REPORT" / f"REPORT_{report_num}.md"
         )
         if report_file.exists():
             report_content = report_file.read_text(encoding="utf-8")

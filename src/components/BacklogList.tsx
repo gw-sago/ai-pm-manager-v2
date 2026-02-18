@@ -411,6 +411,23 @@ export const BacklogList: React.FC<BacklogListProps> = ({
     };
   }, [fetchBacklogs]);
 
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更時にバックログを自動更新
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      // 単一プロジェクトモードの場合、対象プロジェクトのイベントのみ再フェッチ
+      // crossProjectモードの場合は全イベントで再フェッチ
+      if (crossProject || !projectName || event.projectId === projectName) {
+        console.log('[BacklogList] db:changed event received:', event.source, event.projectId);
+        fetchBacklogs(true); // silentモードでバックグラウンド更新
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchBacklogs, crossProject, projectName]);
+
   // ==========================================================================
   // イベントハンドラ
   // ==========================================================================

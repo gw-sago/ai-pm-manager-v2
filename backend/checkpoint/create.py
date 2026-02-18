@@ -31,6 +31,7 @@ if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
 
 from utils.db import get_connection, DatabaseError
+from config.db_config import USER_DATA_PATH, get_project_paths
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +112,9 @@ def _create_db_snapshot(checkpoint_id: str, verbose: bool = False) -> None:
     Raises:
         CheckpointError: スナップショット作成失敗
     """
-    # DB path
-    db_path = _project_root / "data" / "aipm.db"
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    # DB path（USER_DATA_PATH経由）
+    db_path = USER_DATA_PATH / "data" / "aipm.db"
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
     checkpoint_db_path = checkpoint_dir / f"{checkpoint_id}.db"
 
     if not db_path.exists():
@@ -151,8 +152,8 @@ def _record_file_state(
     Raises:
         CheckpointError: ファイル状態記録失敗
     """
-    # RESULT directory
-    result_dir = _project_root / "PROJECTS" / project_id / "RESULT" / order_id
+    # RESULT directory（USER_DATA_PATH経由）
+    result_dir = get_project_paths(project_id)["result"] / order_id
 
     if not result_dir.exists():
         logger.warning(f"RESULTディレクトリが見つかりません: {result_dir}")
@@ -216,7 +217,7 @@ def _save_checkpoint_metadata(
     Raises:
         CheckpointError: メタデータ保存失敗
     """
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
     meta_file = checkpoint_dir / f"{checkpoint_id}_meta.json"
 
     # DBから現在のタスク状態を取得
@@ -271,7 +272,7 @@ def list_checkpoints(
     Returns:
         チェックポイント情報のリスト（新しい順）
     """
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
 
     if not checkpoint_dir.exists():
         return []
@@ -321,7 +322,7 @@ def delete_old_checkpoints(keep_count: int = 10, dry_run: bool = False) -> int:
     Returns:
         削除したチェックポイント数
     """
-    checkpoint_dir = _project_root / "data" / "checkpoints"
+    checkpoint_dir = USER_DATA_PATH / "data" / "checkpoints"
 
     if not checkpoint_dir.exists():
         return 0

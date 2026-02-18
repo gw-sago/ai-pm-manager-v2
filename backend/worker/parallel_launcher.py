@@ -53,7 +53,7 @@ from config.worker_config import (
     get_worker_config,
     WorkerResourceConfig,
 )
-from config.db_config import AI_PM_ROOT
+from config.db_config import AI_PM_ROOT, USER_DATA_PATH
 
 # Optional imports for event-driven daemon loop (TASK_1090)
 try:
@@ -428,7 +428,7 @@ class ParallelWorkerLauncher:
         Returns:
             Path to PROJECTS/{project_id}/RESULT/{order_id}/LOGS/
         """
-        log_dir = AI_PM_ROOT / "PROJECTS" / self.project_id / "RESULT" / self.order_id / "LOGS"
+        log_dir = USER_DATA_PATH / "PROJECTS" / self.project_id / "RESULT" / self.order_id / "LOGS"
         os.makedirs(str(log_dir), exist_ok=True)
         return log_dir
 
@@ -782,7 +782,7 @@ class ParallelWorkerLauncher:
             Returns None if the file is older than 60 seconds.
         """
         hb_path = (
-            AI_PM_ROOT / "PROJECTS" / project_id / "RESULT" / order_id
+            USER_DATA_PATH / "PROJECTS" / project_id / "RESULT" / order_id
             / "LOGS" / "daemon_heartbeat.json"
         )
         try:
@@ -1126,7 +1126,7 @@ class ParallelWorkerLauncher:
             if retcode == 0:
                 report_num = task_id.replace("TASK_", "")
                 report_file = (
-                    AI_PM_ROOT / "PROJECTS" / self.project_id / "RESULT"
+                    USER_DATA_PATH / "PROJECTS" / self.project_id / "RESULT"
                     / self.order_id / "05_REPORT" / f"REPORT_{report_num}.md"
                 )
                 if not report_file.exists():
@@ -1308,7 +1308,7 @@ class ParallelWorkerLauncher:
                 cmd.append("--verbose")
 
             # Create log file for review_worker output
-            log_dir = AI_PM_ROOT / "logs" / "review_workers"
+            log_dir = USER_DATA_PATH / "logs" / "review_workers"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file_path = log_dir / f"{task_id}_review.log"
 

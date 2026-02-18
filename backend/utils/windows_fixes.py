@@ -71,7 +71,8 @@ def check_better_sqlite3(app_dir=None):
         dict with keys: ok (bool), message (str), rebuilt (bool)
     """
     if app_dir is None:
-        app_dir = _project_root / "PROJECTS" / "ai_pm_manager"
+        # Electronアプリのnode_modules確認用 - 実行環境ルート
+        app_dir = _project_root
 
     app_dir = Path(app_dir)
     node_modules = app_dir / "node_modules"

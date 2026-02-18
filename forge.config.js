@@ -1,7 +1,20 @@
 const path = require('path');
+const fs = require('fs');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
+  hooks: {
+    // ビルド前にdata/schema_v2.sqlをframework/data/に同期
+    generateAssets: async () => {
+      const src = path.join(__dirname, 'data', 'schema_v2.sql');
+      const dest = path.join(__dirname, 'framework', 'data', 'schema_v2.sql');
+      if (fs.existsSync(src)) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+        console.log('[forge] Synced schema_v2.sql to framework/data/');
+      }
+    },
+  },
   packagerConfig: {
     asar: {
       // ネイティブモジュール（.node）とその依存関係をasarから除外

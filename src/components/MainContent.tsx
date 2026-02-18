@@ -4,7 +4,6 @@ import { OrderDetailPanel } from './OrderDetailPanel';
 import { BacklogList } from './BacklogList';
 import { BacklogDetailPanel } from './BacklogDetailPanel';
 import { ExecutionLog } from './ExecutionLog';
-import { Settings } from './Settings';
 import { SupervisorDashboard } from './SupervisorDashboard';
 import { ProjectInfo } from './ProjectInfo';
 import type { Project, TaskInfo, OrderInfo, BacklogItem, Supervisor, SupervisorProject } from '../preload';
@@ -28,12 +27,6 @@ interface MainContentProps {
   selectedOrder?: OrderInfo | null;
   /** フレームワーク設定の状態（Layout.tsxから渡される） */
   frameworkConfigState?: FrameworkConfigState;
-  /** 設定画面が表示中かどうか（Layout.tsxから渡される） */
-  isSettingsOpen?: boolean;
-  /** 設定画面を閉じるコールバック */
-  onSettingsClose?: () => void;
-  /** フレームワークパス変更時のコールバック */
-  onFrameworkPathChange?: (newPath: string) => void;
   /** バックログ項目クリック時のコールバック（ORDER_038追加） */
   onBacklogItemClick?: (item: BacklogItem) => void;
   /** ORDER IDクリック時のコールバック */
@@ -51,9 +44,6 @@ export const MainContent: React.FC<MainContentProps> = ({
   selectedProject,
   selectedOrder,
   frameworkConfigState = 'loading',
-  isSettingsOpen = false,
-  onSettingsClose,
-  onFrameworkPathChange,
   onBacklogItemClick,
   onOrderIdClick,
   selectedSupervisor,
@@ -63,10 +53,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   return (
     <main className="flex-1 bg-gray-50 overflow-auto">
       <div className="p-4 h-full">
-        {/* 設定画面が開いている場合 */}
-        {isSettingsOpen ? (
-          <Settings onClose={onSettingsClose} onPathChange={onFrameworkPathChange} />
-        ) : selectedSupervisor ? (
+        {selectedSupervisor ? (
           /* Supervisor選択時は統括ダッシュボードを表示（ORDER_060追加） */
           <SupervisorDashboard
             supervisor={selectedSupervisor}
@@ -195,36 +182,12 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
       {!isFrameworkConfigured && (
         <div className="flex flex-col h-full items-center justify-center">
           <div className="text-center max-w-md">
-            {/* アイコン */}
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6">
-              <svg
-                className="w-8 h-8 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </div>
-
             {/* メッセージ */}
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
               フレームワーク設定が必要です
             </h2>
             <p className="text-sm text-gray-500 mb-6">
-              プロジェクト管理を開始するには、サイドバーの「設定」から
-              AI PM Frameworkのディレクトリを設定してください。
+              プロジェクト管理を開始するには、AI PM Frameworkのディレクトリを設定してください。
             </p>
 
             {/* ヒント */}

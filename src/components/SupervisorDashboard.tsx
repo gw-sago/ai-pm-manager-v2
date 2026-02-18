@@ -67,27 +67,53 @@ export const SupervisorDashboard: React.FC<SupervisorDashboardProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'projects' | 'xbacklog' | 'portfolio'>('projects');
 
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [detailData, projectsData, xbacklogsData] = await Promise.all([
+        window.electronAPI.getSupervisorDetail(supervisor.id),
+        window.electronAPI.getProjectsBySupervisor(supervisor.id),
+        window.electronAPI.getXBacklogs(supervisor.id),
+      ]);
+      setDetail(detailData);
+      setProjects(projectsData);
+      setXBacklogs(xbacklogsData);
+    } catch (err) {
+      console.error('[SupervisorDashboard] Failed to fetch data:', err);
+      setError('データの取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  }, [supervisor.id]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [detailData, projectsData, xbacklogsData] = await Promise.all([
-          window.electronAPI.getSupervisorDetail(supervisor.id),
-          window.electronAPI.getProjectsBySupervisor(supervisor.id),
-          window.electronAPI.getXBacklogs(supervisor.id),
-        ]);
+    fetchData();
+  }, [fetchData]);
+
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更時にSupervisorデータを自動更新
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      console.log('[SupervisorDashboard] db:changed event received:', event.source, event.projectId);
+      // Supervisorダッシュボードは複数プロジェクトを管理するため、全イベントで更新
+      // ローディング表示は抑制して静かに更新
+      Promise.all([
+        window.electronAPI.getSupervisorDetail(supervisor.id),
+        window.electronAPI.getProjectsBySupervisor(supervisor.id),
+        window.electronAPI.getXBacklogs(supervisor.id),
+      ]).then(([detailData, projectsData, xbacklogsData]) => {
         setDetail(detailData);
         setProjects(projectsData);
         setXBacklogs(xbacklogsData);
-      } catch (err) {
-        console.error('[SupervisorDashboard] Failed to fetch data:', err);
-        setError('データの取得に失敗しました');
-      } finally {
-        setLoading(false);
-      }
+      }).catch((err) => {
+        console.error('[SupervisorDashboard] Failed to refresh via db:changed:', err);
+      });
+    });
+
+    return () => {
+      unsubscribe();
     };
-    fetchData();
   }, [supervisor.id]);
 
   const refreshXBacklogs = async () => {

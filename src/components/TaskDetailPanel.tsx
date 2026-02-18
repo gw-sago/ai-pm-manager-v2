@@ -155,39 +155,52 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [promptCopied, setPromptCopied] = useState(false);
 
   // タスク詳細を取得
-  useEffect(() => {
-    let cancelled = false;
+  const fetchTaskDetail = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    const fetchTaskDetail = async () => {
-      setLoading(true);
-      setError(null);
+    try {
+      const taskDetail = await window.electronAPI.getTask(taskId, projectId);
 
-      try {
-        const taskDetail = await window.electronAPI.getTask(taskId, projectId);
-
-        if (!cancelled) {
-          if (taskDetail) {
-            setTask(taskDetail);
-          } else {
-            setError(`タスク ${taskId} が見つかりませんでした。`);
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[TaskDetailPanel] Failed to fetch task detail:', err);
-          setError('タスク詳細の取得に失敗しました。');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (taskDetail) {
+        setTask(taskDetail);
+      } else {
+        setError(`タスク ${taskId} が見つかりませんでした。`);
       }
-    };
+    } catch (err) {
+      console.error('[TaskDetailPanel] Failed to fetch task detail:', err);
+      setError('タスク詳細の取得に失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  }, [taskId, projectId]);
 
+  useEffect(() => {
     fetchTaskDetail();
+  }, [fetchTaskDetail]);
+
+  // DB変更イベントの購読（ORDER_004 / TASK_011）
+  // スクリプト実行完了・タスクステータス変更時にタスク詳細を自動更新
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onDbChanged((event) => {
+      // 現在表示中のプロジェクトに関係するイベントのみ再フェッチ
+      if (event.projectId === projectId) {
+        console.log('[TaskDetailPanel] db:changed event received:', event.source, event.targetId);
+        // ローディング表示は抑制して静かに更新（タスク詳細は既に表示されているため）
+        window.electronAPI.getTask(taskId, projectId)
+          .then((taskDetail) => {
+            if (taskDetail) {
+              setTask(taskDetail);
+            }
+          })
+          .catch((err) => {
+            console.error('[TaskDetailPanel] Failed to refresh task via db:changed:', err);
+          });
+      }
+    });
 
     return () => {
-      cancelled = true;
+      unsubscribe();
     };
   }, [taskId, projectId]);
 

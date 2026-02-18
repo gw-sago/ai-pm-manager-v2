@@ -91,3 +91,12 @@ backend/test_*.py
 *.exe
 *.dmg
 *.app
+
+# Claude Code local settings
+.claude/
+
+# Embedded Python
+python-embed/
+
+# Project data (managed in Roaming, not in repo)
+PROJECTS/

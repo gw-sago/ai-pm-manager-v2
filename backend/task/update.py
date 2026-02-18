@@ -152,8 +152,8 @@ def update_task(
                 updates.append("started_at = ?")
                 params.append(datetime.now().isoformat())
 
-            # REWORK → IN_PROGRESS 遷移時に reviewed_at をリセット
-            if status == "IN_PROGRESS" and current_dict["status"] == "REWORK":
+            # REWORK → DONE 遷移時に reviewed_at をリセット（リワーク完了、再レビュー待ち）
+            if status == "DONE" and current_dict["status"] == "REWORK":
                 updates.append("reviewed_at = NULL")
                 # NULLは値ではなくリテラルなのでparamsには追加しない
 
@@ -327,6 +327,13 @@ def _check_unblock_dependent_tasks(conn, completed_task_id: str, project_id: str
 
         if pending_deps and pending_deps["count"] == 0:
             # 全ての依存が完了 → QUEUED に変更（複合キー対応）
+            # 遷移バリデーション
+            try:
+                validate_transition(conn, "task", "BLOCKED", "QUEUED", "System")
+            except TransitionError as e:
+                print(f"警告: タスク {dependent_id} のBLOCKED→QUEUED遷移が許可されていません: {e}", file=sys.stderr)
+                continue
+
             execute_query(
                 conn,
                 "UPDATE tasks SET status = 'QUEUED', updated_at = ? WHERE id = ? AND project_id = ?",

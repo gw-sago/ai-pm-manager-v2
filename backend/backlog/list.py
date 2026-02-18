@@ -532,6 +532,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="BACKLOG一覧を取得",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        exit_on_error=False,
         epilog="""
 使用例:
   # 全件表示
@@ -627,11 +628,17 @@ def main():
         help="詳細情報を表示"
     )
 
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except (SystemExit, argparse.ArgumentError) as e:
+        error_msg = str(e) if str(e) else "引数エラー"
+        print(json.dumps({"success": False, "error": f"引数エラー: {error_msg}", "items": [], "total_count": 0, "filtered_count": 0}, ensure_ascii=False))
+        sys.exit(1)
 
     # プロジェクト名チェック
     if not args.all_projects and not args.project_name:
-        parser.error("プロジェクト名を指定してください（または --all を使用）")
+        print(json.dumps({"success": False, "error": "プロジェクト名を指定してください（または --all を使用）", "items": [], "total_count": 0, "filtered_count": 0}, ensure_ascii=False))
+        sys.exit(1)
 
     # デフォルトフィルタの設定（--status未指定時はTODO+IN_PROGRESSのみ表示）
     if args.status is None:

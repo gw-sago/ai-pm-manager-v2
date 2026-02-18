@@ -14,10 +14,6 @@ interface SidebarProps {
   selectedOrderId?: string | null;
   /** ORDER選択時のコールバック（Layout.tsxに通知） */
   onOrderSelect?: (order: OrderInfo) => void;
-  /** 設定ボタンクリック時のコールバック（ORDER_152: 削除により未使用） */
-  onSettingsClick?: () => void;
-  /** 設定画面が表示中かどうか（ORDER_152: 削除により未使用） */
-  isSettingsOpen?: boolean;
   /** 現在選択中のSupervisor（ORDER_060追加） */
   selectedSupervisor?: Supervisor | null;
   /** Supervisor選択時のコールバック（ORDER_060追加） */
@@ -31,8 +27,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onProjectSelect,
   selectedOrderId,
   onOrderSelect,
-  // onSettingsClick, // ORDER_152: 削除により未使用
-  // isSettingsOpen = false, // ORDER_152: 削除により未使用
   selectedSupervisor,
   onSupervisorSelect,
 }) => {

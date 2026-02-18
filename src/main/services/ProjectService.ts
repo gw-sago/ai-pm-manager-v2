@@ -116,6 +116,7 @@ export class ProjectService extends EventEmitter {
    */
   private getProjectsFromDb(frameworkPath: string): ProjectListResult {
     try {
+      const configService = getConfigService();
       const aipmDbService = getAipmDbService();
       // デフォルトでアクティブプロジェクトのみ取得（is_active = 1）
       const dbProjects = aipmDbService.getProjects(false);
@@ -185,6 +186,7 @@ export class ProjectService extends EventEmitter {
    * 指定されたフレームワークパスからプロジェクト一覧を取得
    */
   getProjectsFromPath(frameworkPath: string): ProjectListResult {
+    const configService = getConfigService();
     const projectsDir = configService.getProjectsBasePath();
 
     if (!fs.existsSync(projectsDir)) {
@@ -743,26 +745,44 @@ export class ProjectService extends EventEmitter {
         const orders = aipmDbService.getOrders(projectName);
         const order = orders.find((o) => o.id === orderId);
         if (order) {
-          // 疑似Markdownを生成
+          const progress = order.taskCount > 0
+            ? Math.round((order.completedTaskCount / order.taskCount) * 100)
+            : 0;
+
+          // タスク一覧も取得
+          let taskLines: string[] = [];
+          try {
+            const tasks = aipmDbService.getTasks(orderId, projectName);
+            if (tasks && tasks.length > 0) {
+              taskLines = [
+                '',
+                '## タスク一覧',
+                '',
+                '| ID | タイトル | ステータス | 優先度 |',
+                '|-----|---------|----------|--------|',
+                ...tasks.map((t) =>
+                  `| ${t.id} | ${t.title} | ${t.status} | ${t.priority} |`
+                ),
+              ];
+            }
+          } catch {
+            // タスク取得失敗時は無視
+          }
+
           const lines: string[] = [
-            `# ${order.id}: ${order.title}`,
+            `# ${order.title}`,
             '',
-            '## 基本情報',
-            '',
-            `| 項目 | 値 |`,
-            `|------|-----|`,
-            `| プロジェクトID | ${order.projectId} |`,
-            `| ステータス | ${order.status} |`,
-            `| 優先度 | ${order.priority} |`,
-            `| タスク数 | ${order.taskCount} |`,
-            `| 完了タスク数 | ${order.completedTaskCount} |`,
-            `| 作成日時 | ${order.createdAt} |`,
-            `| 開始日時 | ${order.startedAt || '-'} |`,
-            `| 完了日時 | ${order.completedAt || '-'} |`,
+            `**${order.id}** | ${order.status} | ${order.priority} | 進捗 ${progress}% (${order.completedTaskCount}/${order.taskCount})`,
             '',
             '---',
             '',
-            '*このデータはDBから取得されました（ORDERファイルが存在しません）*',
+            '## 基本情報',
+            '',
+            `- **プロジェクト**: ${order.projectId}`,
+            `- **作成日時**: ${order.createdAt}`,
+            ...(order.startedAt ? [`- **開始日時**: ${order.startedAt}`] : []),
+            ...(order.completedAt ? [`- **完了日時**: ${order.completedAt}`] : []),
+            ...taskLines,
           ];
           return lines.join('\n');
         }

@@ -897,6 +897,25 @@ export interface OrderRelatedInfo {
 }
 
 // ============================================================
+// DB変更通知型定義（ORDER_004 / TASK_010）
+// ============================================================
+
+/**
+ * DB変更イベント
+ * スクリプト実行完了・タスクステータス変更・全タスク完了・タスククラッシュ時に発火
+ */
+export interface DbChangedEvent {
+  /** 変更元 */
+  source: string;
+  /** プロジェクトID */
+  projectId: string;
+  /** ターゲットID（ORDER ID または タスクID） */
+  targetId: string;
+  /** イベント発生日時（ISO8601） */
+  timestamp: string;
+}
+
+// ============================================================
 // スクリプト実行関連型定義（ORDER_039 / TASK_566）
 // ============================================================
 
@@ -1284,6 +1303,13 @@ export interface ElectronAPI {
    * @returns ファイル内容（見つからない場合はnull）
    */
   getReviewFile: (projectName: string, taskId: string) => Promise<string | null>;
+
+  /**
+   * PROJECT_INFO.md ファイルの内容を取得
+   * @param projectName プロジェクト名
+   * @returns ファイル内容（見つからない場合はnull）
+   */
+  getProjectInfoFile: (projectName: string) => Promise<string | null>;
 
   // 推奨アクション (TASK_026)
   /**
@@ -2064,6 +2090,18 @@ export interface ElectronAPI {
     deletedCounts?: { orders: number; tasks: number; backlogs: number };
     error?: string;
   }>;
+
+  // ============================================================
+  // DB変更通知（ORDER_004 / TASK_010）
+  // ============================================================
+
+  /**
+   * DB変更イベントのリスナーを登録
+   * スクリプト実行完了・タスクステータス変更・全タスク完了・タスククラッシュ時に発火
+   * @param callback コールバック関数
+   * @returns リスナー解除関数
+   */
+  onDbChanged: (callback: (event: DbChangedEvent) => void) => () => void;
 }
 
 /**
@@ -2127,6 +2165,8 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('project:get-order-file', projectName, orderId),
   getReviewFile: (projectName: string, taskId: string) =>
     ipcRenderer.invoke('project:get-review-file', projectName, taskId),
+  getProjectInfoFile: (projectName: string) =>
+    ipcRenderer.invoke('project:get-project-info-file', projectName),
 
   // 推奨アクション (TASK_026)
   getRecommendedActions: (projectName: string, state: ParsedState) =>
@@ -2382,6 +2422,10 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('project:create-project', projectId, name),
   deleteProject: (projectId: string, force?: boolean) =>
     ipcRenderer.invoke('project:delete-project', projectId, force),
+
+  // DB変更通知（ORDER_004 / TASK_010）
+  onDbChanged: (callback: (event: DbChangedEvent) => void) =>
+    createEventListener('db:changed', callback),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
