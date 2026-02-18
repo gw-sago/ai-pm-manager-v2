@@ -2,15 +2,19 @@
  * TaskDetailPanel Component
  *
  * ORDER_126 / TASK_1119: タスク詳細パネルコンポーネント
+ * ORDER_003 / TASK_005: タスク定義・レポート表示・復旧プロンプト機能追加
  *
  * タスク詳細情報を表示するモーダル/サイドパネルコンポーネント。
  * - タスク基本情報（タイトル、ステータス、優先度、担当Worker）
+ * - タスク定義ファイル（TASK_XXX.md）の内容表示
+ * - 実行レポート（REPORT_XXX.md）の内容表示
+ * - 復旧プロンプト生成（異常状態時）
  * - 説明（Markdown対応）
  * - 依存タスク一覧（クリック可能、他タスク詳細に遷移可能）
  * - 開始/完了日時
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { AipmTask, TaskReviewHistory } from '../preload';
 
@@ -74,6 +78,40 @@ const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
 };
 
 /**
+ * 折りたたみ可能セクションコンポーネント
+ */
+const CollapsibleSection: React.FC<{
+  title: string;
+  count?: number;
+  defaultExpanded?: boolean;
+  children: React.ReactNode;
+}> = ({ title, count, defaultExpanded = true, children }) => {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 hover:text-gray-700 transition"
+        >
+          <svg
+            className={`w-4 h-4 transform transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span>{title}{count !== undefined ? ` (${count})` : ''}</span>
+        </button>
+      </h3>
+      {expanded && children}
+    </div>
+  );
+};
+
+/**
  * 日時フォーマット関数
  */
 const formatDateTime = (dateStr: string | null): string => {
@@ -92,6 +130,11 @@ const formatDateTime = (dateStr: string | null): string => {
   }
 };
 
+/** 異常状態の判定 */
+const isAbnormalStatus = (status: string): boolean => {
+  return ['INTERRUPTED', 'ESCALATED', 'REWORK', 'REJECTED'].includes(status);
+};
+
 /**
  * TaskDetailPanel コンポーネント
  */
@@ -107,6 +150,9 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [reviewHistory, setReviewHistory] = useState<TaskReviewHistory | null>(null);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const [taskFileContent, setTaskFileContent] = useState<string | null>(null);
+  const [reportFileContent, setReportFileContent] = useState<string | null>(null);
+  const [promptCopied, setPromptCopied] = useState(false);
 
   // タスク詳細を取得
   useEffect(() => {
@@ -169,6 +215,34 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     };
   }, [taskId, projectId]);
 
+  // タスク定義ファイル・レポートファイルを取得
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchFiles = async () => {
+      try {
+        const [taskFile, reportFile] = await Promise.all([
+          window.electronAPI.getTaskFile(projectId, taskId),
+          window.electronAPI.getReportFile(projectId, taskId),
+        ]);
+        if (!cancelled) {
+          setTaskFileContent(taskFile);
+          setReportFileContent(reportFile);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[TaskDetailPanel] Failed to fetch task/report files:', err);
+        }
+      }
+    };
+
+    fetchFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId, projectId]);
+
   // Escキーで閉じる
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -196,6 +270,65 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       onTaskClick(depTaskId);
     }
   };
+
+  // 復旧プロンプト生成・コピー
+  const handleCopyRecoveryPrompt = useCallback(async () => {
+    if (!task) return;
+
+    // 最新の差し戻し理由またはエスカレーション理由を取得
+    let reason = '';
+    if (reviewHistory) {
+      if (task.status === 'REWORK' || task.status === 'REJECTED') {
+        const latestRejection = reviewHistory.reviews
+          .filter((r) => r.status === 'REJECTED' && r.comment)
+          .sort((a, b) => {
+            const dateA = a.reviewedAt || a.submittedAt || '';
+            const dateB = b.reviewedAt || b.submittedAt || '';
+            return dateB.localeCompare(dateA);
+          })[0];
+        if (latestRejection) {
+          reason = latestRejection.comment || '';
+        }
+      } else if (task.status === 'ESCALATED') {
+        const latestEscalation = reviewHistory.escalations
+          .filter((e) => !e.resolvedAt)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+        if (latestEscalation) {
+          reason = latestEscalation.reason || '';
+        }
+      }
+    }
+
+    const prompt = [
+      `## 復旧対象タスク`,
+      ``,
+      `- プロジェクト: ${projectId}`,
+      `- タスク: ${task.id} - ${task.title}`,
+      `- ORDER: ${task.orderId}`,
+      `- 現在の状態: ${task.status}`,
+      reason ? `- 理由: ${reason}` : null,
+      ``,
+      `## 復旧コマンド`,
+      ``,
+      '```',
+      `/aipm-recover ${projectId} ${task.id}`,
+      '```',
+      ``,
+      `## 手動復旧の場合`,
+      ``,
+      '```',
+      `/aipm-worker ${projectId} ${task.id}`,
+      '```',
+    ].filter((line) => line !== null).join('\n');
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    } catch (err) {
+      console.error('[TaskDetailPanel] Failed to copy to clipboard:', err);
+    }
+  }, [task, reviewHistory, projectId]);
 
   // ローディング表示
   if (loading) {
@@ -289,14 +422,33 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           <p className="text-lg text-gray-900">{task.title}</p>
         </div>
 
+        {/* タスク定義ファイル */}
+        <CollapsibleSection title="タスク定義" defaultExpanded={true}>
+          {taskFileContent ? (
+            <div className="prose prose-sm max-w-none bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <ReactMarkdown>{taskFileContent}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">タスク定義ファイルなし</p>
+          )}
+        </CollapsibleSection>
+
+        {/* 実行レポート */}
+        {reportFileContent && (
+          <CollapsibleSection title="実行レポート" defaultExpanded={true}>
+            <div className="prose prose-sm max-w-none bg-green-50 rounded-lg p-4 border border-green-100">
+              <ReactMarkdown>{reportFileContent}</ReactMarkdown>
+            </div>
+          </CollapsibleSection>
+        )}
+
         {/* 説明（Markdown） */}
         {task.description && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">説明</h3>
+          <CollapsibleSection title="説明" defaultExpanded={true}>
             <div className="prose prose-sm max-w-none bg-gray-50 rounded-lg p-4">
               <ReactMarkdown>{task.description}</ReactMarkdown>
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* 基本情報 */}
@@ -318,6 +470,29 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             <p className="text-gray-900">{task.projectId}</p>
           </div>
         </div>
+
+        {/* 復旧プロンプト */}
+        {isAbnormalStatus(task.status) && (
+          <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-amber-800 uppercase">復旧サポート</h3>
+              <button
+                onClick={handleCopyRecoveryPrompt}
+                className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+                  promptCopied
+                    ? 'bg-green-500 text-white'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                {promptCopied ? 'コピー完了!' : '復旧プロンプトをコピー'}
+              </button>
+            </div>
+            <p className="text-sm text-amber-700">
+              CLIから復旧するためのプロンプトをクリップボードにコピーします。
+              コピー後、Claude Codeのチャットに貼り付けて実行してください。
+            </p>
+          </div>
+        )}
 
         {/* 依存タスク */}
         {task.dependencies.length > 0 && task.dependencies[0] !== '-' && (
@@ -404,8 +579,11 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         )}
 
         {/* レビュー履歴 */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">レビュー履歴</h3>
+        <CollapsibleSection
+          title="レビュー履歴"
+          count={reviewHistory?.reviews.length}
+          defaultExpanded={false}
+        >
           {reviewHistory && reviewHistory.reviews.length > 0 ? (
             <div className="space-y-2">
               {[...reviewHistory.reviews]
@@ -455,14 +633,15 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           ) : (
             <p className="text-sm text-gray-400">レビュー履歴なし</p>
           )}
-        </div>
+        </CollapsibleSection>
 
         {/* エスカレーション情報 */}
         {reviewHistory && (task.status === 'ESCALATED' || reviewHistory.escalations.length > 0) && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">
-              エスカレーション情報 ({reviewHistory.escalations.length})
-            </h3>
+          <CollapsibleSection
+            title="エスカレーション情報"
+            count={reviewHistory.escalations.length}
+            defaultExpanded={true}
+          >
             <div className="space-y-2">
               {reviewHistory.escalations.map((esc) => (
                 <div
@@ -496,7 +675,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* ステータス遷移 */}
