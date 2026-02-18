@@ -3,18 +3,21 @@
  *
  * アプリケーション設定の永続化を担当するサービス
  *
- * V2パス設計（ORDER_002: DB一元化完了, ORDER_164: Squirrelルート展開）:
+ * V2パス設計（ORDER_002: DB一元化完了, ORDER_164: Squirrelルート展開, ORDER_001: userData移行）:
  * - backendPath: Pythonスクリプト（読み取り専用）
  *   - 開発時: リポジトリ/backend/
  *   - パッケージ時: Squirrelルート/backend/（resources/から展開済み）
  * - schemaPath: DBスキーマ（読み取り専用）
  *   - 開発時: リポジトリ/data/schema_v2.sql
  *   - パッケージ時: Squirrelルート/data/schema_v2.sql（展開済み）
- * - frameworkPath: PROJECTS配下・DB（読み書き）
+ * - frameworkPath: バイナリリソース（読み取り専用: backend, schema, python-embed）
  *   - 開発時: リポジトリ/
  *   - パッケージ時: Squirrelルート（exeの1つ上）
- * - dbPath: DB本体（読み書き）→ 常にframeworkPath/data/aipm.db
- * - configPath: UI設定（config.json）→ %APPDATA%/.aipm/（ユーザー固有）
+ * - userDataPath: ユーザーデータ（読み書き: DB, PROJECTS）
+ *   - 常に: app.getPath('userData') = %APPDATA%/ai-pm-manager-v2/
+ * - dbPath: DB本体（読み書き）→ userDataPath/data/aipm.db
+ * - PROJECTS: プロジェクトデータ → userDataPath/PROJECTS/
+ * - configPath: UI設定（config.json）→ %APPDATA%/ai-pm-manager-v2/.aipm/（ユーザー固有）
  * - pythonPath: Python実行ファイル
  *   - 開発時: 'python'（システムPATH）
  *   - パッケージ時: Squirrelルート/python-embed/python.exe（展開済み）
@@ -58,21 +61,26 @@ const DEFAULT_CONFIG: AppConfig = {
 /**
  * ConfigService クラス
  *
- * V2パス設計（ORDER_002: DB一元化）:
+ * V2パス設計（ORDER_002: DB一元化, ORDER_001: userData移行）:
  * - backendPath: 読み取り専用リソース（Pythonスクリプト）
- * - frameworkPath: 読み書き用（PROJECTS、data/aipm.db）
- *   開発時=リポジトリルート、パッケージ時=exe実行ディレクトリ
- * - configPath: UI設定（config.json）= %APPDATA%/.aipm/（ユーザー固有）
+ * - frameworkPath: バイナリリソース（backend, schema, python-embed）
+ *   開発時=リポジトリルート、パッケージ時=Squirrelルート
+ * - userDataPath: ユーザーデータ（DB, PROJECTS）= app.getPath('userData')
+ * - configPath: UI設定（config.json）= %APPDATA%/ai-pm-manager-v2/.aipm/（ユーザー固有）
  */
 export class ConfigService {
   private configPath: string;
   private _frameworkPath: string;
   private _backendPath: string;
+  private _userDataPath: string;
 
   constructor() {
+    // app.getPath('userData') = %APPDATA%/ai-pm-manager-v2/
+    // DB・PROJECTSなどユーザーデータの永続的な保存先
+    this._userDataPath = app.getPath('userData');
+
     // config.json はユーザー固有設定のため AppData に保存（変更なし）
-    const userDataPath = app.getPath('userData');
-    const aipmDir = path.join(userDataPath, '.aipm');
+    const aipmDir = path.join(this._userDataPath, '.aipm');
     this.configPath = path.join(aipmDir, 'config.json');
 
     if (app.isPackaged) {
@@ -203,11 +211,12 @@ export class ConfigService {
   /**
    * AI PM Framework DB（aipm.db）のパスを取得（読み書き用）
    *
-   * ORDER_002: 開発時・パッケージ時ともに frameworkPath/data/aipm.db を返す。
-   * AppData DBは完全廃止。
+   * ORDER_001: app.getPath('userData') 配下に移動。
+   * Squirrelインストーラーの影響を受けない永続的な場所に配置する。
+   * パス: %APPDATA%/ai-pm-manager-v2/data/aipm.db
    */
   getAipmDbPath(): string {
-    return path.join(this._frameworkPath, 'data', 'aipm.db');
+    return path.join(this._userDataPath, 'data', 'aipm.db');
   }
 
   /**
@@ -220,9 +229,13 @@ export class ConfigService {
 
   /**
    * PROJECTSディレクトリを確保
+   *
+   * ORDER_001: app.getPath('userData') 配下に移動。
+   * Squirrelインストーラーの影響を受けない永続的な場所に配置する。
+   * パス: %APPDATA%/ai-pm-manager-v2/PROJECTS/
    */
   ensureProjectsDirectory(): void {
-    const projectsDir = path.join(this._frameworkPath, 'PROJECTS');
+    const projectsDir = path.join(this._userDataPath, 'PROJECTS');
     if (!fs.existsSync(projectsDir)) {
       fs.mkdirSync(projectsDir, { recursive: true });
       console.log('[ConfigService] Created PROJECTS directory:', projectsDir);

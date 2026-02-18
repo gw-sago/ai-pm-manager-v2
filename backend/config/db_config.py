@@ -43,10 +43,13 @@ def setup_utf8_output():
 
 def _get_ai_pm_root() -> Path:
     """
-    AI_PM_ROOT パスを取得
+    AI_PM_ROOT パスを取得（アプリケーション本体のルート）
 
     環境変数 AI_PM_ROOT が設定されていればそれを使用、
-    なければスクリプトの位置から自動検出
+    なければスクリプトの位置から自動検出。
+
+    このパスはスキーマファイルやバックエンドスクリプトなど、
+    アプリケーションと一緒にデプロイされるファイルの基準パス。
 
     新リポジトリ構成:
     - backend/config/db_config.py → ai-pm-manager-v2/ がルート
@@ -61,32 +64,64 @@ def _get_ai_pm_root() -> Path:
     return current_file.parent.parent.parent
 
 
+def _get_user_data_path() -> Path:
+    """
+    ユーザーデータ（DB, PROJECTS等）の保存先パスを取得
+
+    永続データ（DB、プロジェクトファイル、バックアップ）の基準パス。
+    アプリのアップデート時にも保持される場所に配置する。
+
+    優先順位:
+    1. 環境変数 AI_PM_USERDATA が設定されていればそれを使用
+    2. Windows: %APPDATA%/ai-pm-manager-v2/
+    3. フォールバック: AI_PM_ROOT（従来互換）
+    """
+    # 環境変数が明示指定されていれば最優先
+    env_userdata = os.environ.get("AI_PM_USERDATA")
+    if env_userdata:
+        return Path(env_userdata)
+
+    # Windows: %APPDATA% を使用
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "ai-pm-manager-v2"
+
+    # フォールバック: AI_PM_ROOT（従来互換、非Windows環境等）
+    return _get_ai_pm_root()
+
+
 # グローバル定数
 AI_PM_ROOT = _get_ai_pm_root()
+USER_DATA_PATH = _get_user_data_path()
 
 
 @dataclass
 class DBConfig:
     """データベース設定を保持するクラス"""
 
-    # データベースファイルパス
-    db_path: Path = AI_PM_ROOT / "data" / "aipm.db"
+    # データベースファイルパス（ユーザーデータ領域）
+    db_path: Path = USER_DATA_PATH / "data" / "aipm.db"
 
-    # スキーマファイルパス（新リポジトリ構成）
+    # スキーマファイルパス（アプリ本体と一緒にデプロイされる）
     schema_path: Path = AI_PM_ROOT / "data" / "schema_v2.sql"
 
-    # データディレクトリ
-    data_dir: Path = AI_PM_ROOT / "data"
+    # データディレクトリ（ユーザーデータ領域）
+    data_dir: Path = USER_DATA_PATH / "data"
 
-    # バックアップディレクトリ
-    backup_dir: Path = AI_PM_ROOT / "data" / "backup"
+    # バックアップディレクトリ（ユーザーデータ領域）
+    backup_dir: Path = USER_DATA_PATH / "data" / "backup"
 
     def __post_init__(self):
-        """パスをPathオブジェクトに変換"""
+        """パスをPathオブジェクトに変換し、必要なディレクトリを作成"""
         self.db_path = Path(self.db_path)
         self.schema_path = Path(self.schema_path)
         self.data_dir = Path(self.data_dir)
         self.backup_dir = Path(self.backup_dir)
+
+        # データディレクトリが存在しない場合は自動作成
+        if str(self.db_path) != ":memory:":
+            self.data_dir.mkdir(parents=True, exist_ok=True)
 
 
 # デフォルト設定インスタンス
@@ -223,7 +258,7 @@ def get_project_paths(project_id: str) -> dict:
         backlogパスは廃止されました（ORDER_090）。
         バックログはDBで管理されています。
     """
-    base = AI_PM_ROOT / "PROJECTS" / project_id
+    base = USER_DATA_PATH / "PROJECTS" / project_id
 
     return {
         "base": base,

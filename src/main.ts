@@ -19,6 +19,7 @@ import { registerSupervisorHandlers, cleanupSupervisor } from './main/supervisor
 import { registerDependencyUpdateHandlers, cleanupDependencyUpdate } from './main/dependencyUpdate';
 import { getAipmDbService } from './main/services/AipmDbService';
 import { getConfigService } from './main/services/ConfigService';
+import { migrateFromLocalAppData } from './main/utils/migrate-data';
 
 // DB初期化ステータスを保持（レンダラーへの通知用）
 let dbInitError: string | null = null;
@@ -145,6 +146,25 @@ app.on('ready', async () => {
       'Resource Deployment Error',
       `Failed to deploy resources.\n\nError: ${msg}\n\nSome features may not work correctly.`
     );
+  }
+
+  // ORDER_001 / TASK_004: 初回起動時マイグレーション（旧LOCAL→新ROAMING）
+  // パッケージ時のみ実行（開発時は不要）
+  if (app.isPackaged) {
+    try {
+      const squirrelRoot = path.resolve(path.dirname(process.execPath), '..');
+      const userDataPath = app.getPath('userData');
+      const migrationResult = migrateFromLocalAppData(squirrelRoot, userDataPath);
+      if (migrationResult.migrated) {
+        console.log('[Main] Data migration completed:', migrationResult.details.join('; '));
+      } else {
+        console.log('[Main] No data migration needed:', migrationResult.details.join('; '));
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[Main] Data migration failed:', msg);
+      // マイグレーション失敗は起動をブロックしない
+    }
   }
 
   // Initialize database (data/aipm.db に一元化)
