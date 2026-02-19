@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ProjectInfoGuidance } from './ProjectInfoGuidance';
+import { ProjectPageGenerator } from './ProjectPageGenerator';
 import type { InfoPage, InfoPagesIndex } from '../preload';
 
 interface ProjectInfoProps {
@@ -164,8 +165,11 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   // フォールバック: PROJECT_INFO.md表示
   if (!infoPages && fallbackContent) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <MarkdownViewer content={fallbackContent} />
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <MarkdownViewer content={fallbackContent} />
+        </div>
+        <ProjectPageGenerator projectId={projectId} />
       </div>
     );
   }
@@ -202,7 +206,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   // INFO_PAGES: カード一覧表示
   if (infoPages) {
     return (
-      <div className="p-2">
+      <div className="space-y-4 p-2">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {infoPages.pages.map((page) => (
             <button
@@ -226,6 +230,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
             </button>
           ))}
         </div>
+        <ProjectPageGenerator projectId={projectId} />
       </div>
     );
   }

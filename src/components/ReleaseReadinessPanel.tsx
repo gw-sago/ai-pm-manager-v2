@@ -5,10 +5,16 @@
  *
  * タスク完了状況、レビュー結果、変更ファイル一覧、影響範囲、REPORTサマリを表示し、
  * リリース可否を色（緑・黄・赤）で視覚的に判定できるUIを提供する。
+ *
+ * ORDER_017 / TASK_053: リリースノート表示UIを追加
+ * - 全タスクCOMPLETED時に自動生成・表示
+ * - オンデマンド生成ボタンを提供
+ * - MarkdownViewerでリリースノートをレンダリング
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../preload';
+import { MarkdownViewer } from './MarkdownViewer';
 
 interface ReleaseReadinessPanelProps {
   /** プロジェクト名 */
@@ -49,6 +55,13 @@ export const ReleaseReadinessPanel: React.FC<ReleaseReadinessPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ORDER_017 / TASK_053: リリースノート状態
+  const [releaseNoteContent, setReleaseNoteContent] = useState<string | null>(null);
+  const [releaseNoteLoading, setReleaseNoteLoading] = useState(false);
+  const [releaseNoteError, setReleaseNoteError] = useState<string | null>(null);
+  const [releaseNoteExpanded, setReleaseNoteExpanded] = useState(true);
+  const autoFetchedRef = useRef(false);
+
   // タスク完了状況を計算
   const completedTasks = tasks.filter(t => t.status === 'COMPLETED').length;
   const doneTasks = tasks.filter(t => t.status === 'DONE').length;
@@ -79,8 +92,9 @@ export const ReleaseReadinessPanel: React.FC<ReleaseReadinessPanelProps> = ({
 
   const readinessStatus = getReadinessStatus();
 
-  // TASK_1150: リリースボタンを表示すべきか（全タスクCOMPLETED時のみ）
-  const shouldShowReleaseButton = allTasksCompleted;
+  // TASK_1150: リリースボタンを表示すべきか（全タスクCOMPLETED時 かつ コールバックが提供された時のみ）
+  // ORDER_019: リリースボタンはバックログ一覧に移動したため、onExecuteReleaseが提供された場合のみ表示
+  const shouldShowReleaseButton = allTasksCompleted && !!onExecuteRelease;
 
   // ステータスに応じた色・アイコン・メッセージ
   const getStatusStyle = (): {
@@ -211,6 +225,34 @@ export const ReleaseReadinessPanel: React.FC<ReleaseReadinessPanelProps> = ({
 
     fetchReportSummaries();
   }, [projectName, orderId, tasks]);
+
+  // ORDER_017 / TASK_053: リリースノート生成
+  const handleGenerateReleaseNote = useCallback(async (dryRun = false) => {
+    setReleaseNoteLoading(true);
+    setReleaseNoteError(null);
+    try {
+      const result = await window.electronAPI.generateReleaseNote(projectName, orderId, dryRun);
+      if (result.success && result.noteContent) {
+        setReleaseNoteContent(result.noteContent);
+        setReleaseNoteExpanded(true);
+      } else {
+        setReleaseNoteError(result.error || 'リリースノートの生成に失敗しました');
+      }
+    } catch (err) {
+      console.error('[ReleaseReadinessPanel] generateReleaseNote failed:', err);
+      setReleaseNoteError('リリースノートの生成中にエラーが発生しました');
+    } finally {
+      setReleaseNoteLoading(false);
+    }
+  }, [projectName, orderId]);
+
+  // ORDER_017 / TASK_053: 全タスクCOMPLETED時に自動生成
+  useEffect(() => {
+    if (allTasksCompleted && !autoFetchedRef.current && !releaseNoteContent) {
+      autoFetchedRef.current = true;
+      handleGenerateReleaseNote(false);
+    }
+  }, [allTasksCompleted, releaseNoteContent, handleGenerateReleaseNote]);
 
   // 変更ファイルをMarkdownから抽出
   const extractChangedFiles = (content: string): string[] => {
@@ -472,6 +514,98 @@ export const ReleaseReadinessPanel: React.FC<ReleaseReadinessPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* ORDER_017 / TASK_053: リリースノートセクション */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-gray-700 flex items-center">
+            <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            リリースノート
+            {allTasksCompleted && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                自動生成済み
+              </span>
+            )}
+          </h4>
+          <div className="flex items-center gap-2">
+            {/* オンデマンド生成ボタン */}
+            <button
+              onClick={() => handleGenerateReleaseNote(false)}
+              disabled={releaseNoteLoading}
+              title="リリースノートを生成（RESULT/ORDER_XXX/RELEASE_NOTE.md に保存）"
+              className={`
+                flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors
+                ${releaseNoteLoading
+                  ? 'bg-gray-100 text-gray-400 cursor-wait'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                }
+              `}
+            >
+              {releaseNoteLoading ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>生成中...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{releaseNoteContent ? '再生成' : '生成'}</span>
+                </>
+              )}
+            </button>
+            {/* 展開/折りたたみボタン（コンテンツがある場合のみ） */}
+            {releaseNoteContent && (
+              <button
+                onClick={() => setReleaseNoteExpanded(prev => !prev)}
+                className="flex items-center gap-1 px-2 py-1.5 rounded text-xs text-gray-500 hover:bg-gray-100 transition-colors"
+                title={releaseNoteExpanded ? '折りたたむ' : '展開する'}
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${releaseNoteExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* エラー表示 */}
+        {releaseNoteError && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3">
+            {releaseNoteError}
+          </div>
+        )}
+
+        {/* リリースノートコンテンツ */}
+        {releaseNoteContent ? (
+          releaseNoteExpanded ? (
+            <div className="border border-gray-100 rounded bg-gray-50 p-3 max-h-96 overflow-y-auto">
+              <MarkdownViewer content={releaseNoteContent} />
+            </div>
+          ) : (
+            <div className="text-sm text-gray-400 italic">
+              折りたたまれています — 展開ボタンをクリックして表示
+            </div>
+          )
+        ) : !releaseNoteLoading && !releaseNoteError ? (
+          <div className="text-sm text-gray-400">
+            {allTasksCompleted
+              ? '自動生成中...'
+              : '「生成」ボタンをクリックしてリリースノートを作成できます'}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

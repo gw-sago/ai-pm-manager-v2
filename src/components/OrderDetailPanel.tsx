@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { OrderInfo, OrderResultFile } from '../preload';
 import { ArtifactsBrowser } from './ArtifactsBrowser';
-import { OrderReleaseSection } from './OrderReleaseSection';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ReleaseReadinessPanel } from './ReleaseReadinessPanel';
 import { useOrderActions } from '../hooks/useOrderActions';
@@ -21,14 +20,8 @@ interface OrderDetailPanelProps {
   isPmRunning?: boolean;
   /** ORDER_131 TASK_1136: Worker実行中フラグ */
   isWorkerRunning?: boolean;
-  /** ORDER_131 TASK_1136: リリース実行中フラグ */
-  isReleaseRunning?: boolean;
-  /** ORDER_131 TASK_1136: PM実行コールバック */
-  onExecutePm?: (projectId: string, orderId: string) => void;
   /** ORDER_131 TASK_1136: Worker実行コールバック */
   onExecuteWorker?: (projectId: string, orderId: string) => void;
-  /** ORDER_131 TASK_1136: リリース実行コールバック */
-  onExecuteRelease?: (projectId: string, orderId: string) => void;
   /** ORDER_155 TASK_1229: ORDER一覧リフレッシュコールバック */
   onRefresh?: () => void;
 }
@@ -53,10 +46,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   onTaskClick,
   isPmRunning = false,
   isWorkerRunning = false,
-  isReleaseRunning = false,
-  onExecutePm,
   onExecuteWorker,
-  onExecuteRelease,
   onRefresh,
 }) => {
   const [content, setContent] = useState<string | null>(null);
@@ -99,18 +89,13 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
 
   // ORDER_131 TASK_1137: ORDER状態判定hook（個別無効理由対応）
   const {
-    canExecutePm,
     canExecuteWorker,
-    canRelease,
     disabledReason,
-    pmDisabledReason,
     workerDisabledReason,
-    releaseDisabledReason,
   } = useOrderActions({
     order,
     isPmRunning,
     isWorkerRunning,
-    isReleaseRunning,
   });
 
   // ORDER_155 TASK_1229: PLANNING_FAILEDリカバリhook
@@ -770,13 +755,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
 
             {error && <ErrorDisplay message={error} />}
 
-            {/* ORDER_108/TASK_995: リリース情報セクション */}
-            <OrderReleaseSection
-              projectId={projectName}
-              orderId={order.id}
-              tasks={order.tasks}
-            />
-
             {!loading && !error && content && (
               <div className="prose prose-sm max-w-none">
                 <ReactMarkdown
@@ -902,12 +880,11 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         {activeTab === 'artifacts' && (
           <div className="h-full overflow-auto p-4">
             {/* TASK_1150: ReleaseReadinessPanel統合 - リリース判定情報を成果物タブに表示 */}
+            {/* ORDER_019: リリースボタンはバックログ一覧に移動したため、ここでは非表示 */}
             <ReleaseReadinessPanel
               projectName={projectName}
               orderId={order.id}
               tasks={order.tasks}
-              onExecuteRelease={() => onExecuteRelease?.(projectName, order.id)}
-              isReleaseRunning={isReleaseRunning}
             />
             {/* 既存のArtifactsBrowser */}
             <div className="mt-6 border-t border-gray-200 pt-6">

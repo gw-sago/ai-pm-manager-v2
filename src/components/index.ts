@@ -12,6 +12,7 @@ export { TaskList } from './TaskList';
 export { TaskCard } from './TaskCard';
 export { BacklogList } from './BacklogList';
 export { BacklogFilterBar } from './BacklogFilterBar';
+export { BacklogSuggestPanel } from './BacklogSuggestPanel';
 export { TaskDetail } from './TaskDetail';
 export { ReportViewer } from './ReportViewer';
 export { OrderDetailPanel } from './OrderDetailPanel';

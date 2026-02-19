@@ -21,6 +21,7 @@ import type { BacklogFilters } from '../main/services/DashboardService';
 import type { BacklogItem } from '../preload';
 import { useBacklogActions } from '../hooks/useOrderActions';
 import { BacklogAddForm } from './BacklogAddForm';
+import { BacklogSuggestPanel } from './BacklogSuggestPanel';
 
 // =============================================================================
 // 型定義
@@ -186,6 +187,8 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // ORDER_139: 削除確認ダイアログ状態
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<BacklogItem | null>(null);
+  // ORDER_020: 自動提案パネル表示状態
+  const [isSuggestPanelOpen, setIsSuggestPanelOpen] = useState(false);
 
   // ==========================================================================
   // 派生データ
@@ -588,9 +591,48 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [runningJobs, handleShowToast, fetchBacklogs]);
 
   /**
+   * リリース実行ハンドラ（ORDER_019追加）
+   * 全タスクCOMPLETEDのORDERに対してリリース処理を実行する
+   */
+  const handleExecuteRelease = useCallback((projectId: string, orderId: string) => {
+    const jobKey = `release:${projectId}:${orderId}`;
+    if (runningJobs.has(jobKey)) {
+      return;
+    }
+
+    // ローカル状態で実行中フラグを立てる（UI即時反映用）
+    setRunningJobs((prev) => new Set(prev).add(jobKey));
+    handleShowToast(`リリース処理を開始: ${orderId}`, 'info');
+
+    // バックグラウンドで実行（awaitしない）
+    window.electronAPI.executeRelease(projectId, orderId)
+      .then((result) => {
+        if (result.success) {
+          handleShowToast(`リリースが完了しました: ${orderId}`, 'success');
+        } else {
+          handleShowToast(`リリース失敗: ${(result as { error?: string }).error || 'Unknown error'}`, 'error');
+        }
+        // 完了後にリフレッシュ（ORDER_053: silentモード）
+        fetchBacklogs(true);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        handleShowToast(`リリースエラー: ${message}`, 'error');
+        console.error('[BacklogList] Release execution error:', err);
+      })
+      .finally(() => {
+        setRunningJobs((prev) => {
+          const next = new Set(prev);
+          next.delete(jobKey);
+          return next;
+        });
+      });
+  }, [runningJobs, handleShowToast, fetchBacklogs]);
+
+  /**
    * 特定のジョブが実行中かどうかを確認（ORDER_039追加）
    */
-  const isJobRunning = useCallback((type: 'pm' | 'worker', projectId: string, targetId: string): boolean => {
+  const isJobRunning = useCallback((type: 'pm' | 'worker' | 'release', projectId: string, targetId: string): boolean => {
     return runningJobs.has(`${type}:${projectId}:${targetId}`);
   }, [runningJobs]);
 
@@ -698,6 +740,23 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* ORDER_020: 自動提案ボタン */}
+          {(!crossProject && projectName) && (
+            <button
+              onClick={() => setIsSuggestPanelOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                isSuggestPanelOpen
+                  ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+              title="AIによるバックログ自動提案"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              <span>自動提案</span>
+            </button>
+          )}
           {/* ORDER_139: 追加ボタン */}
           <button
             onClick={handleOpenAddModal}
@@ -744,6 +803,18 @@ export const BacklogList: React.FC<BacklogListProps> = ({
             projects={crossProject ? projects : undefined}
             isLoading={isLoading}
             compact={compactFilterBar}
+          />
+        </div>
+      )}
+
+      {/* ORDER_020: 自動提案パネル */}
+      {isSuggestPanelOpen && !crossProject && projectName && (
+        <div className="p-4 border-b border-gray-100">
+          <BacklogSuggestPanel
+            projectId={projectName}
+            onComplete={() => {
+              fetchBacklogs(true);
+            }}
           />
         </div>
       )}
@@ -823,8 +894,10 @@ export const BacklogList: React.FC<BacklogListProps> = ({
                 onOrderIdClick={onOrderClick}
                 isPmRunning={isJobRunning('pm', item.projectId, item.id)}
                 isWorkerRunning={item.relatedOrderId ? isJobRunning('worker', item.projectId, item.relatedOrderId) : false}
+                isReleaseRunning={item.relatedOrderId ? isJobRunning('release', item.projectId, item.relatedOrderId) : false}
                 onExecutePm={handleExecutePm}
                 onExecuteWorker={handleExecuteWorker}
+                onExecuteRelease={handleExecuteRelease}
                 onDelete={handleOpenDeleteConfirm}
               />
             ))}
@@ -876,10 +949,14 @@ interface BacklogItemCardProps {
   isPmRunning?: boolean;
   /** Worker実行中フラグ */
   isWorkerRunning?: boolean;
+  /** リリース実行中フラグ */
+  isReleaseRunning?: boolean;
   /** PM実行コールバック */
   onExecutePm?: (projectId: string, backlogId: string) => void;
   /** Worker実行コールバック */
   onExecuteWorker?: (projectId: string, orderId: string) => void;
+  /** リリース実行コールバック */
+  onExecuteRelease?: (projectId: string, orderId: string) => void;
   /** 削除ボタンクリックコールバック（ORDER_139追加） */
   onDelete?: (item: BacklogItem, e: React.MouseEvent) => void;
 }
@@ -898,8 +975,10 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
   onOrderIdClick,
   isPmRunning = false,
   isWorkerRunning = false,
+  isReleaseRunning = false,
   onExecutePm,
   onExecuteWorker,
+  onExecuteRelease,
   onDelete,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
@@ -966,6 +1045,16 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
   }, [canExecuteWorker, onExecuteWorker, item.projectId, item.relatedOrderId]);
 
   /**
+   * リリースボタンクリックハンドラ（ORDER_019追加）
+   */
+  const handleExecuteRelease = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onExecuteRelease && item.relatedOrderId) {
+      onExecuteRelease(item.projectId, item.relatedOrderId);
+    }
+  }, [onExecuteRelease, item.projectId, item.relatedOrderId]);
+
+  /**
    * 削除ボタンクリックハンドラ（ORDER_139追加）
    */
   const handleDelete = useCallback((e: React.MouseEvent) => {
@@ -1012,8 +1101,17 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
   const hasOrder = !!item.relatedOrderId;
   const progressPercent = item.progressPercent ?? 0;
 
+  // リリースボタン表示条件: ORDER紐付けあり、IN_PROGRESS、全タスクCOMPLETED（ORDER_019追加）
+  const totalTasks = item.totalTasks ?? 0;
+  const completedTasks = item.completedTasks ?? 0;
+  const shouldShowReleaseButton =
+    !!item.relatedOrderId &&
+    item.orderStatus === 'IN_PROGRESS' &&
+    totalTasks > 0 &&
+    completedTasks === totalTasks;
+
   // 実行中かどうか（ORDER_051: パルスアニメーション用）
-  const isRunning = isPmRunning || isWorkerRunning;
+  const isRunning = isPmRunning || isWorkerRunning || isReleaseRunning;
 
   return (
     <div
@@ -1160,6 +1258,39 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
               )}
             </button>
           )}
+          {/* リリースボタン（ORDER_019追加）: 全タスクCOMPLETED時のみ表示 */}
+          {shouldShowReleaseButton && (
+            <button
+              onClick={handleExecuteRelease}
+              disabled={isReleaseRunning}
+              title={isReleaseRunning ? "リリース実行中..." : "リリース処理を実行"}
+              aria-label="リリース処理を実行"
+              className={`
+                flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors
+                ${isReleaseRunning
+                  ? 'bg-blue-100 text-blue-600 cursor-wait'
+                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                }
+              `}
+            >
+              {isReleaseRunning ? (
+                <>
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>リリース中...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>リリース</span>
+                </>
+              )}
+            </button>
+          )}
           {/* コピーボタン */}
           <button
             onClick={handleCopyClick}
@@ -1249,6 +1380,7 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
     prevProps.showProject === nextProps.showProject &&
     prevProps.isPmRunning === nextProps.isPmRunning &&
     prevProps.isWorkerRunning === nextProps.isWorkerRunning &&
+    prevProps.isReleaseRunning === nextProps.isReleaseRunning &&
     prevProps.onDelete === nextProps.onDelete
   );
 });

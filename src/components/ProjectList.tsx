@@ -742,8 +742,22 @@ export const ProjectList: React.FC<ProjectListProps> = ({
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               プロジェクト
             </h3>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+              title="プロジェクト作成"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
           </div>
           <EmptyState compact />
+          <CreateProjectModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+            onCreated={() => fetchProjects(false)}
+          />
         </div>
       );
     }

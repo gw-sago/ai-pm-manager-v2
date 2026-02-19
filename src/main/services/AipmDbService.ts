@@ -2498,3 +2498,96 @@ export function getOrderReleaseReadiness(
     releaseStatus,
   };
 }
+
+/**
+ * リリースノート生成結果
+ */
+export interface ReleaseNoteResult {
+  /** 成功したか */
+  success: boolean;
+  /** 保存先パス（dry_run時はnull） */
+  notePath: string | null;
+  /** 生成されたMarkdown内容 */
+  noteContent: string;
+  /** タスク数 */
+  taskCount: number;
+  /** REPORTファイル数 */
+  reportCount: number;
+  /** エラーメッセージ（エラー時のみ） */
+  error?: string;
+}
+
+/**
+ * リリースノートを生成する
+ * generate_note.py をspawnして RELEASE_NOTE.md の内容を返す
+ * @param projectId プロジェクトID
+ * @param orderId ORDER ID
+ * @param dryRun trueの場合はファイルに保存せずプレビューのみ
+ * @returns リリースノート生成結果
+ */
+export async function generateReleaseNote(
+  projectId: string,
+  orderId: string,
+  dryRun = false,
+): Promise<ReleaseNoteResult> {
+  const configService = getConfigService();
+  const backendPath = configService.getBackendPath();
+
+  if (!backendPath) {
+    return {
+      success: false,
+      notePath: null,
+      noteContent: '',
+      taskCount: 0,
+      reportCount: 0,
+      error: 'Backend path not configured',
+    };
+  }
+
+  const scriptPath = path.join(backendPath, 'release', 'generate_note.py');
+
+  if (!fs.existsSync(scriptPath)) {
+    return {
+      success: false,
+      notePath: null,
+      noteContent: '',
+      taskCount: 0,
+      reportCount: 0,
+      error: `generate_note.py not found: ${scriptPath}`,
+    };
+  }
+
+  const args = [scriptPath, projectId, orderId, '--json'];
+  if (dryRun) {
+    args.push('--dry-run');
+  }
+
+  try {
+    const { stdout } = await execFileAsync('python', args, {
+      cwd: path.dirname(scriptPath),
+      timeout: 60000,
+    });
+
+    const result = JSON.parse(stdout);
+
+    return {
+      success: result.success === true,
+      notePath: result.note_path ?? null,
+      noteContent: result.note_content ?? '',
+      taskCount: result.task_count ?? 0,
+      reportCount: result.report_count ?? 0,
+      error: result.error,
+    };
+  } catch (error: unknown) {
+    const err = error as { stderr?: string; message?: string };
+    const errorMsg = err.stderr || err.message || String(error);
+    return {
+      success: false,
+      notePath: null,
+      noteContent: '',
+      taskCount: 0,
+      reportCount: 0,
+      error: errorMsg,
+    };
+  }
+}

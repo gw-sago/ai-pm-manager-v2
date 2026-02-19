@@ -264,6 +264,17 @@ export interface BacklogItem {
 }
 
 /**
+ * バックログ自動提案候補（ORDER_020 / TASK_062）
+ */
+export interface BacklogSuggestItem {
+  title: string;
+  description: string;
+  priority: string;
+  category: string;
+  rationale: string;
+}
+
+/**
  * バックログ更新パラメータ（ORDER_139 / TASK_1161）
  */
 export interface BacklogUpdateParams {
@@ -1464,6 +1475,39 @@ export interface ElectronAPI {
     analysis?: string;
   }>;
 
+  // ORDER_020 / TASK_062: バックログ自動提案・一括登録
+  /**
+   * バックログ候補を自動提案
+   * @param projectId プロジェクトID
+   * @returns 提案候補リスト
+   */
+  suggestBacklogs: (projectId: string) => Promise<{
+    success: boolean;
+    suggestions?: BacklogSuggestItem[];
+    error?: string;
+  }>;
+
+  /**
+   * 選択された候補を一括登録
+   * @param projectId プロジェクトID
+   * @param items 登録するバックログ候補リスト
+   * @returns 一括登録結果
+   */
+  bulkAddBacklogs: (
+    projectId: string,
+    items: Array<{
+      title: string;
+      description: string;
+      priority: string;
+      category: string;
+    }>
+  ) => Promise<{
+    success: boolean;
+    addedCount?: number;
+    errors?: string[];
+    error?: string;
+  }>;
+
   // 定期リフレッシュ (TASK_256)
   /**
    * 手動でリフレッシュを実行
@@ -1994,6 +2038,27 @@ export interface ElectronAPI {
   getOrderReleaseReadiness: (projectId: string, orderId: string) => Promise<OrderReleaseReadiness>;
 
   // ============================================================
+  // ORDER_017: TASK_052 - リリースノート生成API
+  // ============================================================
+
+  /**
+   * リリースノートを生成する
+   * generate_note.py をspawnして RELEASE_NOTE.md の内容を返す
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param dryRun trueの場合はファイルに保存せずプレビューのみ
+   * @returns リリースノート生成結果
+   */
+  generateReleaseNote: (projectId: string, orderId: string, dryRun?: boolean) => Promise<{
+    success: boolean;
+    notePath: string | null;
+    noteContent: string;
+    taskCount: number;
+    reportCount: number;
+    error?: string;
+  }>;
+
+  // ============================================================
   // ORDER_128: TASK_1126 - タスクログ読み込みAPI
   // ============================================================
 
@@ -2146,6 +2211,9 @@ export interface ElectronAPI {
    * @returns リスナー解除関数
    */
   onDbChanged: (callback: (event: DbChangedEvent) => void) => () => void;
+  // ORDER_021 / TASK_067: プロジェクト紹介ページ生成・エクスポート
+  generateProjectPage: (projectId: string) => Promise<{ success: boolean; html?: string; error?: string; }>;
+  exportProjectPage: (projectId: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string; }>;
 }
 
 /**
@@ -2257,6 +2325,19 @@ const electronAPI: ElectronAPI = {
     days?: number;
     verbose?: boolean;
   }) => ipcRenderer.invoke('project:prioritize-backlogs', projectId, options),
+
+  // ORDER_020 / TASK_062: バックログ自動提案・一括登録
+  suggestBacklogs: (projectId: string) =>
+    ipcRenderer.invoke('backlog:suggest', projectId),
+  bulkAddBacklogs: (
+    projectId: string,
+    items: Array<{
+      title: string;
+      description: string;
+      priority: string;
+      category: string;
+    }>
+  ) => ipcRenderer.invoke('backlog:bulkAdd', projectId, items),
 
   // 定期リフレッシュ (TASK_256)
   refresh: () => ipcRenderer.invoke('project:refresh'),
@@ -2437,6 +2518,10 @@ const electronAPI: ElectronAPI = {
   getOrderReleaseReadiness: (projectId: string, orderId: string) =>
     ipcRenderer.invoke('project:get-order-release-readiness', projectId, orderId),
 
+  // ORDER_017: TASK_052 - リリースノート生成
+  generateReleaseNote: (projectId: string, orderId: string, dryRun?: boolean) =>
+    ipcRenderer.invoke('project:generate-release-note', projectId, orderId, dryRun),
+
   // ORDER_128: TASK_1126 - タスクログ末尾取得
   getTaskLogTail: (projectId: string, orderId: string, taskId: string, lines?: number) =>
     ipcRenderer.invoke('project:get-task-log-tail', projectId, orderId, taskId, lines),
@@ -2480,6 +2565,12 @@ const electronAPI: ElectronAPI = {
   // DB変更通知（ORDER_004 / TASK_010）
   onDbChanged: (callback: (event: DbChangedEvent) => void) =>
     createEventListener('db:changed', callback),
+
+  // ORDER_021 / TASK_067: プロジェクト紹介ページ生成・エクスポート
+  generateProjectPage: (projectId: string) =>
+    ipcRenderer.invoke('generate-project-page', projectId),
+  exportProjectPage: (projectId: string) =>
+    ipcRenderer.invoke('export-project-page', projectId),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

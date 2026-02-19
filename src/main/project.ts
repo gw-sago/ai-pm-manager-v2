@@ -10,7 +10,13 @@
  * - project:state-changed - STATE変更通知（イベント）
  */
 
-import { ipcMain, BrowserWindow } from 'electron';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { ipcMain, BrowserWindow, dialog } from 'electron';
+
+const execFileAsync = promisify(execFile);
 import {
   getProjectService,
   type Project,
@@ -34,6 +40,8 @@ import {
   getOrderReleaseReadiness,
   type OrderReleaseReadiness,
   type TaskReviewHistory,
+  generateReleaseNote,
+  type ReleaseNoteResult,
 } from './services/AipmDbService';
 import { getConfigService } from './services/ConfigService';
 import {
@@ -569,6 +577,34 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] RESULT Markdown IPC handlers registered');
 
+  // ORDER_017: TASK_052 - リリースノート生成API
+  ipcMain.handle(
+    'project:generate-release-note',
+    async (
+      _event,
+      projectId: string,
+      orderId: string,
+      dryRun?: boolean
+    ): Promise<ReleaseNoteResult> => {
+      console.log(`[Project IPC] リリースノート生成リクエスト: ${projectId}/${orderId} (dryRun=${dryRun})`);
+      try {
+        return await generateReleaseNote(projectId, orderId, dryRun ?? false);
+      } catch (error) {
+        console.error('[Project IPC] リリースノート生成エラー:', error);
+        return {
+          success: false,
+          notePath: null,
+          noteContent: '',
+          taskCount: 0,
+          reportCount: 0,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Release note IPC handler registered (ORDER_017 / TASK_052)');
+
   // ORDER_128: TASK_1126 - タスクログの末尾行取得API
   ipcMain.handle(
     'project:get-task-log-tail',
@@ -897,6 +933,127 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] Backlog prioritization IPC handler registered (ORDER_144 / TASK_1188)');
 
+  // ORDER_020 / TASK_062: バックログ自動提案IPC
+  ipcMain.handle(
+    'backlog:suggest',
+    async (
+      _event,
+      projectId: string
+    ): Promise<{
+      success: boolean;
+      suggestions?: Array<{
+        title: string;
+        description: string;
+        priority: string;
+        category: string;
+        rationale: string;
+      }>;
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] バックログ自動提案: ${projectId}`);
+      try {
+        const configService = getConfigService();
+        const backendPath = configService.getBackendPath();
+        if (!backendPath) {
+          return { success: false, error: 'Backend path not configured' };
+        }
+
+        const suggestScriptPath = path.join(backendPath, 'backlog', 'suggest.py');
+        if (!fs.existsSync(suggestScriptPath)) {
+          return { success: false, error: `suggest.py not found: ${suggestScriptPath}` };
+        }
+
+        const { stdout } = await execFileAsync(
+          'python',
+          [suggestScriptPath, projectId, '--json'],
+          { cwd: path.dirname(suggestScriptPath), timeout: 120000 }
+        );
+
+        const result = JSON.parse(stdout);
+        if (!result.success) {
+          return { success: false, error: result.error || 'Unknown error' };
+        }
+        return { success: true, suggestions: result.suggestions };
+      } catch (error) {
+        console.error('[Project IPC] バックログ自動提案エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  // ORDER_020 / TASK_062: バックログ一括登録IPC
+  ipcMain.handle(
+    'backlog:bulkAdd',
+    async (
+      _event,
+      projectId: string,
+      items: Array<{
+        title: string;
+        description: string;
+        priority: string;
+        category: string;
+      }>
+    ): Promise<{
+      success: boolean;
+      addedCount?: number;
+      errors?: string[];
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] バックログ一括登録: ${projectId} (${items.length}件)`);
+      try {
+        const aipmDbService = getAipmDbService();
+        const errors: string[] = [];
+        let addedCount = 0;
+
+        for (const item of items) {
+          const result = await aipmDbService.addBacklog(
+            projectId,
+            item.title,
+            item.description || null,
+            item.priority,
+            item.category
+          );
+          if (result.success) {
+            addedCount++;
+          } else {
+            errors.push(`${item.title}: ${result.error || 'Unknown error'}`);
+          }
+        }
+
+        if (addedCount > 0) {
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('db:changed', {
+                source: 'backlog-bulk-added',
+                projectId,
+                targetId: '',
+                timestamp: new Date().toISOString(),
+              });
+            }
+          });
+        }
+
+        return {
+          success: errors.length === 0 || addedCount > 0,
+          addedCount,
+          errors: errors.length > 0 ? errors : undefined,
+        };
+      } catch (error) {
+        console.error('[Project IPC] バックログ一括登録エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Backlog suggest/bulkAdd IPC handlers registered (ORDER_020 / TASK_062)');
+
   // === プロジェクト情報取得・更新IPCハンドラ (ORDER_156 / TASK_1233) ===
 
   /**
@@ -1041,6 +1198,125 @@ export function registerProjectHandlers(): void {
   );
 
   console.log('[Project] Project create/delete IPC handlers registered (ORDER_002 / BACKLOG_001)');
+
+  // === プロジェクト紹介ページ生成・エクスポートIPCハンドラ (ORDER_021 / TASK_067) ===
+
+  /**
+   * プロジェクト紹介ページHTML生成
+   * generate_page.py を spawn で呼び出してHTMLを返す
+   */
+  ipcMain.handle(
+    'generate-project-page',
+    async (_event, projectId: string): Promise<{
+      success: boolean;
+      html?: string;
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] プロジェクト紹介ページ生成: ${projectId}`);
+      try {
+        const configService = getConfigService();
+        const backendPath = configService.getBackendPath();
+        if (!backendPath) {
+          return { success: false, error: 'Backend path not configured' };
+        }
+
+        const scriptPath = path.join(backendPath, 'project', 'generate_page.py');
+        if (!fs.existsSync(scriptPath)) {
+          return { success: false, error: `generate_page.py not found: ${scriptPath}` };
+        }
+
+        const { stdout, stderr } = await execFileAsync(
+          'python',
+          [scriptPath, projectId, '--json'],
+          { cwd: path.dirname(scriptPath), timeout: 60000 }
+        );
+
+        if (stderr) {
+          console.warn('[Project IPC] generate_page.py stderr:', stderr);
+        }
+
+        const result = JSON.parse(stdout);
+        if (!result.success) {
+          return { success: false, error: result.error || 'Unknown error' };
+        }
+        return { success: true, html: result.html };
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト紹介ページ生成エラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  /**
+   * プロジェクト紹介ページHTMLファイルエクスポート
+   * dialogでファイル保存先を選択し、generate_page.py の出力を保存する
+   */
+  ipcMain.handle(
+    'export-project-page',
+    async (_event, projectId: string): Promise<{
+      success: boolean;
+      filePath?: string;
+      canceled?: boolean;
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] プロジェクト紹介ページエクスポート: ${projectId}`);
+      try {
+        // ファイル保存先をdialogで選択
+        const { canceled, filePath: savePath } = await dialog.showSaveDialog({
+          title: 'プロジェクト紹介ページを保存',
+          defaultPath: `${projectId}_introduction.html`,
+          filters: [{ name: 'HTML Files', extensions: ['html'] }],
+        });
+
+        if (canceled || !savePath) {
+          return { success: false, canceled: true };
+        }
+
+        // generate_page.py を呼び出してHTMLを生成
+        const configService = getConfigService();
+        const backendPath = configService.getBackendPath();
+        if (!backendPath) {
+          return { success: false, error: 'Backend path not configured' };
+        }
+
+        const scriptPath = path.join(backendPath, 'project', 'generate_page.py');
+        if (!fs.existsSync(scriptPath)) {
+          return { success: false, error: `generate_page.py not found: ${scriptPath}` };
+        }
+
+        const { stdout, stderr } = await execFileAsync(
+          'python',
+          [scriptPath, projectId, '--json'],
+          { cwd: path.dirname(scriptPath), timeout: 60000 }
+        );
+
+        if (stderr) {
+          console.warn('[Project IPC] generate_page.py stderr:', stderr);
+        }
+
+        const result = JSON.parse(stdout);
+        if (!result.success) {
+          return { success: false, error: result.error || 'Failed to generate page' };
+        }
+
+        // HTMLファイルを保存
+        fs.writeFileSync(savePath, result.html, { encoding: 'utf-8' });
+        console.log(`[Project IPC] エクスポート完了: ${savePath}`);
+        return { success: true, filePath: savePath };
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト紹介ページエクスポートエラー:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Project page generation IPC handlers registered (ORDER_021 / TASK_067)');
 
   console.log('[Project] IPC handlers registered');
 }
