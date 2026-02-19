@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { MarkdownViewer } from './MarkdownViewer';
+import { ProjectInfoGuidance } from './ProjectInfoGuidance';
 import type { InfoPage, InfoPagesIndex } from '../preload';
 
 interface ProjectInfoProps {
@@ -69,6 +70,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   const [fallbackContent, setFallbackContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInfoEmpty, setIsInfoEmpty] = useState(false);
 
   // INFO_PAGESの存在確認 + フォールバック読み込み
   useEffect(() => {
@@ -77,6 +79,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     const loadProjectInfo = async () => {
       setIsLoading(true);
       setError(null);
+      setIsInfoEmpty(false);
       setSelectedPageId(null);
       setPageContent(null);
 
@@ -93,7 +96,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
           if (mdContent) {
             setFallbackContent(mdContent);
           } else {
-            setError('プロジェクト情報が見つかりません');
+            setIsInfoEmpty(true);
           }
         }
       } catch (err) {
@@ -142,6 +145,11 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
         <div className="text-gray-500">読み込み中...</div>
       </div>
     );
+  }
+
+  // 情報未作成: ガイダンスUI表示
+  if (isInfoEmpty && !infoPages && !fallbackContent) {
+    return <ProjectInfoGuidance projectId={projectId} />;
   }
 
   // エラー

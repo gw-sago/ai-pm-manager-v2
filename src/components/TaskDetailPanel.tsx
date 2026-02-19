@@ -524,6 +524,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               {taskFileContent ? (
                 <div
                   className="bg-blue-50 rounded-lg border border-blue-100 overflow-x-auto task-definition-section"
+                  style={{ maxHeight: '400px', overflowY: 'auto' }}
                 >
                   <MarkdownViewer content={taskFileContent} />
                 </div>
@@ -573,6 +574,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               {reportFileContent ? (
                 <div
                   className="bg-green-50 rounded-lg border border-green-100 overflow-x-auto task-definition-section"
+                  style={{ maxHeight: '400px', overflowY: 'auto' }}
                 >
                   <MarkdownViewer content={reportFileContent} />
                 </div>
