@@ -18,6 +18,9 @@ Usage:
 """
 
 import os
+import re
+import sys
+import warnings
 from pathlib import Path
 from typing import Union, List
 
@@ -184,3 +187,107 @@ def sanitize_filename(filename: str, replace_char: str = "_") -> str:
         result = result.replace(char, replace_char)
 
     return result
+
+
+# ============================================================
+# Roamingパス検証（BUG_011対策: Localへの書き込み防止）
+# ============================================================
+
+def is_local_path(path: Union[str, Path]) -> bool:
+    """
+    パスがAppData\\Local配下かどうかを判定
+
+    Args:
+        path: 検証対象のパス
+
+    Returns:
+        True if the path contains AppData\\Local
+    """
+    if sys.platform != "win32":
+        return False
+    path_str = str(path).lower().replace('/', '\\')
+    return 'appdata\\local' in path_str
+
+
+def is_roaming_path(path: Union[str, Path]) -> bool:
+    """
+    パスがAppData\\Roaming配下かどうかを判定
+
+    Args:
+        path: 検証対象のパス
+
+    Returns:
+        True if the path contains AppData\\Roaming
+    """
+    if sys.platform != "win32":
+        return True  # 非Windowsではチェック不要
+    path_str = str(path).lower().replace('/', '\\')
+    return 'appdata\\roaming' in path_str
+
+
+def convert_local_to_roaming(local_path: Union[str, Path]) -> str:
+    """
+    LocalパスをRoamingパスに変換
+
+    AppData\\Local\\ai_pm_manager_v2 → AppData\\Roaming\\ai-pm-manager-v2
+
+    Args:
+        local_path: 変換対象のLocalパス
+
+    Returns:
+        Roamingパスに変換された文字列（変換不可の場合は元のパスを返す）
+    """
+    path_str = str(local_path)
+    pattern = re.compile(
+        r'(AppData)[/\\](Local)[/\\](ai_pm_manager_v2)',
+        re.IGNORECASE
+    )
+    return pattern.sub(r'\1\\Roaming\\ai-pm-manager-v2', path_str)
+
+
+def validate_roaming_path(
+    file_path: Union[str, Path],
+    auto_correct: bool = False
+) -> Path:
+    """
+    ファイルパスがRoaming配下であることを検証する
+
+    PROJECTS/配下の永続データがLocalに書き込まれることを防止する。
+    Squirrelインストーラーの更新でLocalが上書きされるため必須。
+
+    Args:
+        file_path: 検証対象のパス
+        auto_correct: Trueの場合、LocalパスをRoamingに自動変換
+
+    Returns:
+        検証済みのパス（auto_correct=Trueの場合は変換済み）
+
+    Raises:
+        PathValidationError: Localパスが検出され、auto_correct=Falseの場合
+    """
+    if sys.platform != "win32":
+        return Path(file_path)
+
+    path_str = str(file_path).lower()
+
+    # PROJECTS/ を含むパスのみチェック
+    if 'projects' not in path_str:
+        return Path(file_path)
+
+    if is_local_path(file_path):
+        corrected = convert_local_to_roaming(str(file_path))
+        if auto_correct:
+            warnings.warn(
+                f"Localパスを自動変換しました: {file_path} -> {corrected}",
+                UserWarning,
+                stacklevel=2
+            )
+            return Path(corrected)
+        else:
+            raise PathValidationError(
+                f"PROJECTS配下のファイルがLocalパスで指定されています。"
+                f"Roamingパスを使用してください。\n"
+                f"  検出パス: {file_path}\n"
+                f"  正しいパス: {corrected}\n"
+                f"  ヒント: get_project_paths() でRoamingパスを取得してください"
+            )

@@ -10,7 +10,6 @@ export { ProgressBar } from './ProgressBar';
 export { OrderList } from './OrderList';
 export { TaskList } from './TaskList';
 export { TaskCard } from './TaskCard';
-export { ReviewQueue } from './ReviewQueue';
 export { BacklogList } from './BacklogList';
 export { BacklogFilterBar } from './BacklogFilterBar';
 export { TaskDetail } from './TaskDetail';

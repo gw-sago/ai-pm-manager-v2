@@ -22,7 +22,6 @@ export type {
   ParsedState,
   ProjectInfo,
   TaskInfo,
-  ReviewQueueItem,
   ProgressSummary,
   OrderInfo,
 } from './StateParser';
@@ -46,7 +45,6 @@ export type {
   AipmProject,
   AipmOrder,
   AipmTask,
-  AipmReviewItem,
 } from './AipmDbService';
 
 export {

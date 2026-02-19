@@ -241,6 +241,10 @@ class WorkerExecutor:
             # Step 5: ステータス更新（DONE）
             self._step_update_status_done()
 
+            # Step 6.5: バグ修正タスクの自動記録（ORDER_007）
+            if not self.skip_ai:
+                self._step_record_bug_fix()
+
             # Step 7: 自動レビュー（--auto-review 指定時）
             # NOTE: ORDER_132で無効化 - レビューはreview_workerで別プロセス実行
             # if self.auto_review:
@@ -1339,6 +1343,24 @@ GUI操作を含むタスクが割り当てられた場合は、上記の代替�
 
 """
 
+        # Roamingパスルール（BUG_011対策: Localへの書き込み防止）
+        roaming_path_section = f"""
+## ファイルパスルール（PROJECTS配下はRoaming絶対パス必須）
+
+PROJECTS/配下のファイルを読み書きする際は以下の**Roaming絶対パス**を使用してください。
+相対パス `PROJECTS/{self.project_id}/...` は**禁止**です（cwdがLocalのためLocalに書き込まれます）。
+
+| 用途 | 絶対パス |
+|------|---------|
+| ベース | `{self.project_dir}` |
+| RESULT | `{self.project_dir / "RESULT"}` |
+| ORDERS | `{self.project_dir / "ORDERS"}` |
+| PROJECT_INFO.md | `{self.project_dir / "PROJECT_INFO.md"}` |
+
+**理由**: Squirrelインストーラーの更新でAppData\\Localが上書きされるため、永続データは必ずAppData\\Roaming配下に配置する必要があります。
+
+"""
+
         # REWORK履歴を取得
         rework_count, rework_history_section = self._get_rework_history()
 
@@ -1402,7 +1424,7 @@ output_file = "tmp/tmp_results.json"
 - タイトル: {self.task_info.get('title', 'Untitled')}
 - 説明: {self.task_info.get('description', '（なし）')}
 - 優先度: {self.task_info.get('priority', 'P1')}
-{rework_section}{rework_history_section}{failure_context_section}{migration_section}{worker_env_section}{test_file_rules_section}{known_bugs_section}
+{rework_section}{rework_history_section}{failure_context_section}{migration_section}{worker_env_section}{roaming_path_section}{test_file_rules_section}{known_bugs_section}
 ## タスク定義
 {task_content}
 
@@ -2149,6 +2171,60 @@ JSONのみを出力し、説明文は含めないでください。"""
             self._log_step("auto_review", "error", f"レビュー処理エラー: {e}")
             return {"success": False, "error": str(e)}
 
+    def _step_record_bug_fix(self) -> None:
+        """Step 6.5: バグ修正タスクの自動記録（ORDER_007）
+
+        タスクタイトルにバグ修正を示すキーワードが含まれる場合、
+        record_fix.pyを呼び出してDB+PROJECT_INFO.mdに記録を促す。
+        """
+        try:
+            task_title = self.task_info.get("title", "") if self.task_info else ""
+
+            # バグ修正タスクかどうかを判定
+            BUG_FIX_KEYWORDS = [
+                "バグ修正", "バグ対応", "bug fix", "bugfix", "hotfix",
+                "不具合修正", "障害対応", "エラー修正", "修正対応",
+            ]
+            is_bug_fix = any(kw.lower() in task_title.lower() for kw in BUG_FIX_KEYWORDS)
+
+            if not is_bug_fix:
+                self._log_step("record_bug_fix", "skip", "バグ修正タスクではありません")
+                return
+
+            # REPORTからバグ情報を抽出
+            report_content = self.results.get("report_content", "")
+            if not report_content:
+                self._log_step("record_bug_fix", "skip", "REPORT内容なし")
+                return
+
+            from bugs.record_fix import record_fix
+
+            result = record_fix(
+                project_id=self.project_id,
+                title=task_title,
+                description=f"タスク {self.task_id} で修正されたバグ",
+                solution=f"詳細はREPORTを参照: REPORT_{self.task_id.replace('TASK_', '')}.md",
+                severity="Medium",
+                task_id=self.task_id,
+                order_id=self.task_info.get("order_id") if self.task_info else None,
+            )
+
+            if result.success:
+                self._log_step("record_bug_fix", "success", result.message)
+                self.results["bug_fix_record"] = {
+                    "bug_id": result.bug_id,
+                    "rule_id": result.rule_id,
+                    "bug_history_id": result.bug_history_id,
+                }
+            else:
+                self._log_step("record_bug_fix", "warning", f"記録失敗: {result.error}")
+
+        except ImportError:
+            self._log_step("record_bug_fix", "skip", "bugs.record_fix 利用不可")
+        except Exception as e:
+            # バグ記録失敗はワーニングのみ（メインフローをブロックしない）
+            self._log_step("record_bug_fix", "warning", f"バグ記録エラー: {e}")
+
     def _step_bug_learning(self, review_result: Dict[str, Any]) -> None:
         """Step 7.5: バグパターン自動学習
 
@@ -2187,6 +2263,29 @@ JSONのみを出力し、説明文は含めないでください。"""
                         "bug_learning", "info",
                         f"新規パターン提案: {proposal.get('proposed_id')} - {proposal.get('title')}"
                     )
+
+                    # ORDER_007: 差し戻し2回以上で自動登録
+                    reject_count = self.task_info.get("reject_count", 0) if self.task_info else 0
+                    if reject_count >= 2:
+                        try:
+                            from bugs.record_fix import record_fix
+                            auto_result = record_fix(
+                                project_id=self.project_id,
+                                title=proposal.get("title", f"自動検出パターン - {self.task_id}"),
+                                description=proposal.get("description", comment),
+                                solution=proposal.get("solution", "差し戻しコメントを参照"),
+                                severity=proposal.get("severity", "Medium"),
+                                pattern_type=proposal.get("cause_category"),
+                                task_id=self.task_id,
+                                skip_file=True,  # 自動登録時はDB のみ
+                            )
+                            if auto_result.success:
+                                self._log_step(
+                                    "bug_learning", "success",
+                                    f"差し戻し{reject_count}回→自動登録: {auto_result.bug_id}"
+                                )
+                        except Exception as auto_err:
+                            self._log_step("bug_learning", "warning", f"自動登録失敗: {auto_err}")
 
             elif verdict == "APPROVE":
                 # 承認時: 有効性評価を実行（10タスクごとに実行 = タスクIDの末尾0判定）

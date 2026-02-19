@@ -580,6 +580,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     severity TEXT DEFAULT 'Medium',
     description TEXT,
     root_cause TEXT,
+    resolution TEXT,
+    pattern_id TEXT,
     affected_records TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

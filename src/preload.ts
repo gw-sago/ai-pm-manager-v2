@@ -136,22 +136,6 @@ export interface AipmTask {
 }
 
 /**
- * レビューキューアイテム
- *
- * @deprecated ORDER_145: review_queueテーブル廃止
- * DONEステータスのタスクを直接参照するように変更されました。
- * この型は後方互換性のために残されています。
- */
-export interface ReviewQueueItem {
-  taskId: string;
-  submittedAt: string;
-  status: string;
-  reviewer?: string;
-  priority: string;
-  note?: string;
-}
-
-/**
  * 進捗サマリ
  */
 export interface ProgressSummary {
@@ -180,7 +164,6 @@ export interface OrderInfo {
 export interface ParsedState {
   projectInfo: ProjectInfo;
   tasks: TaskInfo[];
-  reviewQueue: ReviewQueueItem[];
   progressSummary: ProgressSummary;
   orders: OrderInfo[];
 }
@@ -216,6 +199,26 @@ export interface ProjectStateChangedEvent {
 }
 
 // 推奨アクション (TASK_026)
+
+/**
+ * INFO_PAGESページ情報 (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+ */
+export interface InfoPage {
+  id: string;
+  title: string;
+  file: string;
+  icon: string;
+  description: string;
+}
+
+/**
+ * INFO_PAGESインデックス (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+ */
+export interface InfoPagesIndex {
+  version: string;
+  project_id: string;
+  pages: InfoPage[];
+}
 
 /**
  * 成果物ファイル情報
@@ -697,6 +700,15 @@ export interface TaskReviewHistory {
     reviewedAt: string | null;
   }[];
   statusHistory: {
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: string | null;
+    changeReason: string | null;
+    changedAt: string;
+  }[];
+  /** ORDER_008 / TASK_023: ステータス以外のフィールド変更履歴 */
+  fieldChanges: {
     fieldName: string;
     oldValue: string | null;
     newValue: string | null;
@@ -1310,6 +1322,22 @@ export interface ElectronAPI {
    * @returns ファイル内容（見つからない場合はnull）
    */
   getProjectInfoFile: (projectName: string) => Promise<string | null>;
+
+  // INFO_PAGES (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+  /**
+   * INFO_PAGESのページ一覧を取得
+   * @param projectName プロジェクト名
+   * @returns ページ一覧（INFO_PAGESが存在しない場合はnull）
+   */
+  getInfoPages: (projectName: string) => Promise<InfoPagesIndex | null>;
+
+  /**
+   * INFO_PAGESの指定ページのコンテンツを取得
+   * @param projectName プロジェクト名
+   * @param pageId ページID
+   * @returns ページコンテンツ（見つからない場合はnull）
+   */
+  getInfoPageContent: (projectName: string, pageId: string) => Promise<string | null>;
 
   // 推奨アクション (TASK_026)
   /**
@@ -1999,6 +2027,22 @@ export interface ElectronAPI {
    */
   getTaskReviewHistory: (projectId: string, taskId: string) => Promise<TaskReviewHistory>;
 
+  /**
+   * ORDER全体のタスク構成変更履歴を取得
+   * ORDER_009 / TASK_025
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @returns 構成変更履歴の配列
+   */
+  getOrderStructureHistory: (projectId: string, orderId: string) => Promise<Array<{
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: string | null;
+    changeReason: string | null;
+    changedAt: string;
+  }>>;
+
   // ============================================================
   // ORDER_156: TASK_1233 - プロジェクト情報取得・更新
   // ============================================================
@@ -2167,6 +2211,12 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('project:get-review-file', projectName, taskId),
   getProjectInfoFile: (projectName: string) =>
     ipcRenderer.invoke('project:get-project-info-file', projectName),
+
+  // INFO_PAGES (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+  getInfoPages: (projectName: string) =>
+    ipcRenderer.invoke('project:get-info-pages', projectName),
+  getInfoPageContent: (projectName: string, pageId: string) =>
+    ipcRenderer.invoke('project:get-info-page-content', projectName, pageId),
 
   // 推奨アクション (TASK_026)
   getRecommendedActions: (projectName: string, state: ParsedState) =>
@@ -2398,6 +2448,10 @@ const electronAPI: ElectronAPI = {
   // ORDER_138: TASK_1158 - レビュー履歴取得
   getTaskReviewHistory: (projectId: string, taskId: string) =>
     ipcRenderer.invoke('project:get-task-review-history', projectId, taskId),
+
+  // ORDER_009: TASK_025 - ORDER構成変更履歴取得
+  getOrderStructureHistory: (projectId: string, orderId: string) =>
+    ipcRenderer.invoke('project:get-order-structure-history', projectId, orderId),
 
   // ORDER_156: TASK_1233 - プロジェクト情報取得・更新
   getProjectInfo: (projectId: string) =>

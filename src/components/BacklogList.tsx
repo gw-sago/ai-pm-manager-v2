@@ -15,7 +15,7 @@
  * @task TASK_328
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BacklogFilterBar, type ProjectOption } from './BacklogFilterBar';
 import type { BacklogFilters } from '../main/services/DashboardService';
 import type { BacklogItem } from '../preload';
@@ -1233,10 +1233,14 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
   // ORDER_053: カスタム比較関数でメモ化を最適化
   // 変更がない場合はtrueを返して再レンダリングをスキップ
   // ORDER_139 / TASK_1164: 優先度変更検知のためpriority比較を維持
+  // TASK_031: title/description/sortOrder も比較対象に追加（編集保存後のUI反映バグ修正）
   return (
     prevProps.item.id === nextProps.item.id &&
+    prevProps.item.title === nextProps.item.title &&
+    prevProps.item.description === nextProps.item.description &&
     prevProps.item.status === nextProps.item.status &&
     prevProps.item.priority === nextProps.item.priority &&
+    prevProps.item.sortOrder === nextProps.item.sortOrder &&
     prevProps.item.relatedOrderId === nextProps.item.relatedOrderId &&
     prevProps.item.orderStatus === nextProps.item.orderStatus &&
     prevProps.item.progressPercent === nextProps.item.progressPercent &&

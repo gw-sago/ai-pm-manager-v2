@@ -115,6 +115,24 @@ export function registerProjectHandlers(): void {
     }
   );
 
+  // INFO_PAGESページ一覧取得 (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+  ipcMain.handle(
+    'project:get-info-pages',
+    async (_event, projectName: string) => {
+      console.log(`[Project IPC] INFO_PAGESページ一覧取得リクエスト: ${projectName}`);
+      return projectService.getInfoPages(projectName);
+    }
+  );
+
+  // INFO_PAGESページコンテンツ取得 (ORDER_002 / BACKLOG_002: プロジェクト情報の深化)
+  ipcMain.handle(
+    'project:get-info-page-content',
+    async (_event, projectName: string, pageId: string): Promise<string | null> => {
+      console.log(`[Project IPC] INFO_PAGESページコンテンツ取得リクエスト: ${projectName}/${pageId}`);
+      return projectService.getInfoPageContent(projectName, pageId);
+    }
+  );
+
   // REVIEWファイル内容取得 (統合フォーマット: 実施内容+判定結果を含む)
   ipcMain.handle(
     'project:get-review-file',
@@ -696,6 +714,24 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] Review history IPC handler registered');
 
+  // ORDER_009: TASK_025 - ORDER構成変更履歴取得IPC
+  ipcMain.handle(
+    'project:get-order-structure-history',
+    async (
+      _event,
+      projectId: string,
+      orderId: string
+    ) => {
+      try {
+        const aipmDbService = getAipmDbService();
+        return aipmDbService.getOrderStructureHistory(projectId, orderId);
+      } catch (error) {
+        console.error('[Project IPC] ORDER構成変更履歴取得エラー:', error);
+        return [];
+      }
+    }
+  );
+
   // ORDER_139: TASK_1161 - バックログ追加・更新・削除IPC API
   ipcMain.handle(
     'project:add-backlog',
@@ -710,7 +746,22 @@ export function registerProjectHandlers(): void {
       console.log(`[Project IPC] バックログ追加: ${projectId}`);
       try {
         const aipmDbService = getAipmDbService();
-        return await aipmDbService.addBacklog(projectId, title, description, priority, category);
+        const result = await aipmDbService.addBacklog(projectId, title, description, priority, category);
+        if (result.success) {
+          // db:changed イベントを発火してBacklogListを自動更新
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('db:changed', {
+                source: 'backlog-added',
+                projectId,
+                targetId: result.backlogId || '',
+                timestamp: new Date().toISOString(),
+              });
+            }
+          });
+        }
+        return result;
       } catch (error) {
         console.error('[Project IPC] バックログ追加エラー:', error);
         return {
@@ -738,7 +789,22 @@ export function registerProjectHandlers(): void {
       console.log(`[Project IPC] バックログ更新: ${projectId}/${backlogId}`);
       try {
         const aipmDbService = getAipmDbService();
-        return await aipmDbService.updateBacklog(projectId, backlogId, updates);
+        const result = await aipmDbService.updateBacklog(projectId, backlogId, updates);
+        if (result.success) {
+          // db:changed イベントを発火してBacklogListを自動更新
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('db:changed', {
+                source: 'backlog-updated',
+                projectId,
+                targetId: backlogId,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          });
+        }
+        return result;
       } catch (error) {
         console.error('[Project IPC] バックログ更新エラー:', error);
         return {
@@ -759,7 +825,22 @@ export function registerProjectHandlers(): void {
       console.log(`[Project IPC] バックログ削除: ${projectId}/${backlogId}`);
       try {
         const aipmDbService = getAipmDbService();
-        return await aipmDbService.deleteBacklog(projectId, backlogId);
+        const result = await aipmDbService.deleteBacklog(projectId, backlogId);
+        if (result.success) {
+          // db:changed イベントを発火してBacklogListを自動更新
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('db:changed', {
+                source: 'backlog-deleted',
+                projectId,
+                targetId: backlogId,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          });
+        }
+        return result;
       } catch (error) {
         console.error('[Project IPC] バックログ削除エラー:', error);
         return {

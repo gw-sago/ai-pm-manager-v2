@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ActionGenerator, getActionGenerator, resetActionGenerator } from '../ActionGenerator';
 import type { RecommendedAction } from '../ActionGenerator';
-import type { ParsedState, TaskInfo, ReviewQueueItem } from '../StateParser';
+import type { ParsedState, TaskInfo } from '../StateParser';
 
 /**
  * テスト用のモックParsedStateを生成するヘルパー
@@ -21,7 +21,6 @@ function createMockState(overrides?: Partial<ParsedState>): ParsedState {
       currentOrderId: 'ORDER_001',
     },
     tasks: [],
-    reviewQueue: [],
     progressSummary: {
       completed: 0,
       inProgress: 0,
@@ -211,44 +210,6 @@ describe('ActionGenerator', () => {
       expect(reviewAction?.priority).toBe(2);
     });
 
-    it('should generate review action for PENDING in review queue', () => {
-      const state = createMockState({
-        reviewQueue: [
-          {
-            taskId: 'TASK_100',
-            submittedAt: '2026-01-26 10:00',
-            status: 'PENDING',
-            priority: 'P1',
-          },
-        ],
-      });
-
-      const actions = generator.generate('AI_PM_PJ', state);
-
-      expect(actions.length).toBeGreaterThanOrEqual(1);
-      const reviewAction = actions.find(a => a.type === 'review');
-      expect(reviewAction).toBeDefined();
-      expect(reviewAction?.description).toContain('1件');
-    });
-
-    it('should add specific action for P0 priority review', () => {
-      const state = createMockState({
-        reviewQueue: [
-          {
-            taskId: 'TASK_100',
-            submittedAt: '2026-01-26 10:00',
-            status: 'PENDING',
-            priority: 'P0',
-          },
-        ],
-      });
-
-      const actions = generator.generate('AI_PM_PJ', state);
-
-      const p0Action = actions.find(a => a.command.includes('100'));
-      expect(p0Action).toBeDefined();
-      expect(p0Action?.description).toContain('P0');
-    });
   });
 
   describe('QUEUED tasks (priority 3)', () => {

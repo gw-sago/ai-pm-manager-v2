@@ -72,6 +72,7 @@ from utils.transition import (
     record_transition,
     TransitionError,
 )
+from config.db_config import get_project_paths
 
 
 # 優先度変換マッピング（BACKLOG → ORDER）
@@ -202,7 +203,8 @@ def create_order_md_file(
         today=today,
     )
 
-    order_path = Path(f"PROJECTS/{project_name}/ORDERS/{order_id}.md")
+    paths = get_project_paths(project_name)
+    order_path = paths["orders"] / f"{order_id}.md"
     order_path.parent.mkdir(parents=True, exist_ok=True)
     order_path.write_text(content, encoding="utf-8")
     logger.info(f"ORDER.mdファイルを作成しました: {order_path}")
@@ -220,7 +222,8 @@ def create_result_directories(project_name: str, order_id: str) -> bool:
     Returns:
         bool: 作成成功したかどうか
     """
-    base_path = Path(f"PROJECTS/{project_name}/RESULT/{order_id}")
+    paths = get_project_paths(project_name)
+    base_path = paths["result"] / order_id
     base_path.mkdir(parents=True, exist_ok=True)
     # 01_GOAL.md, 02_REQUIREMENTS.md, 03_STAFFING.md はフラットファイルとして
     # process_order.py が生成するため、ここではディレクトリを作らない。

@@ -6,7 +6,7 @@
  * TASK_025: 推奨アクション生成ロジック実装
  */
 
-import type { ParsedState, TaskInfo, ReviewQueueItem } from './StateParser';
+import type { ParsedState, TaskInfo } from './StateParser';
 
 /**
  * 推奨アクションの種類
@@ -71,7 +71,7 @@ export class ActionGenerator {
     actions.push(...reworkActions);
 
     // 2. レビュー待ちを検出（優先度2）
-    const reviewActions = this.generateReviewActions(projectName, state.tasks, state.reviewQueue);
+    const reviewActions = this.generateReviewActions(projectName, state.tasks);
     actions.push(...reviewActions);
 
     // 3. 実行可能タスク（QUEUED）を検出（優先度3）
@@ -132,53 +132,27 @@ export class ActionGenerator {
    * レビュー待ちタスクに対するアクションを生成
    * 優先度2
    *
-   * DONEステータスのタスク、またはレビューキューのPENDINGを検出
+   * DONEステータスのタスクを検出
    */
   private generateReviewActions(
     projectName: string,
-    tasks: TaskInfo[],
-    reviewQueue: ReviewQueueItem[]
+    tasks: TaskInfo[]
   ): RecommendedAction[] {
     const actions: RecommendedAction[] = [];
 
     // DONEステータスのタスクを検出
     const doneTasks = tasks.filter(t => t.status === 'DONE');
 
-    // レビューキューのPENDINGエントリを検出
-    const pendingReviews = reviewQueue.filter(r => r.status === 'PENDING');
-
     // レビュー待ちがある場合
-    if (doneTasks.length > 0 || pendingReviews.length > 0) {
+    if (doneTasks.length > 0) {
       // 一般的なレビュー実行コマンド
       actions.push({
         id: 'review-next',
         type: 'review' as ActionType,
         command: `/aipm-review ${projectName} --next`,
-        description: `レビュー待ちタスクをレビュー（${Math.max(doneTasks.length, pendingReviews.length)}件）`,
+        description: `レビュー待ちタスクをレビュー（${doneTasks.length}件）`,
         priority: 2,
       });
-
-      // 個別のレビュー待ちタスク（優先度が高いものから）
-      // P0 > P1 > P2の順でソート
-      const sortedPending = [...pendingReviews].sort((a, b) => {
-        const priorityA = this.parsePriority(a.priority);
-        const priorityB = this.parsePriority(b.priority);
-        return priorityA - priorityB;
-      });
-
-      // 最優先のレビューがあれば個別アクションも追加
-      if (sortedPending.length > 0 && sortedPending[0].priority === 'P0') {
-        const p0Review = sortedPending[0];
-        const taskNumber = p0Review.taskId.replace('TASK_', '');
-        actions.push({
-          id: `review-${p0Review.taskId}`,
-          type: 'review' as ActionType,
-          command: `/aipm-review ${projectName} ${taskNumber}`,
-          description: `優先レビュー（P0）: ${p0Review.taskId}`,
-          priority: 2,
-          taskId: p0Review.taskId,
-        });
-      }
     }
 
     return actions;
@@ -225,17 +199,6 @@ export class ActionGenerator {
     return null;
   }
 
-  /**
-   * 優先度文字列を数値に変換
-   * P0 -> 0, P1 -> 1, P2 -> 2, ...
-   */
-  private parsePriority(priority: string): number {
-    const match = priority.match(/P(\d+)/);
-    if (match) {
-      return parseInt(match[1], 10);
-    }
-    return 99; // 不明な優先度は最低に
-  }
 }
 
 /**

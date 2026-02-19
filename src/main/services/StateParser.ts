@@ -34,18 +34,6 @@ export interface TaskInfo {
 }
 
 /**
- * レビューキューアイテム
- */
-export interface ReviewQueueItem {
-  taskId: string;
-  submittedAt: string;
-  status: string;
-  reviewer?: string;
-  priority: string;
-  note?: string;
-}
-
-/**
  * 進捗サマリ
  */
 export interface ProgressSummary {
@@ -64,7 +52,6 @@ export interface ProgressSummary {
 export interface ParsedState {
   projectInfo: ProjectInfo;
   tasks: TaskInfo[];
-  reviewQueue: ReviewQueueItem[];
   progressSummary: ProgressSummary;
   orders: OrderInfo[];
 }
@@ -117,13 +104,11 @@ export class StateParser {
 
     const projectInfo = this.parseProjectInfo(lines);
     const { orders, tasks } = this.parseTaskSections(lines);
-    const reviewQueue = this.parseReviewQueue(lines);
     const progressSummary = this.parseProgressSummary(lines, tasks);
 
     return {
       projectInfo,
       tasks,
-      reviewQueue,
       progressSummary,
       orders,
     };
@@ -342,87 +327,6 @@ export class StateParser {
       dependencies,
       startDate: cells[5] && cells[5] !== '-' ? cells[5] : undefined,
       completedDate: cells[6] && cells[6] !== '-' ? cells[6] : undefined,
-    };
-  }
-
-  /**
-   * レビューキューセクションをパース
-   */
-  private parseReviewQueue(lines: string[]): ReviewQueueItem[] {
-    const queue: ReviewQueueItem[] = [];
-    let inSection = false;
-    let inTable = false;
-    let headerParsed = false;
-
-    for (const line of lines) {
-      // セクション検出
-      if (line.match(/^##\s*レビューキュー/)) {
-        inSection = true;
-        continue;
-      }
-
-      // 次のセクション開始で終了
-      if (inSection && line.match(/^##\s+[^#]/) && !line.match(/^###/)) {
-        break;
-      }
-
-      if (!inSection) continue;
-
-      // テーブルヘッダー検出
-      if (line.includes('| Task ID') || line.includes('|Task ID')) {
-        inTable = true;
-        headerParsed = false;
-        continue;
-      }
-
-      // テーブル区切り行をスキップ
-      if (line.match(/^\|[\s\-:]+\|/)) {
-        headerParsed = true;
-        continue;
-      }
-
-      // テーブル行のパース
-      if (inTable && headerParsed && line.startsWith('|')) {
-        const item = this.parseReviewQueueRow(line);
-        if (item) {
-          queue.push(item);
-        }
-        continue;
-      }
-
-      // テーブル終了検出
-      if (inTable && !line.startsWith('|') && line.trim() !== '') {
-        inTable = false;
-      }
-    }
-
-    return queue;
-  }
-
-  /**
-   * レビューキュー行をパース
-   */
-  private parseReviewQueueRow(line: string): ReviewQueueItem | null {
-    const cells = line.split('|')
-      .map(cell => cell.trim())
-      .filter(cell => cell !== '');
-
-    if (cells.length < 5) return null;
-
-    // Task IDがない行をスキップ
-    const taskIdMatch = cells[0].match(/TASK_\d+(?:_INT(?:_\d+)?)?/);
-    if (!taskIdMatch) return null;
-
-    // "-" のみの行（空エントリ）をスキップ
-    if (cells[0] === '-') return null;
-
-    return {
-      taskId: cells[0],
-      submittedAt: cells[1] || '',
-      status: cells[2] || 'PENDING',
-      reviewer: cells[3] && cells[3] !== '-' ? cells[3] : undefined,
-      priority: cells[4] || 'P1',
-      note: cells[5] && cells[5] !== '-' ? cells[5] : undefined,
     };
   }
 

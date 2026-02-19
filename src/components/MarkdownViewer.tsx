@@ -3,13 +3,16 @@
  *
  * react-markdown + remark-gfm を使用し、Markdownをリッチテキストとして表示する。
  * 見出し・リスト・コードブロック・テーブル・チェックボックス・引用・インライン要素に対応。
+ * DOMPurify によるXSSサニタイズも実施。
  *
  * TASK_1123: Markdownレンダリングコンポーネント準備
+ * TASK_039: DOMPurify XSSサニタイズ追加・overflow/word-wrapスタイル改善
  */
 
 import React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import DOMPurify from 'dompurify';
 import type { Components } from 'react-markdown';
 
 /**
@@ -112,24 +115,27 @@ const markdownComponents: Components = {
     </blockquote>
   ),
 
-  // テーブル
+  // テーブル - divラッパーで横スクロール対応
   table: ({ children }) => (
-    <div className="overflow-x-auto my-4">
-      <table className="min-w-full border-collapse border border-gray-300 text-sm">
+    <div className="markdown-table-wrapper">
+      <table className="markdown-table">
         {children}
       </table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="bg-gray-100">{children}</thead>
+    <thead>{children}</thead>
+  ),
+  tbody: ({ children }) => (
+    <tbody>{children}</tbody>
   ),
   th: ({ children }) => (
-    <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
+    <th className="markdown-th">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="border border-gray-300 px-3 py-2 text-gray-700">
+    <td className="markdown-td">
       {children}
     </td>
   ),
@@ -200,10 +206,18 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, classNa
     );
   }
 
+  // DOMPurifyによるXSSサニタイズ（Electron環境ではwindowが存在する）
+  const sanitizedContent = typeof window !== 'undefined'
+    ? DOMPurify.sanitize(content, { USE_PROFILES: { html: true } })
+    : content;
+
   return (
-    <div className={`prose prose-sm max-w-none ${className}`}>
+    <div
+      className={`prose prose-sm max-w-none markdown-content ${className}`}
+      style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}
+    >
       <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-        {content}
+        {sanitizedContent}
       </Markdown>
     </div>
   );

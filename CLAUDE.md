@@ -100,9 +100,30 @@ out/make/squirrel.windows/x64/ai-pm-manager-v2-0.1.0 Setup.exe
 3. **preload.ts**: forge.config.js の entryPoints に preload 設定が必要
 4. **DB駆動のみ**: MDモードは廃止済み。全データはSQLite DBで管理
 
+## 永続データのパスルール（Roaming必須）
+
+**重要**: PROJECTS/配下のファイルおよびdata/aipm.dbは、必ず`%APPDATA%`（Roaming）パスで操作すること。
+
+### 背景
+- SquirrelインストーラーがAppData\Localを上書きするため、Localに永続データを置くとインストール時に消失する
+- `backend/config/db_config.py` の `_get_user_data_path()` が `%APPDATA%`(Roaming) を返す設計
+
+### ルール
+1. **ファイルパス構築時は必ず `get_project_paths()` を使う**
+   ```python
+   from config.db_config import get_project_paths
+   paths = get_project_paths(project_id)  # Roaming絶対パスを返す
+   ```
+2. **相対パス `PROJECTS/{...}` の直接使用は禁止**
+   - cwdがLocalのため、相対パスはLocalに解決される
+3. **Workerサブエージェントのパス解決**
+   - `execute_task.py` がWorkerプロンプトにRoaming絶対パスを注入する
+   - CLIでの取得: `python backend/config/resolve_path.py PROJECT_NAME --json`
+
 ## 既知のバグパターン
 
 - **BUG_003**: `sqlite3.Row` は `.get()` メソッド非対応。直接インデックスまたは `row_to_dict()` を使用
 - **BUG_004**: DONE→REJECTED は禁止。必ず DONE→REWORK→REJECTED の遷移を経る
 - **BUG_009**: preload.ts の型定義とバックエンド実装の乖離に注意
 - **BUG_010**: export済みフック/コンポーネントの未import に注意
+- **BUG_011**: WorkerがPROJECTS/配下を相対パスで参照するとLocalに書き込まれRoamingと不整合になる。必ず`get_project_paths()`のRoaming絶対パスを使用すること

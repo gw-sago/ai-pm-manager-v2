@@ -49,7 +49,6 @@ def get_task(
     *,
     include_dependencies: bool = True,
     include_history: bool = False,
-    include_review: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """
     タスク詳細を取得
@@ -59,7 +58,6 @@ def get_task(
         task_id: タスクID
         include_dependencies: 依存関係を含めるか
         include_history: 変更履歴を含めるか
-        include_review: レビュー情報を含めるか
 
     Returns:
         タスク詳細（見つからない場合はNone）
@@ -173,31 +171,6 @@ def get_task(
             )
             task["history"] = rows_to_dicts(history)
 
-        # レビュー情報を取得
-        if include_review:
-            review = fetch_one(
-                conn,
-                """
-                SELECT
-                    id,
-                    status,
-                    reviewer,
-                    priority,
-                    comment,
-                    submitted_at,
-                    reviewed_at
-                FROM review_queue
-                WHERE task_id = ?
-                ORDER BY submitted_at DESC
-                LIMIT 1
-                """,
-                (task_id,)
-            )
-            if review:
-                task["review"] = row_to_dict(review)
-            else:
-                task["review"] = None
-
         return task
 
     finally:
@@ -250,20 +223,6 @@ def format_detail(task: Dict[str, Any]) -> str:
         "",
     ])
 
-    # レビュー情報
-    if task.get("review"):
-        r = task["review"]
-        lines.extend([
-            "## レビュー情報",
-            f"- **ステータス**: {r['status']}",
-            f"- **レビュアー**: {r.get('reviewer') or '-'}",
-            f"- **優先度**: {r['priority']}",
-            f"- **提出日時**: {r['submitted_at']}",
-        ])
-        if r.get("comment"):
-            lines.append(f"- **コメント**: {r['comment']}")
-        lines.append("")
-
     # 変更履歴
     if task.get("history"):
         lines.append("## 変更履歴（最新20件）")
@@ -308,7 +267,6 @@ def main():
             args.task_id,
             include_dependencies=not args.no_deps,
             include_history=args.detail,
-            include_review=True,
         )
 
         if not task:

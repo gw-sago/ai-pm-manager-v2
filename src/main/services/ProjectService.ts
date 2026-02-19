@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { StateParser, type ParsedState } from './StateParser';
 import { getConfigService } from './ConfigService';
-import { getAipmDbService, type AipmOrder, type AipmTask, type AipmReviewItem } from './AipmDbService';
+import { getAipmDbService, type AipmOrder, type AipmTask } from './AipmDbService';
 import { fileWatcherService, type FileChangeEvent } from './FileWatcherService';
 
 /**
@@ -308,18 +308,12 @@ export class ProjectService extends EventEmitter {
       const totalTasks = orderInfos.reduce((sum, oi) => sum + oi.tasks.length, 0);
       console.log(`[ProjectService] [DB] Loaded ${totalTasks} tasks across ${orders.length} orders for ${projectName}`);
 
-      // レビューキューをDBから取得（FR-003、既に実装済み）
-      // 注: getReviewQueue()はproject_id（内部ID）を期待するため、dbProject.idを使用
-      const reviewQueue = aipmDbService.getReviewQueue(dbProject.id);
-      console.log(`[ProjectService] [DB] Loaded ${reviewQueue.length} review queue items for ${projectName} (id: ${dbProject.id})`);
-
       // ParsedState型に変換（進捗サマリはDB由来データから計算: FR-004）
       const state = this.convertDbDataToParsedState(
         projectName,
         dbProject.status,
         currentOrder,
-        orderInfos,
-        reviewQueue
+        orderInfos
       );
 
       console.log(`[ProjectService] [DB] Project state loaded for ${projectName}: completed=${state.progressSummary.completed}, inProgress=${state.progressSummary.inProgress}, total=${state.progressSummary.total}`);
@@ -339,8 +333,7 @@ export class ProjectService extends EventEmitter {
     projectName: string,
     projectStatus: string,
     currentOrder: AipmOrder | undefined,
-    orderInfos: Array<{ order: AipmOrder; tasks: AipmTask[] }>,
-    reviewQueue: AipmReviewItem[]
+    orderInfos: Array<{ order: AipmOrder; tasks: AipmTask[] }>
   ): ParsedState {
     // 全タスクを収集
     const allTasks: AipmTask[] = [];
@@ -383,16 +376,6 @@ export class ProjectService extends EventEmitter {
       })),
     }));
 
-    // レビューキューを変換（StateParserのReviewQueueItem型に準拠）
-    const parsedReviewQueue = reviewQueue.map((item) => ({
-      taskId: item.taskId,
-      submittedAt: item.submittedAt,
-      status: item.status,
-      reviewer: item.reviewer || undefined,
-      priority: item.priority,
-      note: item.comment || undefined,
-    }));
-
     // プロジェクト情報を構築
     const projectInfo = {
       name: projectName,
@@ -415,7 +398,6 @@ export class ProjectService extends EventEmitter {
     return {
       projectInfo,
       tasks: parsedTasks,
-      reviewQueue: parsedReviewQueue,
       progressSummary,
       orders: parsedOrders,
     };
@@ -813,6 +795,69 @@ export class ProjectService extends EventEmitter {
         return fs.readFileSync(projectInfoPath, 'utf-8');
       } catch (error) {
         console.error(`[ProjectService] Failed to read PROJECT_INFO.md for ${projectName}:`, error);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * INFO_PAGESのページ一覧を取得（index.json）
+   * @param projectName プロジェクト名
+   * @returns ページ一覧（INFO_PAGESが存在しない場合はnull）
+   */
+  getInfoPages(projectName: string): { version: string; project_id: string; pages: Array<{ id: string; title: string; file: string; icon: string; description: string }> } | null {
+    const configService = getConfigService();
+    const frameworkPath = configService.getActiveFrameworkPath();
+
+    if (!frameworkPath) {
+      return null;
+    }
+
+    const indexPath = path.join(configService.getProjectsBasePath(), projectName, 'INFO_PAGES', 'index.json');
+    if (fs.existsSync(indexPath)) {
+      try {
+        const content = fs.readFileSync(indexPath, 'utf-8');
+        return JSON.parse(content);
+      } catch (error) {
+        console.error(`[ProjectService] Failed to read INFO_PAGES/index.json for ${projectName}:`, error);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * INFO_PAGESの指定ページのコンテンツを取得
+   * @param projectName プロジェクト名
+   * @param pageId ページID
+   * @returns ページコンテンツ（見つからない場合はnull）
+   */
+  getInfoPageContent(projectName: string, pageId: string): string | null {
+    const configService = getConfigService();
+    const frameworkPath = configService.getActiveFrameworkPath();
+
+    if (!frameworkPath) {
+      return null;
+    }
+
+    // index.jsonからファイル名を取得
+    const pages = this.getInfoPages(projectName);
+    if (!pages) {
+      return null;
+    }
+
+    const page = pages.pages.find(p => p.id === pageId);
+    if (!page) {
+      return null;
+    }
+
+    const pagePath = path.join(configService.getProjectsBasePath(), projectName, 'INFO_PAGES', page.file);
+    if (fs.existsSync(pagePath)) {
+      try {
+        return fs.readFileSync(pagePath, 'utf-8');
+      } catch (error) {
+        console.error(`[ProjectService] Failed to read INFO_PAGES/${page.file} for ${projectName}:`, error);
       }
     }
 

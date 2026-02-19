@@ -20,6 +20,8 @@ interface BacklogDetailPanelProps {
   onClose: () => void;
   /** ORDER IDクリック時のコールバック */
   onOrderClick?: (orderId: string) => void;
+  /** 保存完了時のコールバック（TASK_031: 保存後のUI反映用） */
+  onSave?: () => void;
 }
 
 /**
@@ -49,6 +51,7 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
   item,
   onClose,
   onOrderClick,
+  onSave,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -153,6 +156,8 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
       if (result && result.success) {
         // 成功時：編集モードを終了
         setIsEditing(false);
+        // 保存完了コールバックを呼び出してリストの再取得を促す（TASK_031）
+        onSave?.();
         // パネルを閉じてリフレッシュを促す
         handleClose();
       } else {

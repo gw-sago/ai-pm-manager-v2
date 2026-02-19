@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { StateParser, StateParseError } from '../StateParser';
-import type { ParsedState, TaskInfo, ReviewQueueItem, ProgressSummary } from '../StateParser';
+import type { ParsedState, TaskInfo, ProgressSummary } from '../StateParser';
 
 describe('StateParser', () => {
   let parser: StateParser;
@@ -154,48 +154,6 @@ describe('StateParser', () => {
 
       const intTask02 = result.tasks.find(t => t.id === 'TASK_075_INT_02');
       expect(intTask02?.dependencies).toEqual(['TASK_075_INT']);
-    });
-  });
-
-  describe('parseReviewQueue', () => {
-    it('should parse review queue with entries', () => {
-      const content = `
-## レビューキュー
-
-| Task ID | 提出日時 | ステータス | レビュアー | 優先度 | 備考 |
-|---------|---------|----------|-----------|--------|------|
-| TASK_017 | 2026-01-23 15:30 | PENDING | - | P1 | - |
-| TASK_016 | 2026-01-21 10:00 | IN_REVIEW | PM | P0 | 再提出 |
-`;
-
-      const result = parser.parse(content);
-
-      expect(result.reviewQueue).toHaveLength(2);
-
-      const queue017 = result.reviewQueue.find(q => q.taskId === 'TASK_017');
-      expect(queue017?.submittedAt).toBe('2026-01-23 15:30');
-      expect(queue017?.status).toBe('PENDING');
-      expect(queue017?.reviewer).toBeUndefined();
-      expect(queue017?.priority).toBe('P1');
-      expect(queue017?.note).toBeUndefined();
-
-      const queue016 = result.reviewQueue.find(q => q.taskId === 'TASK_016');
-      expect(queue016?.reviewer).toBe('PM');
-      expect(queue016?.priority).toBe('P0');
-      expect(queue016?.note).toBe('再提出');
-    });
-
-    it('should handle empty review queue', () => {
-      const content = `
-## レビューキュー
-
-| Task ID | 提出日時 | ステータス | レビュアー | 優先度 | 備考 |
-|---------|---------|----------|-----------|--------|------|
-| - | - | - | - | - | - |
-`;
-
-      const result = parser.parse(content);
-      expect(result.reviewQueue).toHaveLength(0);
     });
   });
 

@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
 import { getConfigService } from './ConfigService';
+import { getDatabase } from '../database';
 import type { TaskProgressInfo } from '../../shared/types';
 
 const execFileAsync = promisify(execFile);
@@ -70,20 +71,6 @@ export interface AipmTask {
 }
 
 /**
- * レビューキュー項目（DB由来）
- */
-export interface AipmReviewItem {
-  id: number;
-  taskId: string;
-  submittedAt: string;
-  status: string;
-  reviewer: string | null;
-  priority: string;
-  comment: string | null;
-  reviewedAt: string | null;
-}
-
-/**
  * バックログ項目（DB由来）
  */
 export interface AipmBacklogItem {
@@ -129,6 +116,18 @@ export interface TaskReviewHistory {
   }[];
   rejectCount: number;
   maxRework: number;
+}
+
+/**
+ * ORDER全体のタスク構成変更履歴（ORDER_009 / TASK_025）
+ */
+export interface OrderStructureChange {
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string | null;
+  changeReason: string | null;
+  changedAt: string;
 }
 
 /**
@@ -643,63 +642,6 @@ export class AipmDbService {
   }
 
   /**
-   * レビューキューを取得
-   *
-   * ORDER_145: Phase 2-3 - review_queueテーブルバイパス実装
-   * review_queueテーブルを使用せず、DONEステータスのタスクを直接取得
-   *
-   * @param projectId プロジェクトID
-   * @returns レビューキュー項目一覧（DONEステータスのタスク）
-   */
-  getReviewQueue(projectId: string): AipmReviewItem[] {
-    try {
-      const db = this.getConnection();
-
-      // DONEステータスのタスクを直接取得
-      const stmt = db.prepare(`
-        SELECT
-          CAST(ROW_NUMBER() OVER (ORDER BY t.updated_at DESC) AS INTEGER) as id,
-          t.id as task_id,
-          t.updated_at as submitted_at,
-          'PENDING' as status,
-          t.assignee as reviewer,
-          t.priority,
-          NULL as comment,
-          NULL as reviewed_at
-        FROM tasks t
-        WHERE t.project_id = ? AND t.status = 'DONE'
-        ORDER BY t.updated_at DESC
-      `);
-
-      const rows = stmt.all(projectId) as Array<{
-        id: number;
-        task_id: string;
-        submitted_at: string;
-        status: string;
-        reviewer: string | null;
-        priority: string;
-        comment: string | null;
-        reviewed_at: string | null;
-      }>;
-
-      return rows.map((row) => ({
-        id: row.id,
-        taskId: row.task_id,
-        submittedAt: row.submitted_at,
-        status: row.status,
-        reviewer: row.reviewer,
-        priority: row.priority,
-        comment: row.comment,
-        reviewedAt: row.reviewed_at,
-      }));
-    } catch (error) {
-      console.error('[AipmDbService] getReviewQueue failed:', error);
-      // エラー時は空配列を返す（throwせず、UIを壊さない）
-      return [];
-    }
-  }
-
-  /**
    * バックログ一覧を取得
    * @param projectId プロジェクトID
    * @returns バックログ項目一覧
@@ -950,6 +892,38 @@ export class AipmDbService {
         changedAt: row.changed_at,
       }));
 
+      // ORDER_008 / TASK_023: change_history からステータス以外のフィールド変更を取得
+      const fieldChangesStmt = db.prepare(`
+        SELECT
+          field_name,
+          old_value,
+          new_value,
+          changed_by,
+          change_reason,
+          changed_at
+        FROM change_history
+        WHERE entity_type = 'task' AND entity_id = ? AND project_id = ? AND field_name != 'status'
+        ORDER BY changed_at DESC
+      `);
+
+      const fieldChangeRows = fieldChangesStmt.all(taskId, projectId) as Array<{
+        field_name: string;
+        old_value: string | null;
+        new_value: string | null;
+        changed_by: string | null;
+        change_reason: string | null;
+        changed_at: string;
+      }>;
+
+      const fieldChanges = fieldChangeRows.map((row) => ({
+        fieldName: row.field_name,
+        oldValue: row.old_value,
+        newValue: row.new_value,
+        changedBy: row.changed_by,
+        changeReason: row.change_reason,
+        changedAt: row.changed_at,
+      }));
+
       // escalations からエスカレーション情報を取得
       const escalationStmt = db.prepare(`
         SELECT
@@ -998,6 +972,7 @@ export class AipmDbService {
       return {
         reviews,
         statusHistory,
+        fieldChanges,
         escalations,
         rejectCount,
         maxRework,
@@ -1007,10 +982,62 @@ export class AipmDbService {
       return {
         reviews: [],
         statusHistory: [],
+        fieldChanges: [],
         escalations: [],
         rejectCount: 0,
         maxRework: 3,
       };
+    }
+  }
+
+  /**
+   * ORDER全体のタスク構成変更履歴を取得
+   *
+   * ORDER_009 / TASK_025: タスク構成変更（追加/削除/依存変更/再構成）の履歴
+   * change_historyからORDER単位のエントリを取得する
+   *
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @returns 構成変更履歴の配列
+   */
+  getOrderStructureHistory(projectId: string, orderId: string): OrderStructureChange[] {
+    try {
+      const db = this.getConnection();
+
+      const stmt = db.prepare(`
+        SELECT
+          field_name,
+          old_value,
+          new_value,
+          changed_by,
+          change_reason,
+          changed_at
+        FROM change_history
+        WHERE entity_type = 'order' AND entity_id = ? AND project_id = ?
+          AND field_name IN ('task_added', 'task_removed', 'task_reordered', 'dependency_changed', 'task_restructured')
+        ORDER BY changed_at DESC
+      `);
+
+      const rows = stmt.all(orderId, projectId) as Array<{
+        field_name: string;
+        old_value: string | null;
+        new_value: string | null;
+        changed_by: string | null;
+        change_reason: string | null;
+        changed_at: string;
+      }>;
+
+      return rows.map((row) => ({
+        fieldName: row.field_name,
+        oldValue: row.old_value,
+        newValue: row.new_value,
+        changedBy: row.changed_by,
+        changeReason: row.change_reason,
+        changedAt: row.changed_at,
+      }));
+    } catch (error) {
+      console.error('[AipmDbService] getOrderStructureHistory failed:', error);
+      return [];
     }
   }
 
@@ -1104,62 +1131,70 @@ export class AipmDbService {
       sortOrder?: number;
     }
   ): Promise<{ success: boolean; error?: string }> {
-    const configService = getConfigService();
-    const frameworkPath = configService.getActiveFrameworkPath();
-
-    if (!frameworkPath) {
-      return { success: false, error: 'Framework path not configured' };
-    }
-
-    const backendPath = configService.getBackendPath();
-    if (!backendPath) {
-      return { success: false, error: 'Backend path not configured' };
-    }
-    const updateScriptPath = path.join(backendPath, 'backlog', 'update.py');
-
-    if (!fs.existsSync(updateScriptPath)) {
-      return { success: false, error: `update.py not found: ${updateScriptPath}` };
-    }
-
     try {
-      const args = [updateScriptPath, projectId, backlogId, '--json'];
+      const db = getDatabase();
+
+      // バックログ存在確認
+      const existing = db.prepare(
+        'SELECT id, status FROM backlog_items WHERE id = ? AND project_id = ?'
+      ).get(backlogId, projectId) as { id: string; status: string } | undefined;
+
+      if (!existing) {
+        return { success: false, error: `BACKLOGが見つかりません: ${backlogId}` };
+      }
+
+      // 更新フィールドを構築
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
 
       if (updates.title) {
-        args.push('--title', updates.title);
+        setClauses.push('title = ?');
+        values.push(updates.title);
       }
 
       if (updates.description !== undefined) {
-        args.push('--description', updates.description);
+        setClauses.push('description = ?');
+        values.push(updates.description);
       }
 
       if (updates.priority) {
-        args.push('--priority', updates.priority);
+        setClauses.push('priority = ?');
+        values.push(updates.priority);
       }
 
       if (updates.status) {
-        args.push('--status', updates.status);
+        setClauses.push('status = ?');
+        values.push(updates.status);
+        if (updates.status === 'DONE') {
+          setClauses.push('completed_at = ?');
+          values.push(new Date().toISOString());
+        }
       }
 
       if (updates.sortOrder !== undefined) {
-        args.push('--sort-order', updates.sortOrder.toString());
+        setClauses.push('sort_order = ?');
+        values.push(updates.sortOrder);
       }
 
-      const { stdout } = await execFileAsync('python', args, {
-        cwd: path.dirname(updateScriptPath),
-        timeout: 30000,
-      });
-
-      const result = JSON.parse(stdout);
-
-      if (!result.success) {
-        return { success: false, error: result.error || 'Unknown error' };
+      if (setClauses.length === 0) {
+        return { success: true };
       }
+
+      // updated_at を追加
+      setClauses.push('updated_at = ?');
+      values.push(new Date().toISOString());
+
+      // WHERE句パラメータ
+      values.push(backlogId, projectId);
+
+      const sql = `UPDATE backlog_items SET ${setClauses.join(', ')} WHERE id = ? AND project_id = ?`;
+      db.prepare(sql).run(...values);
 
       console.log(`[AipmDbService] Backlog updated: ${backlogId}`);
       return { success: true };
     } catch (error: unknown) {
-      const err = error as { stderr?: string; message?: string };
-      const errorMsg = err.stderr || err.message || String(error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[AipmDbService] updateBacklog failed:', errorMsg);
       return { success: false, error: errorMsg };
     }
   }
@@ -1473,7 +1508,7 @@ export class AipmDbService {
       'file_lock',          // ファイルロック取得
       'execute_task',       // AI実行
       'create_report',      // REPORT作成
-      'add_review_queue',   // レビューキュー追加
+      'await_review',       // レビュー待ち
       'update_status_done', // ステータス更新（DONE）
       'auto_review',        // 自動レビュー
     ];
@@ -1484,7 +1519,7 @@ export class AipmDbService {
       file_lock: 'ファイルロック',
       execute_task: 'AI実行',
       create_report: 'レポート作成',
-      add_review_queue: 'レビュー待ち',
+      await_review: 'レビュー待ち',
       update_status_done: '完了処理',
       auto_review: '自動レビュー',
     };
@@ -1551,11 +1586,11 @@ export class AipmDbService {
         // DONEステータスの場合はレビュー待ち
         if (task.status === 'DONE') {
           return {
-            currentStep: 'add_review_queue',
+            currentStep: 'await_review',
             currentStepDisplay: 'レビュー待ち',
-            stepIndex: EXECUTION_STEPS.indexOf('add_review_queue'),
+            stepIndex: EXECUTION_STEPS.indexOf('await_review'),
             totalSteps: EXECUTION_STEPS.length,
-            progressPercent: Math.round(((EXECUTION_STEPS.indexOf('add_review_queue') + 1) / EXECUTION_STEPS.length) * 100),
+            progressPercent: Math.round(((EXECUTION_STEPS.indexOf('await_review') + 1) / EXECUTION_STEPS.length) * 100),
           };
         }
 
