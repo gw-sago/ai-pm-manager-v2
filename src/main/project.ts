@@ -740,6 +740,7 @@ export function registerProjectHandlers(): void {
         return {
           reviews: [],
           statusHistory: [],
+          fieldChanges: [],
           escalations: [],
           rejectCount: 0,
           maxRework: 3,

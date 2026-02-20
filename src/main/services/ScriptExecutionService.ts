@@ -1145,7 +1145,6 @@ export class ScriptExecutionService extends EventEmitter {
    * 処理フロー:
    * 1. execute_task.py が存在する場合 → 親スクリプト経由でタスク実行
    * 2. orchestrator.py が存在する場合 → orchestrator.py経由で自動サイクル
-   * 3. どちらもない場合 → execute_all.py で一括実行
    *
    * @param projectId プロジェクトID
    * @param orderId ORDER ID
@@ -1187,19 +1186,14 @@ export class ScriptExecutionService extends EventEmitter {
       return this.executeWorkerViaExecuteTask(projectId, orderId, taskId, executionId, startedAt);
     }
 
-    // フォールバック1: aipm-autoスクリプト経由
+    // フォールバック: aipm-autoスクリプト経由
     const orchestratorPath = this.getAipmAutoPath('orchestrator.py');
     if (orchestratorPath) {
       console.log(`[ScriptExecution] Fallback: Using orchestrator.py for Worker process`);
       return this.executeWorkerViaOrchestrator(projectId, orderId, executionId, startedAt);
     }
 
-    // フォールバック2: 従来のexecute_all.py
-    console.log(`[ScriptExecution] Fallback: Using execute_all.py`);
-    const backendPath = this.getBackendPath()!;
-    const scriptPath = path.join(backendPath, 'task', 'execute_all.py');
-    const args = [scriptPath, projectId, orderId, '--json'];
-    return this.executeScript('worker', projectId, orderId, args, executionId, startedAt);
+    return this.createErrorResult('worker', projectId, orderId, 'No worker script found (execute_task.py or orchestrator.py)');
   }
 
   /**

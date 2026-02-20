@@ -523,12 +523,15 @@ export class ProjectService extends EventEmitter {
           .sort((a, b) => b.localeCompare(a)); // 降順ソート（最新ORDER優先）
 
         for (const orderDir of orderDirs) {
-          const queueDir = path.join(resultDir, orderDir, '04_QUEUE');
-          if (fs.existsSync(queueDir)) {
-            const taskFileName = `${taskId}.md`;
-            const taskFilePath = path.join(queueDir, taskFileName);
-            if (fs.existsSync(taskFilePath)) {
-              return fs.readFileSync(taskFilePath, 'utf-8');
+          const taskFileName = `${taskId}.md`;
+          // 04_QUEUE と 04_TASK の両方を検索（ORDERのフォーマットにより異なる）
+          for (const taskDirName of ['04_QUEUE', '04_TASK']) {
+            const taskDir = path.join(resultDir, orderDir, taskDirName);
+            if (fs.existsSync(taskDir)) {
+              const taskFilePath = path.join(taskDir, taskFileName);
+              if (fs.existsSync(taskFilePath)) {
+                return fs.readFileSync(taskFilePath, 'utf-8');
+              }
             }
           }
         }
@@ -652,14 +655,20 @@ export class ProjectService extends EventEmitter {
     const frameworkPath = configService.getActiveFrameworkPath();
 
     if (!frameworkPath) {
+      console.warn(`[ProjectService] getReviewFileContent: frameworkPath not set for ${taskId}`);
       return null;
     }
 
-    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
+    // Roaming絶対パスを使用（getProjectsBasePath()は%APPDATA%/ai-pm-manager-v2/PROJECTS/を返す）
+    const projectsBasePath = configService.getProjectsBasePath();
+    const projectPath = path.join(projectsBasePath, projectName);
 
     // RESULT/ORDER_XXX/07_REVIEW/ の下を検索
     const resultDir = path.join(projectPath, 'RESULT');
+    console.log(`[ProjectService] getReviewFileContent: searching in ${resultDir} for ${taskId}`);
+
     if (!fs.existsSync(resultDir)) {
+      console.warn(`[ProjectService] getReviewFileContent: RESULT dir not found: ${resultDir}`);
       return null;
     }
 
@@ -672,16 +681,20 @@ export class ProjectService extends EventEmitter {
         .map(d => d.name)
         .sort((a, b) => b.localeCompare(a)); // 降順ソート（最新ORDER優先）
 
+      console.log(`[ProjectService] getReviewFileContent: scanning ${orderDirs.length} ORDER dirs for REVIEW_${taskNumber}.md`);
+
       for (const orderDir of orderDirs) {
         const reviewDir = path.join(resultDir, orderDir, '07_REVIEW');
         if (fs.existsSync(reviewDir)) {
           const reviewFileName = `REVIEW_${taskNumber}.md`;
           const reviewFilePath = path.join(reviewDir, reviewFileName);
           if (fs.existsSync(reviewFilePath)) {
+            console.log(`[ProjectService] getReviewFileContent: found ${reviewFilePath}`);
             return fs.readFileSync(reviewFilePath, 'utf-8');
           }
         }
       }
+      console.log(`[ProjectService] getReviewFileContent: REVIEW_${taskNumber}.md not found in any ORDER dir`);
     } catch (error) {
       console.error(`[ProjectService] Failed to read review file for ${taskId}:`, error);
     }

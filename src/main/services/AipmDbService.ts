@@ -107,6 +107,15 @@ export interface TaskReviewHistory {
     changeReason: string | null;
     changedAt: string;
   }[];
+  /** ORDER_008 / TASK_023: ステータス以外のフィールド変更履歴 */
+  fieldChanges: {
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: string | null;
+    changeReason: string | null;
+    changedAt: string;
+  }[];
   escalations: {
     id: string;
     reason: string | null;
@@ -821,24 +830,62 @@ export class AipmDbService {
       const db = this.getConnection();
 
       // ORDER_145: review_queueテーブルは削除済み
-      // change_historyからレビュー関連の履歴を取得
-      const reviewHistoryStmt = db.prepare(`
-        SELECT
-          ROW_NUMBER() OVER (ORDER BY changed_at DESC) as id,
-          entity_id as task_id,
-          new_value as status,
-          changed_by as reviewer,
-          change_reason as comment,
-          changed_at as submitted_at,
-          changed_at as reviewed_at
+      // change_historyのreview_resultフィールドからレビュー判定結果を取得
+      // (APPROVED/REJECTED/ESCALATED が格納される)
+      // ORDER_030/TASK_094修正: field_name='review_result'を優先取得し、
+      // 旧データ(project_id=NULL)も対象にするUNION方式に変更
+      // 新データにreview_resultが存在する場合はそれを優先、存在しない場合はstatus遷移から復元
+      const hasReviewResultStmt = db.prepare(`
+        SELECT COUNT(*) as cnt
         FROM change_history
         WHERE entity_type = 'task'
           AND entity_id = ?
-          AND project_id = ?
-          AND field_name = 'status'
-          AND (old_value = 'DONE' OR new_value = 'DONE' OR new_value IN ('COMPLETED', 'REWORK'))
-        ORDER BY changed_at DESC
+          AND (project_id = ? OR project_id IS NULL)
+          AND field_name = 'review_result'
       `);
+      const hasReviewResultRow = hasReviewResultStmt.get(taskId, projectId) as { cnt: number };
+      const hasReviewResult = hasReviewResultRow.cnt > 0;
+
+      const reviewHistoryStmt = hasReviewResult
+        ? db.prepare(`
+          SELECT
+            ROW_NUMBER() OVER (ORDER BY changed_at DESC) as id,
+            entity_id as task_id,
+            new_value as status,
+            changed_by as reviewer,
+            change_reason as comment,
+            changed_at as submitted_at,
+            changed_at as reviewed_at
+          FROM change_history
+          WHERE entity_type = 'task'
+            AND entity_id = ?
+            AND (project_id = ? OR project_id IS NULL)
+            AND field_name = 'review_result'
+            AND new_value IN ('APPROVED', 'REJECTED', 'ESCALATED')
+          ORDER BY changed_at DESC
+        `)
+        : db.prepare(`
+          SELECT
+            ROW_NUMBER() OVER (ORDER BY changed_at DESC) as id,
+            entity_id as task_id,
+            CASE
+              WHEN new_value = 'COMPLETED' THEN 'APPROVED'
+              WHEN new_value = 'REWORK' THEN 'REJECTED'
+              ELSE new_value
+            END as status,
+            changed_by as reviewer,
+            change_reason as comment,
+            changed_at as submitted_at,
+            changed_at as reviewed_at
+          FROM change_history
+          WHERE entity_type = 'task'
+            AND entity_id = ?
+            AND (project_id = ? OR project_id IS NULL)
+            AND field_name = 'status'
+            AND old_value = 'DONE'
+            AND new_value IN ('COMPLETED', 'REWORK')
+          ORDER BY changed_at DESC
+        `);
 
       const reviewRows = reviewHistoryStmt.all(taskId, projectId) as Array<{
         id: number;
@@ -861,6 +908,7 @@ export class AipmDbService {
       }));
 
       // change_history からステータス変更履歴を取得
+      // ORDER_030/TASK_094修正: 旧データ(project_id=NULL)も対象に含める
       const historyStmt = db.prepare(`
         SELECT
           field_name,
@@ -870,7 +918,7 @@ export class AipmDbService {
           change_reason,
           changed_at
         FROM change_history
-        WHERE entity_type = 'task' AND entity_id = ? AND project_id = ? AND field_name = 'status'
+        WHERE entity_type = 'task' AND entity_id = ? AND (project_id = ? OR project_id IS NULL) AND field_name = 'status'
         ORDER BY changed_at DESC
       `);
 
@@ -893,6 +941,7 @@ export class AipmDbService {
       }));
 
       // ORDER_008 / TASK_023: change_history からステータス以外のフィールド変更を取得
+      // ORDER_030/TASK_094修正: 旧データ(project_id=NULL)も対象に含める
       const fieldChangesStmt = db.prepare(`
         SELECT
           field_name,
@@ -902,7 +951,7 @@ export class AipmDbService {
           change_reason,
           changed_at
         FROM change_history
-        WHERE entity_type = 'task' AND entity_id = ? AND project_id = ? AND field_name != 'status'
+        WHERE entity_type = 'task' AND entity_id = ? AND (project_id = ? OR project_id IS NULL) AND field_name != 'status'
         ORDER BY changed_at DESC
       `);
 
