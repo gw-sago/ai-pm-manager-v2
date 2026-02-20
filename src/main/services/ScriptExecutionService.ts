@@ -289,8 +289,8 @@ export class ScriptExecutionService extends EventEmitter {
    * Pythonコマンドを取得
    */
   private getPythonCommand(): string {
-    // Windowsの場合は 'python'、それ以外は 'python3'
-    return process.platform === 'win32' ? 'python' : 'python3';
+    // ConfigServiceから取得（パッケージ時: python-embed/python.exe、開発時: システムPython）
+    return getConfigService().getPythonPath();
   }
 
   /**

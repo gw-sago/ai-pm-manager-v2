@@ -52,11 +52,18 @@ export async function fetchDependencyStatus(
     return [];
   }
 
-  const scriptsDir = configService.getBackendPath();
-  const pythonScript = path.join(scriptsDir, 'portfolio', 'dependency_status.py');
+  const backendPath = configService.getBackendPath();
+  const pythonScript = path.join(backendPath, 'portfolio', 'dependency_status.py');
+
+  if (!fs.existsSync(pythonScript)) {
+    console.error(`[DependencyUpdate] dependency_status.py not found: ${pythonScript}`);
+    return [];
+  }
+
+  const pythonCommand = configService.getPythonPath();
 
   return new Promise((resolve, reject) => {
-    const args = ['-m', 'portfolio.dependency_status', projectId];
+    const args = [pythonScript, projectId];
 
     if (taskId) {
       args.push(taskId);
@@ -68,10 +75,10 @@ export async function fetchDependencyStatus(
 
     args.push('--json');
 
-    console.log('[DependencyUpdate] Executing:', 'python', args.join(' '));
+    console.log('[DependencyUpdate] Executing:', pythonCommand, args.join(' '));
 
-    const proc = spawn('python', args, {
-      cwd: scriptsDir,
+    const proc = spawn(pythonCommand, args, {
+      cwd: path.dirname(pythonScript),
       env: {
         ...process.env,
         PYTHONIOENCODING: 'utf-8',
@@ -282,10 +289,12 @@ function parseEventFile(eventFilePath: string): DependencyUpdateEvent | null {
  */
 export function startEventMonitoring(projectId: string, orderId: string): void {
   const configService = getConfigService();
-  const frameworkPath = configService.getActiveFrameworkPath();
+  // PROJECTS配下はRoamingパス（userDataPath）を使用する
+  // frameworkPathはLocalのSquirrelルートであり、永続データの保存先ではない
+  const userDataPath = configService.getUserDataPath();
 
-  if (!frameworkPath) {
-    console.error('[DependencyUpdate] Framework path not set, cannot start monitoring');
+  if (!userDataPath) {
+    console.error('[DependencyUpdate] User data path not set, cannot start monitoring');
     return;
   }
 
@@ -298,7 +307,7 @@ export function startEventMonitoring(projectId: string, orderId: string): void {
   }
 
   const eventsDir = path.join(
-    frameworkPath,
+    userDataPath,
     'PROJECTS',
     projectId,
     'RESULT',

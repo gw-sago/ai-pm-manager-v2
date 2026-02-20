@@ -738,7 +738,8 @@ export class AipmDbService {
 
     try {
       // Python実行: python reorder.py PROJECT_ID --json
-      const { stdout } = await execFileAsync('python', [reorderScriptPath, projectId, '--json'], {
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await execFileAsync(pythonCommand, [reorderScriptPath, projectId, '--json'], {
         cwd: path.dirname(reorderScriptPath),
         timeout: 30000, // 30秒タイムアウト
       });
@@ -1142,7 +1143,8 @@ export class AipmDbService {
         args.push('--category', category);
       }
 
-      const { stdout } = await execFileAsync('python', args, {
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await execFileAsync(pythonCommand, args, {
         cwd: path.dirname(addScriptPath),
         timeout: 30000,
       });
@@ -1324,7 +1326,8 @@ export class AipmDbService {
         args.push('--verbose');
       }
 
-      const { stdout } = await execFileAsync('python', args, {
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await execFileAsync(pythonCommand, args, {
         cwd: path.dirname(prioritizeScriptPath),
         timeout: 60000, // 60秒タイムアウト
       });
@@ -1866,7 +1869,8 @@ export class AipmDbService {
         args.push('--name', name);
       }
 
-      const { stdout } = await execFileAsync('python', args, {
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await execFileAsync(pythonCommand, args, {
         cwd: path.dirname(createScriptPath),
         timeout: 30000,
       });
@@ -1922,7 +1926,8 @@ export class AipmDbService {
         args.push('--force');
       }
 
-      const { stdout } = await execFileAsync('python', args, {
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await execFileAsync(pythonCommand, args, {
         cwd: path.dirname(deleteScriptPath),
         timeout: 30000,
       });
@@ -2343,25 +2348,35 @@ export async function retryOrder(
   error?: string;
 }> {
   try {
-    const frameworkPath = getConfigService().getAipmFrameworkPath();
-    if (!frameworkPath) {
+    const configService = getConfigService();
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
       return {
         success: false,
-        message: 'Framework path not configured',
-        error: 'Framework path not configured',
+        message: 'Backend path not configured',
+        error: 'Backend path not configured',
       };
     }
 
     const { spawn } = await import('child_process');
     const path = await import('path');
+    const fs = await import('fs');
 
     const scriptPath = path.join(
-      frameworkPath,
-      'scripts',
-      'aipm-db',
+      backendPath,
       'order',
       'retry_order.py'
     );
+
+    if (!fs.existsSync(scriptPath)) {
+      return {
+        success: false,
+        message: `retry_order.py not found: ${scriptPath}`,
+        error: `retry_order.py not found: ${scriptPath}`,
+      };
+    }
+
+    const pythonCommand = configService.getPythonPath();
 
     return new Promise((resolve) => {
       let stdout = '';
@@ -2378,11 +2393,11 @@ export async function retryOrder(
         '--json', // JSON形式で出力を取得
       ];
 
-      console.log(`[AipmDbService] Executing retry_order.py: python ${args.join(' ')}`);
+      console.log(`[AipmDbService] Executing retry_order.py: ${pythonCommand} ${args.join(' ')}`);
 
-      const childProcess = spawn('python', args, {
-        cwd: path.join(frameworkPath, 'scripts', 'aipm-db'),
-        env: { ...process.env },
+      const childProcess = spawn(pythonCommand, args, {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
       });
 
       if (childProcess.stdout) {
@@ -2403,9 +2418,9 @@ export async function retryOrder(
 
       childProcess.on('close', (exitCode) => {
         if (exitCode === 0) {
-          // 成功時はJSON出力をパース
+          // 成功時はJSON出力をパース（結果内容は無視してexitCodeで判断）
           try {
-            const result = JSON.parse(stdout);
+            JSON.parse(stdout);
             resolve({
               success: true,
               message: `ORDER ${orderId} was successfully retried`,
@@ -2612,7 +2627,8 @@ export async function generateReleaseNote(
   }
 
   try {
-    const { stdout } = await execFileAsync('python', args, {
+    const pythonCommand = configService.getPythonPath();
+    const { stdout } = await execFileAsync(pythonCommand, args, {
       cwd: path.dirname(scriptPath),
       timeout: 60000,
     });
@@ -2628,8 +2644,10 @@ export async function generateReleaseNote(
       error: result.error,
     };
   } catch (error: unknown) {
-    const err = error as { stderr?: string; message?: string };
-    const errorMsg = err.stderr || err.message || String(error);
+    const err = error as { code?: string; stderr?: string; message?: string };
+    const errorMsg = err.code === 'ENOENT'
+      ? `Pythonが見つかりません。パス: ${configService.getPythonPath()}`
+      : err.stderr || err.message || String(error);
     return {
       success: false,
       notePath: null,

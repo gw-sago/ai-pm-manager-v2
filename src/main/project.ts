@@ -322,7 +322,8 @@ export function registerProjectHandlers(): void {
         return null;
       }
 
-      dashboardService = new DashboardService(frameworkPath);
+      const pythonPath = configService.getPythonPath();
+      dashboardService = new DashboardService(frameworkPath, pythonPath);
       console.log('[Project IPC] Dashboard: サービス初期化完了');
       return dashboardService;
     } catch (error) {
@@ -964,8 +965,9 @@ export function registerProjectHandlers(): void {
           return { success: false, error: `suggest.py not found: ${suggestScriptPath}` };
         }
 
+        const pythonCommand = configService.getPythonPath();
         const { stdout } = await execFileAsync(
-          'python',
+          pythonCommand,
           [suggestScriptPath, projectId, '--json'],
           { cwd: path.dirname(suggestScriptPath), timeout: 120000 }
         );
@@ -977,9 +979,13 @@ export function registerProjectHandlers(): void {
         return { success: true, suggestions: result.suggestions };
       } catch (error) {
         console.error('[Project IPC] バックログ自動提案エラー:', error);
+        const errObj = error as { code?: string; message?: string };
+        const errorMsg = errObj.code === 'ENOENT'
+          ? `Pythonが見つかりません。パス: ${getConfigService().getPythonPath()}`
+          : error instanceof Error ? error.message : String(error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMsg,
         };
       }
     }
@@ -1226,8 +1232,9 @@ export function registerProjectHandlers(): void {
           return { success: false, error: `generate_page.py not found: ${scriptPath}` };
         }
 
+        const pythonCommand = configService.getPythonPath();
         const { stdout, stderr } = await execFileAsync(
-          'python',
+          pythonCommand,
           [scriptPath, projectId, '--json'],
           { cwd: path.dirname(scriptPath), timeout: 60000 }
         );
@@ -1243,9 +1250,13 @@ export function registerProjectHandlers(): void {
         return { success: true, html: result.html };
       } catch (error) {
         console.error('[Project IPC] プロジェクト紹介ページ生成エラー:', error);
+        const errObj = error as { code?: string; message?: string };
+        const errorMsg = errObj.code === 'ENOENT'
+          ? `Pythonが見つかりません。パス: ${getConfigService().getPythonPath()}`
+          : error instanceof Error ? error.message : String(error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMsg,
         };
       }
     }
@@ -1288,8 +1299,9 @@ export function registerProjectHandlers(): void {
           return { success: false, error: `generate_page.py not found: ${scriptPath}` };
         }
 
+        const pythonCommand = configService.getPythonPath();
         const { stdout, stderr } = await execFileAsync(
-          'python',
+          pythonCommand,
           [scriptPath, projectId, '--json'],
           { cwd: path.dirname(scriptPath), timeout: 60000 }
         );
@@ -1309,9 +1321,13 @@ export function registerProjectHandlers(): void {
         return { success: true, filePath: savePath };
       } catch (error) {
         console.error('[Project IPC] プロジェクト紹介ページエクスポートエラー:', error);
+        const errObj = error as { code?: string; message?: string };
+        const errorMsg = errObj.code === 'ENOENT'
+          ? `Pythonが見つかりません。パス: ${getConfigService().getPythonPath()}`
+          : error instanceof Error ? error.message : String(error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMsg,
         };
       }
     }

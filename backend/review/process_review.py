@@ -702,9 +702,9 @@ JSONのみを出力し、説明文は含めないでください。"""
             execute_query(
                 conn,
                 """
-                UPDATE tasks SET status = 'ESCALATED' WHERE id = ? AND project_id = ?
+                UPDATE tasks SET status = 'ESCALATED', updated_at = ? WHERE id = ? AND project_id = ?
                 """,
-                (self.task_id, self.project_id)
+                (current_time, self.task_id, self.project_id)
             )
 
             record_transition(

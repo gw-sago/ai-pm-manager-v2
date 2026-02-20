@@ -8,6 +8,7 @@ from .add import add_backlog, AddBacklogResult
 from .update import update_backlog, UpdateBacklogResult
 from .list import list_backlogs, ListBacklogResult
 from .to_order import convert_backlog_to_order, ToOrderResult
+from .suggest import suggest_backlogs
 
 __all__ = [
     "add_backlog",
@@ -18,4 +19,5 @@ __all__ = [
     "ListBacklogResult",
     "convert_backlog_to_order",
     "ToOrderResult",
+    "suggest_backlogs",
 ]

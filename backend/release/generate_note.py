@@ -449,11 +449,8 @@ def main():
         )
 
         if args.json:
-            # JSON出力時はnote_contentを除外（大きすぎるため）
-            output = {k: v for k, v in result.items() if k != "note_content"}
-            if args.dry_run:
-                output["note_content"] = result.get("note_content", "")
-            print(json.dumps(output, indent=2, ensure_ascii=False, default=str))
+            # Electron UIがnote_contentを表示するため、常に含める
+            print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
         else:
             if result.get("success"):
                 if args.dry_run:
