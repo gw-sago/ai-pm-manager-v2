@@ -500,12 +500,16 @@ class ParallelWorkerLauncher:
 
                 # Launch worker process in background
                 # stdout goes to log file, stderr merges into stdout
+                # Ensure PYTHONPATH includes backend/ for python-embed compatibility
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(_package_root) + os.pathsep + env.get("PYTHONPATH", "")
                 process = subprocess.Popen(
                     cmd,
                     cwd=_package_root,
                     stdout=log_fh,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    env=env,
                 )
 
                 current_worker_count += 1
@@ -560,10 +564,12 @@ class ParallelWorkerLauncher:
         Returns:
             Command as list of strings
         """
+        # Use direct script path instead of -m to avoid python-embed's
+        # module resolution limitation (._pth ignores PYTHONPATH and cwd)
+        execute_task_script = str(_current_dir / "execute_task.py")
         cmd = [
-            "python",
-            "-m",
-            "worker.execute_task",
+            sys.executable,
+            execute_task_script,
             self.project_id,
             task_id,
             "--timeout",
@@ -854,6 +860,10 @@ class ParallelWorkerLauncher:
         last_orphan_check_time = time.time()
         orphan_check_interval = 60  # seconds
 
+        # ORDER_042: Track consecutive launch failures per task to prevent infinite retry loops
+        self._task_launch_failure_count: Dict[str, int] = {}
+        self._max_launch_failures = 5  # Max consecutive failures before escalating
+
         try:
             while not self._shutdown_requested:
                 loop_count += 1
@@ -1095,6 +1105,9 @@ class ParallelWorkerLauncher:
                         f"[daemon] Worker for {task_id} finished successfully "
                         f"(PID {proc.pid})"
                     )
+                    # ORDER_042: Reset failure counter on success
+                    if hasattr(self, '_task_launch_failure_count'):
+                        self._task_launch_failure_count.pop(task_id, None)
                 else:
                     logger.warning(
                         f"[daemon] Worker for {task_id} exited with code {retcode} "
@@ -1104,6 +1117,27 @@ class ParallelWorkerLauncher:
                         "task_id": task_id,
                         "reason": f"exit_code_{retcode}",
                     })
+
+                    # ORDER_042: Track consecutive launch failures to prevent infinite retry
+                    if hasattr(self, '_task_launch_failure_count'):
+                        count = self._task_launch_failure_count.get(task_id, 0) + 1
+                        self._task_launch_failure_count[task_id] = count
+                        max_failures = getattr(self, '_max_launch_failures', 5)
+                        if count >= max_failures:
+                            logger.error(
+                                f"[daemon] Task {task_id} has failed {count} times consecutively. "
+                                f"Escalating to prevent infinite retry loop."
+                            )
+                            try:
+                                update_task(
+                                    self.project_id,
+                                    task_id,
+                                    status="ESCALATED",
+                                    role="System",
+                                    reason=f"Consecutive launch failures ({count}x): exit_code_{retcode}",
+                                )
+                            except Exception as esc_err:
+                                logger.error(f"[daemon] Failed to escalate {task_id}: {esc_err}")
             else:
                 # proc.poll() returned None (appears running), but verify PID is alive (TASK_1156)
                 pid = info["pid"]
@@ -1222,12 +1256,16 @@ class ParallelWorkerLauncher:
                 log_fh = open(str(log_file_path), "w", encoding="utf-8")
                 self._log_file_handles.append(log_fh)
 
+                # Ensure PYTHONPATH includes backend/ for python-embed compatibility
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(_package_root) + os.pathsep + env.get("PYTHONPATH", "")
                 process = subprocess.Popen(
                     cmd,
                     cwd=_package_root,
                     stdout=log_fh,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    env=env,
                 )
 
                 self._running_workers[task_id] = {
@@ -1312,12 +1350,16 @@ class ParallelWorkerLauncher:
             self._log_file_handles.append(log_fh)
 
             # Launch review_worker subprocess
+            # Ensure PYTHONPATH includes backend/ for python-embed compatibility
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(_package_root) + os.pathsep + env.get("PYTHONPATH", "")
             process = subprocess.Popen(
                 cmd,
                 cwd=_package_root,
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
                 text=True,
+                env=env,
             )
 
             # Track the review_worker process
