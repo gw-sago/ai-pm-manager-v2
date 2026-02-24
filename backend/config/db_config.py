@@ -266,4 +266,6 @@ def get_project_paths(project_id: str) -> dict:
         "orders": base / "ORDERS",
         "result": base / "RESULT",
         "release_log": base / "RELEASE_LOG.md",
+        "docs": base / "docs",
+        "docs_index": base / "docs" / "INDEX.md",
     }

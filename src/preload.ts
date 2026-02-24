@@ -226,12 +226,16 @@ export interface InfoPagesIndex {
 export interface ArtifactFile {
   /** ファイル名 */
   name: string;
-  /** 相対パス */
+  /** 表示用パス（絶対パスまたは相対パス） */
   path: string;
   /** ファイルタイプ */
   type: 'file' | 'directory';
   /** 拡張子（ファイルの場合のみ） */
   extension?: string;
+  /** 実ファイルの絶対パス（REPORTから抽出した開発ディレクトリパス） */
+  absolutePath?: string;
+  /** 元のREPORTファイルパス */
+  reportFile?: string;
 }
 
 /**
@@ -930,6 +934,59 @@ export interface OrderRelatedInfo {
 }
 
 // ============================================================
+// ドキュメント関連型定義（ORDER_057 / TASK_196）
+// ============================================================
+
+/**
+ * ドキュメントファイル情報
+ */
+export interface DocFile {
+  /** ファイルID（例: "architecture", "decisions/adr_001"） */
+  id: string;
+  /** タイトル（H1見出しまたはファイル名） */
+  title: string;
+  /** ファイル名 */
+  file: string;
+  /** 絶対パス */
+  path: string;
+  /** docs/からの相対パス */
+  relative_path: string;
+  /** ファイルサイズ（バイト） */
+  size: number;
+  /** カテゴリ（"root", "decisions"等） */
+  category: string;
+}
+
+/**
+ * ドキュメント一覧取得結果
+ */
+export interface DocsListResult {
+  success: boolean;
+  project_id: string;
+  docs_path: string;
+  index_exists: boolean;
+  files: DocFile[];
+  categories: string[];
+  message?: string;
+  error?: string;
+}
+
+/**
+ * ドキュメント内容取得結果
+ */
+export interface DocContentResult {
+  success: boolean;
+  project_id?: string;
+  file_id?: string;
+  title?: string;
+  relative_path?: string;
+  path?: string;
+  content?: string;
+  generated?: boolean;
+  error?: string;
+}
+
+// ============================================================
 // DB変更通知型定義（ORDER_004 / TASK_010）
 // ============================================================
 
@@ -1280,6 +1337,16 @@ export interface ElectronAPI {
    */
   getUserDataPath: () => Promise<string>;
 
+  /**
+   * 環境変数パスを取得（ORDER_064）
+   * pathFormatter が使用する APPDATA、LOCALAPPDATA、APP_PATH を返す
+   */
+  getEnvPaths: () => Promise<{
+    APPDATA: string;
+    LOCALAPPDATA: string;
+    APP_PATH: string;
+  }>;
+
   // プロジェクト管理 (TASK_018)
   /**
    * プロジェクト一覧を取得
@@ -1392,10 +1459,10 @@ export interface ElectronAPI {
   ) => Promise<ArtifactFile[]>;
 
   /**
-   * 成果物ファイルの内容を取得
-   * @param projectName プロジェクト名
-   * @param orderId ORDER ID
-   * @param filePath 相対ファイルパス
+   * 成果物ファイルの内容を取得（実パス読み取り方式）
+   * @param projectName プロジェクト名（API互換性維持のため残存、内部では未使用）
+   * @param orderId ORDER ID（API互換性維持のため残存、内部では未使用）
+   * @param filePath 絶対ファイルパス（REPORTのartifactsフィールドから抽出した実パス）
    * @returns ファイル内容（見つからない場合はnull）
    */
   getArtifactContent: (
@@ -1591,6 +1658,16 @@ export interface ElectronAPI {
    * @returns 実行結果
    */
   retryOrder: (projectId: string, orderId: string, options?: { timeout?: number; model?: string; verbose?: boolean }) => Promise<ExecutionResult>;
+
+  /**
+   * フルオートORDER実行（PM処理→Worker→レビューを自動ループ）
+   * ORDER_062
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param options オプション（最大サイクル数、タイムアウト、モデル、詳細ログ）
+   * @returns 実行結果
+   */
+  orderFullAuto: (projectId: string, orderId: string, options?: { maxCycles?: number; timeout?: number; model?: string; verbose?: boolean }) => Promise<ExecutionResult>;
 
   /**
    * 実行中のジョブ一覧を取得
@@ -2162,6 +2239,25 @@ export interface ElectronAPI {
   ) => Promise<{ success: boolean; error?: string }>;
 
   // ============================================================
+  // ORDER_057: ドキュメントツリービュー（TASK_196）
+  // ============================================================
+
+  /**
+   * docs/配下のファイル一覧を取得
+   * @param projectId プロジェクトID
+   * @returns ドキュメントファイル一覧
+   */
+  getDocsList: (projectId: string) => Promise<DocsListResult>;
+
+  /**
+   * docs/配下の指定ファイルの内容を取得
+   * @param projectId プロジェクトID
+   * @param fileId ファイルID（例: "architecture", "decisions/adr_001"）
+   * @returns ドキュメント内容
+   */
+  getDocContent: (projectId: string, fileId: string) => Promise<DocContentResult>;
+
+  // ============================================================
   // ORDER_157: DB初期化ステータス
   // ============================================================
 
@@ -2259,6 +2355,40 @@ export interface ElectronAPI {
    * @returns 操作結果
    */
   downloadArtifactFile: (srcPath: string, defaultFileName?: string) => Promise<{ success: boolean; canceled?: boolean; savedPath?: string; error?: string }>;
+
+  // ORDER_060: ORDERリカバリ
+  /**
+   * ORDER/TASKの失敗状態を検出・修復する
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param options オプション（stallMinutes: スタック判定閾値（分）、dryRun: 検出のみ）
+   * @returns リカバリ結果
+   */
+  recoverOrder: (projectId: string, orderId: string, options?: { stallMinutes?: number; dryRun?: boolean }) => Promise<{
+    success: boolean;
+    project_id: string;
+    order_id: string;
+    dry_run?: boolean;
+    detected?: {
+      order: Record<string, unknown> | null;
+      stalled_tasks: Array<Record<string, unknown>>;
+      rejected_tasks: Array<Record<string, unknown>>;
+      has_failure: boolean;
+      failure_reasons: string[];
+    };
+    recovered_tasks?: Array<{
+      task_id: string;
+      previous_status: string;
+      new_status: string | null;
+      reason: string;
+      locks_released?: number;
+      reject_count_reset?: boolean;
+      error?: string;
+    }>;
+    order_recovered?: boolean;
+    message?: string;
+    error?: string;
+  }>;
 }
 
 /**
@@ -2304,6 +2434,7 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('config:save', request),
   getActiveFrameworkPath: () => ipcRenderer.invoke('config:get-active-path'),
   getUserDataPath: () => ipcRenderer.invoke('config:get-user-data-path'),
+  getEnvPaths: () => ipcRenderer.invoke('config:get-env-paths'),
 
   // プロジェクト管理 (TASK_018)
   getProjects: () => ipcRenderer.invoke('project:get-projects'),
@@ -2406,6 +2537,9 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('script:execute-worker', projectId, orderId),
   retryOrder: (projectId: string, orderId: string, options?: { timeout?: number; model?: string; verbose?: boolean }) =>
     ipcRenderer.invoke('script:retry-order', projectId, orderId, options),
+  // ORDER_062: フルオートORDER実行
+  orderFullAuto: (projectId: string, orderId: string, options?: { maxCycles?: number; timeout?: number; model?: string; verbose?: boolean }) =>
+    ipcRenderer.invoke('script:execute-full-auto', projectId, orderId, options),
   getRunningJobs: () =>
     ipcRenderer.invoke('script:get-running-jobs'),
   isJobRunning: (projectId: string, targetId: string) =>
@@ -2631,6 +2765,16 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('shell:open-path', folderPath),
   downloadArtifactFile: (srcPath: string, defaultFileName?: string) =>
     ipcRenderer.invoke('shell:save-file-dialog', srcPath, defaultFileName),
+
+  // ORDER_057: ドキュメントツリービュー（TASK_196）
+  getDocsList: (projectId: string) =>
+    ipcRenderer.invoke('docs:list', projectId),
+  getDocContent: (projectId: string, fileId: string) =>
+    ipcRenderer.invoke('docs:get', projectId, fileId),
+
+  // ORDER_060: ORDERリカバリ
+  recoverOrder: (projectId: string, orderId: string, options?: { stallMinutes?: number; dryRun?: boolean }) =>
+    ipcRenderer.invoke('recover-order', projectId, orderId, options),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

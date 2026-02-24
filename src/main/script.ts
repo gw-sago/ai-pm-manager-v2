@@ -117,6 +117,20 @@ export function registerScriptHandlers(): void {
     }
   );
 
+  // ORDER_062: フルオートORDER実行
+  ipcMain.handle(
+    'script:execute-full-auto',
+    async (
+      _event,
+      projectId: string,
+      orderId: string,
+      options?: { maxCycles?: number; timeout?: number; model?: string; verbose?: boolean }
+    ): Promise<ExecutionResult> => {
+      console.log('[Script] execute-full-auto called:', { projectId, orderId, options });
+      return scriptService.executeFullAuto(projectId, orderId, options);
+    }
+  );
+
   // ORDER_155 TASK_1230: ORDER再実行
   ipcMain.handle(
     'script:retry-order',

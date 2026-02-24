@@ -8,7 +8,7 @@
  * ウィンドウ設定のみconfig.jsonで管理。
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import { getConfigService } from './services/ConfigService';
 import type { AppConfig, WindowConfig } from './services/ConfigService';
 
@@ -59,6 +59,24 @@ export function registerConfigHandlers(): void {
   // アクティブなフレームワークパスを取得（V2: 固定パス）
   ipcMain.handle('config:get-active-path', async (): Promise<string> => {
     return configService.getActiveFrameworkPath();
+  });
+
+  // ORDER_053: ユーザーデータパスを取得（Roaming絶対パス: %APPDATA%/ai-pm-manager-v2/）
+  ipcMain.handle('config:get-user-data-path', async (): Promise<string> => {
+    return configService.getUserDataPath();
+  });
+
+  // ORDER_064: 環境変数パスを取得（APPDATA、LOCALAPPDATA、APP_PATH）
+  ipcMain.handle('config:get-env-paths', async (): Promise<{
+    APPDATA: string;
+    LOCALAPPDATA: string;
+    APP_PATH: string;
+  }> => {
+    return {
+      APPDATA: process.env.APPDATA ?? app.getPath('appData'),
+      LOCALAPPDATA: process.env.LOCALAPPDATA ?? app.getPath('userData').replace(/Roaming[/\\].*$/, 'Local'),
+      APP_PATH: app.getPath('exe'),
+    };
   });
 
   // ウィンドウ設定を取得

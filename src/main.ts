@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -17,6 +17,7 @@ import { registerScriptHandlers } from './main/script';
 import { registerAipmAutoLogHandlers, cleanupAipmAutoLog } from './main/aipmAutoLog';
 import { registerSupervisorHandlers, cleanupSupervisor } from './main/supervisor';
 import { registerDependencyUpdateHandlers, cleanupDependencyUpdate } from './main/dependencyUpdate';
+import { registerRecoverHandlers } from './main/recover';
 import { getAipmDbService } from './main/services/AipmDbService';
 import { getConfigService } from './main/services/ConfigService';
 import { migrateFromLocalAppData } from './main/utils/migrate-data';
@@ -254,6 +255,9 @@ app.on('ready', async () => {
   // Register IPC handlers for dependency updates (ORDER_122 / TASK_1103)
   registerDependencyUpdateHandlers();
 
+  // Register IPC handlers for order recovery (ORDER_060)
+  registerRecoverHandlers();
+
   // ORDER_157: DB初期化ステータスをレンダラーに公開するIPCハンドラ
   ipcMain.handle('db:get-init-status', () => {
     return {
@@ -302,6 +306,135 @@ app.on('ready', async () => {
       detached: true,
       stdio: 'ignore',
     });
+  });
+
+  // ORDER_053: 成果物フォルダを開く（shell.openPath）
+  // folderPath は Roaming 絶対パスを受け取る
+  ipcMain.handle('shell:open-path', async (_event, folderPath: string) => {
+    console.log('[Main] shell:open-path:', folderPath);
+    if (!folderPath || typeof folderPath !== 'string') {
+      return { success: false, error: 'Invalid path' };
+    }
+    if (!fs.existsSync(folderPath)) {
+      return { success: false, error: `Path does not exist: ${folderPath}` };
+    }
+    const result = await shell.openPath(folderPath);
+    // shell.openPath returns empty string on success, error message on failure
+    if (result === '') {
+      return { success: true };
+    } else {
+      return { success: false, error: result };
+    }
+  });
+
+  // ORDER_053: ファイルを保存ダイアログで任意パスへコピー（dialog.showSaveDialog + fs.copyFile）
+  // srcPath は Roaming 絶対パスを受け取る
+  ipcMain.handle('shell:save-file-dialog', async (_event, srcPath: string, defaultFileName?: string) => {
+    console.log('[Main] shell:save-file-dialog:', srcPath);
+    if (!srcPath || typeof srcPath !== 'string') {
+      return { success: false, error: 'Invalid source path' };
+    }
+    if (!fs.existsSync(srcPath)) {
+      return { success: false, error: `Source file does not exist: ${srcPath}` };
+    }
+    const suggestedName = defaultFileName || path.basename(srcPath);
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath: suggestedName,
+      filters: [{ name: 'All Files', extensions: ['*'] }],
+    });
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+    try {
+      fs.copyFileSync(srcPath, filePath);
+      console.log('[Main] File copied:', srcPath, '->', filePath);
+      return { success: true, savedPath: filePath };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[Main] File copy error:', msg);
+      return { success: false, error: msg };
+    }
+  });
+
+  // ============================================================
+  // ORDER_057: ドキュメントツリービュー IPC ハンドラ（TASK_196）
+  // docs:list - docs/配下のファイル一覧取得
+  // docs:get  - docs/配下の指定ファイルの内容取得
+  // ============================================================
+  ipcMain.handle('docs:list', async (_event, projectId: string) => {
+    console.log('[Main] docs:list called:', projectId);
+    try {
+      const backendPath = configService.getBackendPath();
+      if (!backendPath) {
+        return { success: false, error: 'Backend path not configured', files: [], categories: [] };
+      }
+      const scriptPath = path.join(backendPath, 'project', 'docs_list.py');
+      if (!fs.existsSync(scriptPath)) {
+        return { success: false, error: `docs_list.py not found: ${scriptPath}`, files: [], categories: [] };
+      }
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+        const proc = spawn(pythonCommand, [scriptPath, projectId, '--json'], {
+          cwd: path.dirname(scriptPath),
+          timeout: 30000,
+        });
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+        proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.on('close', (code: number | null) => {
+          if (code === 0) {
+            resolve({ stdout, stderr });
+          } else {
+            reject(new Error(`docs_list.py exited with code ${code}: ${stderr}`));
+          }
+        });
+        proc.on('error', reject);
+      });
+      const result = JSON.parse(stdout);
+      return result;
+    } catch (error) {
+      console.error('[Main] docs:list error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error), files: [], categories: [] };
+    }
+  });
+
+  ipcMain.handle('docs:get', async (_event, projectId: string, fileId: string) => {
+    console.log('[Main] docs:get called:', projectId, fileId);
+    try {
+      const backendPath = configService.getBackendPath();
+      if (!backendPath) {
+        return { success: false, error: 'Backend path not configured' };
+      }
+      const scriptPath = path.join(backendPath, 'project', 'docs_get.py');
+      if (!fs.existsSync(scriptPath)) {
+        return { success: false, error: `docs_get.py not found: ${scriptPath}` };
+      }
+      const pythonCommand = configService.getPythonPath();
+      const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+        const proc = spawn(pythonCommand, [scriptPath, projectId, fileId, '--json'], {
+          cwd: path.dirname(scriptPath),
+          timeout: 30000,
+        });
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+        proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.on('close', (code: number | null) => {
+          if (code === 0) {
+            resolve({ stdout, stderr });
+          } else {
+            reject(new Error(`docs_get.py exited with code ${code}: ${stderr}`));
+          }
+        });
+        proc.on('error', reject);
+      });
+      const result = JSON.parse(stdout);
+      return result;
+    } catch (error) {
+      console.error('[Main] docs:get error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 
   createWindow();

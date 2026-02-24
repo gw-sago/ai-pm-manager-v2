@@ -105,6 +105,13 @@ try:
 except ImportError:
     PERMISSION_RESOLVER_AVAILABLE = False
 
+# ドキュメント選択的参照（ORDER_057: docs_selector）
+try:
+    from project.docs_selector import select_docs
+    DOCS_SELECTOR_AVAILABLE = True
+except ImportError:
+    DOCS_SELECTOR_AVAILABLE = False
+
 
 class WorkerExecutionError(Exception):
     """Worker実行エラー"""
@@ -1230,6 +1237,66 @@ class WorkerExecutor:
             logger.warning(f"既知バグ取得に失敗: {e}")
             return ""
 
+    def _get_project_docs_section(self) -> str:
+        """
+        タスク内容に基づいてdocs/配下から関連ドキュメントを選択し、
+        プロンプト注入用のセクション文字列を生成する。
+
+        docs_selectorが利用できない場合やdocs/が存在しない場合は
+        空文字列を返す（後方互換性維持）。
+
+        Returns:
+            ドキュメントセクション文字列（空文字列の場合はスキップ）
+        """
+        if not DOCS_SELECTOR_AVAILABLE:
+            return ""
+
+        if not self.task_info:
+            return ""
+
+        try:
+            task_title = self.task_info.get("title", "")
+            task_description = self.task_info.get("description", "")
+
+            docs = select_docs(
+                project_id=self.project_id,
+                task_title=task_title,
+                task_description=task_description,
+            )
+
+            if not docs:
+                return ""
+
+            lines = [
+                "",
+                "## プロジェクトドキュメント（関連部分）",
+                "",
+                "以下はこのタスクに関連するプロジェクトドキュメントです。実装時の参考にしてください。",
+                "",
+            ]
+
+            for doc in docs:
+                filename = doc["filename"]
+                reason = doc["reason"]
+                content = doc["content"]
+                lines.append(f"### {filename}")
+                lines.append(f"*選択理由: {reason}*")
+                lines.append("")
+                lines.append(content)
+                lines.append("")
+
+            self._log_step(
+                "docs_selector", "success",
+                f"選択ドキュメント: {[d['filename'] for d in docs]} ({len(docs)}件)"
+            )
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.warning(f"ドキュメント選択に失敗: {e}")
+            self._log_step("docs_selector", "warning", f"ドキュメント選択失敗: {e}")
+            return ""
+
     def _build_execution_prompt(self, task_content: str) -> str:
         """タスク実行用プロンプトを構築"""
         # リワークモードの場合、差し戻しコメントを追加
@@ -1418,6 +1485,9 @@ output_file = "tmp/tmp_results.json"
 
 """
 
+        # プロジェクトドキュメント選択的参照（ORDER_057）
+        project_docs_section = self._get_project_docs_section()
+
         mode_label = "【リワーク】" if self.is_rework else ""
 
         # REWORK回数に応じた警告メッセージ
@@ -1437,7 +1507,7 @@ output_file = "tmp/tmp_results.json"
 - プロジェクトID: {self.project_id}
 - タスクID: {self.task_id}
 - ORDER ID: {self.order_id}
-
+{project_docs_section}
 ## タスク情報
 - タイトル: {self.task_info.get('title', 'Untitled')}
 - 説明: {self.task_info.get('description', '（なし）')}

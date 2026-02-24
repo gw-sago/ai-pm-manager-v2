@@ -11,3 +11,6 @@ export type { OrderActionsResult, UseOrderActionsOptions } from './useOrderActio
 
 export { useRetryOrder } from './useRetryOrder';
 export type { UseRetryOrderOptions, UseRetryOrderResult } from './useRetryOrder';
+
+export { useRecoverOrder } from './useRecoverOrder';
+export type { UseRecoverOrderOptions, UseRecoverOrderResult, RecoverOrderResult, RecoverDetected, RecoveredTask } from './useRecoverOrder';

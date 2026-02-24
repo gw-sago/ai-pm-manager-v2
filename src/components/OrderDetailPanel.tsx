@@ -4,8 +4,15 @@ import type { OrderInfo, OrderResultFile } from '../preload';
 import { ArtifactsBrowser } from './ArtifactsBrowser';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ReleaseReadinessPanel } from './ReleaseReadinessPanel';
+import { RecoveryAlert } from './RecoveryAlert';
 import { useOrderActions } from '../hooks/useOrderActions';
 import { useRetryOrder } from '../hooks/useRetryOrder';
+
+// ORDER_062 TASK_212: フルオート通知の型
+interface FullAutoToast {
+  type: 'success' | 'error';
+  message: string;
+}
 
 interface OrderDetailPanelProps {
   /** プロジェクト名 */
@@ -24,9 +31,11 @@ interface OrderDetailPanelProps {
   onExecuteWorker?: (projectId: string, orderId: string) => void;
   /** ORDER_155 TASK_1229: ORDER一覧リフレッシュコールバック */
   onRefresh?: () => void;
+  /** ORDER_062 TASK_212: フルオート実行中フラグ */
+  isFullAutoRunning?: boolean;
 }
 
-type TabType = 'order' | 'artifacts' | 'goal' | 'requirements' | 'staffing' | 'reports';
+type TabType = 'order' | 'artifacts' | 'goal' | 'requirements' | 'staffing';
 
 /**
  * ORDER詳細表示パネル
@@ -48,26 +57,23 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   isWorkerRunning = false,
   onExecuteWorker,
   onRefresh,
+  isFullAutoRunning: isFullAutoRunningProp = false,
 }) => {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('order');
 
+  // ORDER_062 TASK_212: フルオート実行state
+  const [isFullAutoRunning, setIsFullAutoRunning] = useState(isFullAutoRunningProp);
+  const [fullAutoToast, setFullAutoToast] = useState<FullAutoToast | null>(null);
+
   // TASK_1124: PM成果物表示用state
   const [resultFileContent, setResultFileContent] = useState<string | null>(null);
   const [resultFileLoading, setResultFileLoading] = useState(false);
   const [resultFileError, setResultFileError] = useState<string | null>(null);
 
-  // TASK_1124: REPORTタブ用state
-  const [reportList, setReportList] = useState<string[]>([]);
-  const [reportListLoading, setReportListLoading] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<string | null>(null);
-  const [reportContent, setReportContent] = useState<string | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-
-  /**
+/**
    * ORDER内タスクの進捗率を計算
    * TASK_239: 進捗率表示のORDER単位化
    */
@@ -140,15 +146,40 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     setResultFileContent(null);
     setResultFileLoading(false);
     setResultFileError(null);
-    setReportList([]);
-    setReportListLoading(false);
-    setSelectedReport(null);
-    setReportContent(null);
-    setReportLoading(false);
-    setReportError(null);
     setActiveTab('order');
     clearRetryState();
+    // ORDER変更時はフルオートstate・toastもリセット
+    setIsFullAutoRunning(false);
+    setFullAutoToast(null);
   }, [order.id]);
+
+  // ORDER_062 TASK_212: フルオート実行ハンドラ
+  const handleFullAuto = useCallback(async () => {
+    setIsFullAutoRunning(true);
+    setFullAutoToast(null);
+    try {
+      const result = await window.electronAPI.orderFullAuto(projectName, order.id);
+      if (result.success) {
+        setFullAutoToast({ type: 'success', message: 'フルオート完了' });
+        onRefresh?.();
+      } else {
+        const msg = result.error || result.stderr || 'フルオートに失敗しました';
+        setFullAutoToast({ type: 'error', message: msg });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'フルオートに失敗しました';
+      setFullAutoToast({ type: 'error', message: msg });
+    } finally {
+      setIsFullAutoRunning(false);
+    }
+  }, [projectName, order.id, onRefresh]);
+
+  // ORDER_062 TASK_212: トースト自動消去（5秒後）
+  useEffect(() => {
+    if (!fullAutoToast) return;
+    const timer = setTimeout(() => setFullAutoToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [fullAutoToast]);
 
   // ORDER詳細を取得
   const fetchOrderContent = useCallback(async () => {
@@ -217,56 +248,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     }
   }, [projectName, order.id]);
 
-  /**
-   * TASK_1124: レポート一覧を取得
-   * TASK_1125: selectedReportを依存配列から除外し、不要な再生成・再fetchを防止
-   */
-  const fetchReportList = useCallback(async () => {
-    setReportListLoading(true);
-    setReportError(null);
-
-    try {
-      const list = await window.electronAPI.getOrderReportList(projectName, order.id);
-      setReportList(list || []);
-      // 一覧取得後、最初のレポートを自動選択
-      if (list && list.length > 0) {
-        setSelectedReport((prev) => prev || list[0]);
-      }
-    } catch (err) {
-      console.error('[OrderDetailPanel] Failed to fetch report list:', err);
-      setReportError('レポート一覧の取得に失敗しました');
-    } finally {
-      setReportListLoading(false);
-    }
-  }, [projectName, order.id]);
-
-  /**
-   * TASK_1124: 特定レポートファイルの内容を取得
-   */
-  const fetchReportContent = useCallback(async (reportFilename: string) => {
-    setReportLoading(true);
-    setReportError(null);
-    setReportContent(null);
-
-    try {
-      const result: OrderResultFile = await window.electronAPI.getOrderReport(
-        projectName,
-        order.id,
-        reportFilename
-      );
-      if (result.exists && result.content) {
-        setReportContent(result.content);
-      } else {
-        setReportError(`レポートが見つかりません: ${reportFilename}`);
-      }
-    } catch (err) {
-      console.error(`[OrderDetailPanel] Failed to fetch report ${reportFilename}:`, err);
-      setReportError(`${reportFilename} の取得に失敗しました`);
-    } finally {
-      setReportLoading(false);
-    }
-  }, [projectName, order.id]);
-
   // タブ切り替え時にコンテンツを取得
   useEffect(() => {
     if (activeTab === 'goal') {
@@ -275,17 +256,8 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
       fetchResultFile('02_REQUIREMENTS.md');
     } else if (activeTab === 'staffing') {
       fetchResultFile('03_STAFFING.md');
-    } else if (activeTab === 'reports') {
-      fetchReportList();
     }
-  }, [activeTab, fetchResultFile, fetchReportList]);
-
-  // 選択レポート変更時にコンテンツを取得
-  useEffect(() => {
-    if (activeTab === 'reports' && selectedReport) {
-      fetchReportContent(selectedReport);
-    }
-  }, [activeTab, selectedReport, fetchReportContent]);
+  }, [activeTab, fetchResultFile]);
 
   /**
    * ステータスに応じたバッジの色を取得
@@ -379,29 +351,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   );
 
   /**
-   * TASK_1124: 「ファイルなし」表示共通コンポーネント
-   */
-  const NoContentDisplay: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-    <div className="flex flex-col items-center justify-center h-32 text-center">
-      <svg
-        className="w-12 h-12 text-gray-300 mb-3"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        />
-      </svg>
-      <h3 className="text-base font-medium text-gray-600 mb-1">{title}</h3>
-      <p className="text-sm text-gray-400">{description}</p>
-    </div>
-  );
-
-  /**
    * TASK_1124: RESULT Markdownファイル表示用コンテンツ（GOAL/要件定義/STAFFING共通）
    */
   const renderResultFileContent = () => {
@@ -415,64 +364,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
       return <MarkdownViewer content={resultFileContent} />;
     }
     return null;
-  };
-
-  /**
-   * TASK_1124: REPORTタブコンテンツ
-   */
-  const renderReportsContent = () => {
-    if (reportListLoading) {
-      return <LoadingSpinner />;
-    }
-
-    if (reportError && reportList.length === 0) {
-      return <ErrorDisplay message={reportError} />;
-    }
-
-    if (reportList.length === 0) {
-      return (
-        <NoContentDisplay
-          title="レポートなし"
-          description="このORDERにはまだレポートファイルが作成されていません。タスク完了後にレポートが生成されます。"
-        />
-      );
-    }
-
-    return (
-      <div className="flex flex-col h-full">
-        {/* レポート選択セレクタ */}
-        <div className="flex items-center space-x-2 mb-3 px-1">
-          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">
-            REPORT:
-          </label>
-          <select
-            value={selectedReport || ''}
-            onChange={(e) => setSelectedReport(e.target.value)}
-            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {reportList.map((filename) => (
-              <option key={filename} value={filename}>
-                {filename}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-gray-400">
-            {reportList.length}件
-          </span>
-        </div>
-
-        {/* レポート内容 */}
-        <div className="flex-1 overflow-auto">
-          {reportLoading ? (
-            <LoadingSpinner />
-          ) : reportError ? (
-            <ErrorDisplay message={reportError} />
-          ) : reportContent ? (
-            <MarkdownViewer content={reportContent} />
-          ) : null}
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -642,8 +533,79 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
               </button>
             </div>
           )}
+
+          {/* ORDER_062 TASK_212: フルオートボタン（PLANNING / IN_PROGRESS 時に表示） */}
+          {(order.status === 'PLANNING' || order.status === 'IN_PROGRESS') && (
+            <button
+              onClick={handleFullAuto}
+              disabled={isFullAutoRunning || isPmRunning || isWorkerRunning}
+              title={
+                isFullAutoRunning
+                  ? 'フルオート実行中...'
+                  : (isPmRunning || isWorkerRunning)
+                  ? '他の処理が実行中のため待機中'
+                  : 'PM→Worker→レビューを完全自動実行'
+              }
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors
+                ${isFullAutoRunning
+                  ? 'bg-purple-100 text-purple-600 cursor-wait'
+                  : (isPmRunning || isWorkerRunning)
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                }
+              `}
+            >
+              {isFullAutoRunning ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>フルオート実行中...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                  </svg>
+                  <span>フルオート</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* ORDER_062 TASK_212: フルオート完了/失敗トースト */}
+      {fullAutoToast && (
+        <div
+          className={`mx-4 mt-2 px-4 py-2.5 rounded-md text-sm font-medium flex items-center gap-2 ${
+            fullAutoToast.type === 'success'
+              ? 'bg-green-100 text-green-800 border border-green-200'
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}
+        >
+          {fullAutoToast.type === 'success' ? (
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          )}
+          <span className="truncate">{fullAutoToast.message}</span>
+          <button
+            onClick={() => setFullAutoToast(null)}
+            className="ml-auto flex-shrink-0 opacity-60 hover:opacity-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* タブナビゲーション - TASK_1124: PM成果物タブ追加 */}
       <div className="flex border-b border-gray-200 px-4 overflow-x-auto">
@@ -732,27 +694,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('reports')}
-          className={getTabStyle('reports')}
-        >
-          <span className="flex items-center">
-            <svg
-              className="w-4 h-4 mr-1.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            REPORT
-          </span>
-        </button>
-        <button
           onClick={() => setActiveTab('artifacts')}
           className={getTabStyle('artifacts')}
         >
@@ -779,6 +720,15 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
       <div className="flex-1 overflow-hidden">
         {activeTab === 'order' && (
           <div className="h-full overflow-auto p-4">
+            {/* ORDER_060 TASK_205: 失敗状態検出・リカバリアラート */}
+            <div className="mb-3">
+              <RecoveryAlert
+                projectId={projectName}
+                order={order}
+                onRecoverSuccess={onRefresh}
+              />
+            </div>
+
             {loading && <LoadingSpinner />}
 
             {error && <ErrorDisplay message={error} />}
@@ -895,13 +845,6 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         {activeTab === 'staffing' && (
           <div className="h-full overflow-auto p-4">
             {renderResultFileContent()}
-          </div>
-        )}
-
-        {/* TASK_1124: REPORTタブ */}
-        {activeTab === 'reports' && (
-          <div className="h-full overflow-auto p-4">
-            {renderReportsContent()}
           </div>
         )}
 

@@ -12,7 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MarkdownViewer } from './MarkdownViewer';
 import { ProjectInfoGuidance } from './ProjectInfoGuidance';
 import { ProjectPageGenerator } from './ProjectPageGenerator';
-import type { InfoPage, InfoPagesIndex } from '../preload';
+import type { InfoPagesIndex } from '../preload';
 
 interface ProjectInfoProps {
   projectId: string;
@@ -120,25 +120,30 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     loadProjectInfo();
   }, [projectId, loadProjectInfo]);
 
-  // プロジェクト情報最新化ハンドラ
-  const handleRefreshProjectInfo = useCallback(async () => {
+  // PROJECT_INFO.md最新化バックログ追加ハンドラ
+  const handleAddBacklogItem = useCallback(async () => {
     setIsRefreshing(true);
     setToast(null);
     try {
-      const result = await window.electronAPI.refreshProjectInfo(projectId);
+      const result = await window.electronAPI.addBacklog(
+        projectId,
+        'PROJECT_INFO.md の最新化',
+        'プロジェクト情報（PROJECT_INFO.md）を最新の状態に更新してください。',
+        'Medium',
+        undefined
+      );
       if (result.success) {
-        setToast({ type: 'success', message: 'プロジェクト情報を最新化しました' });
-        await loadProjectInfo();
+        setToast({ type: 'success', message: 'バックログに追加しました' });
       } else {
-        setToast({ type: 'error', message: result.error || '最新化に失敗しました' });
+        setToast({ type: 'error', message: result.error || 'バックログへの追加に失敗しました' });
       }
     } catch (err) {
-      console.error('[ProjectInfo] Failed to refresh project info:', err);
-      setToast({ type: 'error', message: '最新化中にエラーが発生しました' });
+      console.error('[ProjectInfo] Failed to add backlog item:', err);
+      setToast({ type: 'error', message: 'バックログ追加中にエラーが発生しました' });
     } finally {
       setIsRefreshing(false);
     }
-  }, [projectId, loadProjectInfo]);
+  }, [projectId]);
 
   // ページコンテンツ読み込み
   const loadPageContent = useCallback(async (pageId: string) => {
@@ -191,17 +196,17 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     );
   }
 
-  // 最新化ボタンUI（共通）
+  // 最新化リクエストボタンUI（共通）
   const refreshButton = (
     <button
-      onClick={handleRefreshProjectInfo}
+      onClick={handleAddBacklogItem}
       disabled={isRefreshing}
       className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
         isRefreshing
           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
           : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
       }`}
-      title="AI がプロジェクト情報を最新の状態に更新します"
+      title="PROJECT_INFO.md 最新化のバックログを追加します"
     >
       {isRefreshing ? (
         <>
@@ -209,14 +214,14 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          最新化中...
+          追加中...
         </>
       ) : (
         <>
           <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          情報を最新化
+          最新化リクエスト
         </>
       )}
     </button>

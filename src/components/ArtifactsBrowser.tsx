@@ -2,6 +2,27 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { ArtifactFile } from '../preload';
 
+/**
+ * 絶対パスから表示用の短縮パスを生成する
+ * 例: D:\your_workspace\ai-pm-manager-v2\src\foo.ts → src/foo.ts
+ */
+function getDisplayPath(file: ArtifactFile): string {
+  const absPath = file.absolutePath || file.path;
+  // パス区切りを正規化
+  const normalized = absPath.replace(/\\/g, '/');
+  // your_workspace 以降を短縮表示
+  const wsIdx = normalized.indexOf('your_workspace/');
+  if (wsIdx !== -1) {
+    return normalized.slice(wsIdx + 'your_workspace/'.length);
+  }
+  // AppData 配下なら短縮
+  const appdataIdx = normalized.toLowerCase().indexOf('appdata/');
+  if (appdataIdx !== -1) {
+    return normalized.slice(appdataIdx);
+  }
+  return normalized;
+}
+
 interface ArtifactsBrowserProps {
   /** プロジェクト名 */
   projectName: string;
@@ -29,6 +50,7 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
   const [selectedFile, setSelectedFile] = useState<ArtifactFile | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const [openFolderError, setOpenFolderError] = useState<string | null>(null);
 
   // 成果物ファイル一覧を取得
   useEffect(() => {
@@ -69,7 +91,7 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
         const content = await window.electronAPI.getArtifactContent(
           projectName,
           orderId,
-          selectedFile.path
+          selectedFile.absolutePath || selectedFile.path
         );
         setFileContent(content);
       } catch (err) {
@@ -88,6 +110,31 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
     () => files.filter((f) => f.type === 'file'),
     [files]
   );
+
+  // 成果物フォルダのパスを取得（最初のファイルの親ディレクトリ）
+  const artifactFolderPath = useMemo(() => {
+    const firstFile = fileList[0];
+    if (!firstFile) return null;
+    const absPath = firstFile.absolutePath || firstFile.path;
+    const normalized = absPath.replace(/\\/g, '/');
+    const lastSlash = normalized.lastIndexOf('/');
+    if (lastSlash === -1) return null;
+    return absPath.substring(0, absPath.replace(/\\/g, '/').lastIndexOf('/'));
+  }, [fileList]);
+
+  // フォルダを開く
+  const handleOpenFolder = async () => {
+    if (!artifactFolderPath) return;
+    setOpenFolderError(null);
+    try {
+      const result = await window.electronAPI.openArtifactsFolder(artifactFolderPath);
+      if (!result.success) {
+        setOpenFolderError(result.error || 'フォルダを開けませんでした');
+      }
+    } catch (err) {
+      setOpenFolderError('フォルダを開けませんでした');
+    }
+  };
 
   // ファイルアイコンを取得
   const getFileIcon = (file: ArtifactFile) => {
@@ -197,9 +244,26 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
         {/* ファイル一覧パネル */}
         <div className="w-1/3 border-r border-gray-200 overflow-auto bg-gray-50">
           <div className="p-2">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2 py-1">
-              成果物ファイル ({fileList.length})
-            </h4>
+            <div className="flex items-center justify-between mb-2 px-2 py-1">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                成果物ファイル ({fileList.length})
+              </h4>
+              {artifactFolderPath && (
+                <button
+                  onClick={handleOpenFolder}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors duration-150"
+                  title={`フォルダを開く: ${artifactFolderPath}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>開く</span>
+                </button>
+              )}
+            </div>
+            {openFolderError && (
+              <p className="text-xs text-red-500 px-2 mb-1">{openFolderError}</p>
+            )}
             {fileList.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-24 text-center">
                 <svg
@@ -220,18 +284,21 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
             ) : (
               <ul className="space-y-0.5">
                 {fileList.map((file, idx) => (
-                  <li key={file.path}>
+                  <li key={file.absolutePath || file.path}>
                     <button
                       onClick={() => setSelectedFile(file)}
-                      className={`w-full flex items-center px-3 py-2 text-left text-sm rounded-md transition-all duration-150 ${
+                      className={`w-full flex items-start px-3 py-2 text-left text-sm rounded-md transition-all duration-150 ${
                         selectedFile?.path === file.path
                           ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200'
                           : `text-gray-700 hover:bg-white hover:shadow-sm ${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white/50'}`
                       }`}
-                      title={file.path}
+                      title={file.absolutePath || file.path}
                     >
-                      <span className="flex-shrink-0 mr-2.5 flex items-center">{getFileIcon(file)}</span>
-                      <span className="truncate">{file.name}</span>
+                      <span className="flex-shrink-0 mr-2.5 flex items-center mt-0.5">{getFileIcon(file)}</span>
+                      <span className="flex flex-col min-w-0">
+                        <span className="truncate font-medium">{file.name}</span>
+                        <span className="truncate text-xs opacity-60 font-normal">{getDisplayPath(file)}</span>
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -298,20 +365,22 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
               <p className="text-sm text-gray-500">
                 ファイル内容を取得できませんでした
               </p>
-              <p className="text-xs text-gray-400 mt-1">{selectedFile.path}</p>
+              <p className="text-xs text-gray-400 mt-1 break-all select-all">{selectedFile.absolutePath || selectedFile.path}</p>
             </div>
           )}
 
           {selectedFile && !contentLoading && fileContent !== null && (
             <div>
               {/* ファイルパスヘッダー */}
-              <div className="flex items-center mb-3 pb-2.5 border-b border-gray-200">
-                <span className="flex-shrink-0 mr-2.5 flex items-center">{getFileIcon(selectedFile)}</span>
-                <span className="text-sm font-semibold text-gray-700 truncate">
-                  {selectedFile.name}
-                </span>
-                <span className="text-xs text-gray-400 ml-2 truncate hidden sm:inline">
-                  {selectedFile.path}
+              <div className="flex flex-col mb-3 pb-2.5 border-b border-gray-200">
+                <div className="flex items-center">
+                  <span className="flex-shrink-0 mr-2.5 flex items-center">{getFileIcon(selectedFile)}</span>
+                  <span className="text-sm font-semibold text-gray-700 truncate">
+                    {selectedFile.name}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400 mt-1 break-all select-all pl-0.5" title={selectedFile.absolutePath || selectedFile.path}>
+                  {selectedFile.absolutePath || selectedFile.path}
                 </span>
               </div>
 

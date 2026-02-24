@@ -28,6 +28,8 @@ export { TaskDetailPanel } from './TaskDetailPanel';
 export { TaskDependencyView } from './TaskDependencyView';
 export { TaskLogModal } from './TaskLogModal';
 export { ProjectInfo } from './ProjectInfo';
+export { DocsPanel } from './DocsPanel';
+export { RecoveryAlert } from './RecoveryAlert';
 
 // Hooks (ORDER_131 TASK_1137: useBacklogActions追加)
 export { useOrderActions, useBacklogActions } from '../hooks/useOrderActions';

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { resolveEnvPath } from '../utils/pathFormatter';
 
 interface SettingsProps {
   /** 設定画面を閉じるコールバック */
@@ -71,6 +72,7 @@ const CheckIcon: React.FC = () => (
  */
 export const Settings: React.FC<SettingsProps> = ({ onClose, onPathChange }) => {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [displayPath, setDisplayPath] = useState<string | null>(null);
   const [validation, setValidation] = useState<DirectoryValidationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,6 +87,8 @@ export const Settings: React.FC<SettingsProps> = ({ onClose, onPathChange }) => 
         const activePath = await window.electronAPI.getActiveFrameworkPath();
         if (activePath) {
           setCurrentPath(activePath);
+          const formatted = await resolveEnvPath(activePath);
+          setDisplayPath(formatted);
           const validationResult = await window.electronAPI.validateDirectory(activePath);
           setValidation(validationResult);
         }
@@ -123,6 +127,8 @@ export const Settings: React.FC<SettingsProps> = ({ onClose, onPathChange }) => 
 
           if (saveResult.success) {
             setCurrentPath(newPath);
+            const formatted = await resolveEnvPath(newPath);
+            setDisplayPath(formatted);
             setMessage({ type: 'success', text: '設定を保存しました' });
 
             // ファイル監視を再開始
@@ -179,9 +185,9 @@ export const Settings: React.FC<SettingsProps> = ({ onClose, onPathChange }) => 
               </span>
               {validation?.isValid && <CheckIcon />}
             </div>
-            {currentPath ? (
+            {displayPath ?? currentPath ? (
               <div className="font-mono text-sm text-gray-800 break-all">
-                {currentPath}
+                {displayPath ?? currentPath}
               </div>
             ) : (
               <div className="text-sm text-gray-400 italic">

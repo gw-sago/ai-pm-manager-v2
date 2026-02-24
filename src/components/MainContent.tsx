@@ -6,12 +6,13 @@ import { BacklogDetailPanel } from './BacklogDetailPanel';
 import { ExecutionLog } from './ExecutionLog';
 import { SupervisorDashboard } from './SupervisorDashboard';
 import { ProjectInfo } from './ProjectInfo';
+import { DocsPanel } from './DocsPanel';
 import type { Project, TaskInfo, OrderInfo, BacklogItem, Supervisor, SupervisorProject } from '../preload';
 
 /**
  * メインコンテンツのタブ種別（ORDER_040追加, ORDER_156拡張）
  */
-type MainContentTab = 'backlog' | 'execution-log' | 'project-info';
+type MainContentTab = 'backlog' | 'execution-log' | 'project-info' | 'docs';
 
 
 /**
@@ -254,6 +255,16 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
               >
                 プロジェクト情報
               </button>
+              <button
+                onClick={() => setActiveTab('docs')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'docs'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                ドキュメント
+              </button>
             </div>
           )}
 
@@ -284,6 +295,13 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
           {selectedProject && selectedProject.state && activeTab === 'project-info' && (
             <div className="w-full">
               <ProjectInfo projectId={selectedProject.name} />
+            </div>
+          )}
+
+          {/* ドキュメント（プロジェクト選択時 & ドキュメントタブ選択時）（ORDER_057 / TASK_196） */}
+          {selectedProject && selectedProject.state && activeTab === 'docs' && (
+            <div className="w-full">
+              <DocsPanel projectId={selectedProject.name} />
             </div>
           )}
 

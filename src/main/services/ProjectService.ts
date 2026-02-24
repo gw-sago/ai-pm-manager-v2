@@ -59,12 +59,16 @@ export type DataSource = 'db' | 'file';
 export interface ArtifactFile {
   /** ファイル名 */
   name: string;
-  /** 相対パス */
+  /** 相対パス（表示用） */
   path: string;
   /** ファイルタイプ */
   type: 'file' | 'directory';
   /** 拡張子（ファイルの場合のみ） */
   extension?: string;
+  /** 実ファイルの絶対パス（REPORTから抽出した開発ディレクトリパス） */
+  absolutePath?: string;
+  /** 元のREPORTファイルパス */
+  reportFile?: string;
 }
 
 /**
@@ -878,7 +882,9 @@ export class ProjectService extends EventEmitter {
   }
 
   /**
-   * 成果物ファイル一覧を取得
+   * 成果物ファイル一覧を取得（REPORTパース方式）
+   * RESULT/ORDER_XXX/05_REPORT/REPORT_*.md を列挙し、
+   * 各ファイルのJSONブロック内 artifacts フィールドからファイルパスを抽出して返す。
    * @param projectName プロジェクト名
    * @param orderId ORDER ID (例: "ORDER_010")
    * @returns 成果物ファイル一覧
@@ -892,100 +898,112 @@ export class ProjectService extends EventEmitter {
     }
 
     const projectPath = path.join(configService.getProjectsBasePath(), projectName);
+    const reportDir = path.join(projectPath, 'RESULT', orderId, '05_REPORT');
 
-    // RESULT/ORDER_XXX/06_ARTIFACTS/ を検索
-    const artifactsDir = path.join(projectPath, 'RESULT', orderId, '06_ARTIFACTS');
-
-    if (!fs.existsSync(artifactsDir)) {
-      // 08_ARTIFACTSも試す（フォーマットの違いに対応）
-      const altArtifactsDir = path.join(projectPath, 'RESULT', orderId, '08_ARTIFACTS');
-      if (!fs.existsSync(altArtifactsDir)) {
-        return [];
-      }
-      return this.scanArtifactsDirectory(altArtifactsDir, '');
+    if (!fs.existsSync(reportDir)) {
+      return [];
     }
 
-    return this.scanArtifactsDirectory(artifactsDir, '');
+    return this.parseArtifactsFromReports(reportDir);
   }
 
   /**
-   * 成果物ディレクトリを再帰的にスキャン
+   * 05_REPORT/REPORT_*.md を列挙し、各JSONブロックの artifacts フィールドからファイルパスを抽出
    */
-  private scanArtifactsDirectory(dirPath: string, relativePath: string): ArtifactFile[] {
+  private parseArtifactsFromReports(reportDir: string): ArtifactFile[] {
     const results: ArtifactFile[] = [];
+    const seen = new Set<string>();
 
+    let entries: string[];
     try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      entries = fs.readdirSync(reportDir);
+    } catch {
+      return [];
+    }
 
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+    const reportFiles = entries
+      .filter(f => f.startsWith('REPORT_') && f.endsWith('.md'))
+      .sort();
 
-        if (entry.isDirectory()) {
-          results.push({
-            name: entry.name,
-            path: relPath,
-            type: 'directory',
-          });
-          // 再帰的にサブディレクトリをスキャン
-          const subItems = this.scanArtifactsDirectory(fullPath, relPath);
-          results.push(...subItems);
-        } else {
-          const ext = path.extname(entry.name).toLowerCase();
-          results.push({
-            name: entry.name,
-            path: relPath,
-            type: 'file',
-            extension: ext,
-          });
-        }
+    for (const reportFileName of reportFiles) {
+      const reportFilePath = path.join(reportDir, reportFileName);
+      let content: string;
+      try {
+        content = fs.readFileSync(reportFilePath, 'utf-8');
+      } catch {
+        continue;
       }
-    } catch (error) {
-      console.error(`[ProjectService] Failed to scan artifacts directory:`, error);
+
+      // JSONブロック（```json ... ```）を抽出してartifactsフィールドをパース
+      const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+      if (!jsonBlockMatch) continue;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(jsonBlockMatch[1]);
+      } catch {
+        continue;
+      }
+
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        !Array.isArray((parsed as Record<string, unknown>)['artifacts'])
+      ) {
+        continue;
+      }
+
+      const artifacts = (parsed as Record<string, unknown>)['artifacts'] as unknown[];
+      for (const artifact of artifacts) {
+        if (typeof artifact !== 'string' || !artifact) continue;
+
+        const absolutePath = artifact;
+        if (seen.has(absolutePath)) continue;
+        seen.add(absolutePath);
+
+        const fileName = path.basename(absolutePath);
+        const ext = path.extname(fileName).toLowerCase();
+
+        results.push({
+          name: fileName,
+          path: absolutePath, // 表示用に絶対パスをそのまま使用
+          type: 'file',
+          extension: ext || undefined,
+          absolutePath,
+          reportFile: reportFilePath,
+        });
+      }
     }
 
     return results;
   }
 
   /**
-   * 成果物ファイルの内容を取得
-   * @param projectName プロジェクト名
-   * @param orderId ORDER ID (例: "ORDER_010")
-   * @param filePath 相対ファイルパス
+   * 成果物ファイルの内容を取得（実パス読み取り方式）
+   * REPORTのartifactsフィールドに記録された実ファイルパス（開発ディレクトリ絶対パス）から
+   * ファイル内容を直接読み取る。06_ARTIFACTS/配下のコピーファイルは参照しない。
+   * @param projectName プロジェクト名（API互換性維持のため残存、内部では未使用）
+   * @param orderId ORDER ID（API互換性維持のため残存、内部では未使用）
+   * @param filePath 絶対ファイルパス（REPORTのartifactsフィールドから抽出した実パス）
    * @returns ファイル内容（見つからない場合はnull）
    */
-  getArtifactContent(projectName: string, orderId: string, filePath: string): string | null {
-    const configService = getConfigService();
-    const frameworkPath = configService.getActiveFrameworkPath();
-
-    if (!frameworkPath) {
+  getArtifactContent(_projectName: string, _orderId: string, filePath: string): string | null {
+    if (!filePath) {
       return null;
     }
 
-    const projectPath = path.join(configService.getProjectsBasePath(), projectName);
+    // REPORTのartifactsフィールドから取得した絶対パスを直接読み取る
+    const normalizedPath = path.normalize(filePath);
+    if (!path.isAbsolute(normalizedPath)) {
+      console.warn(`[ProjectService] getArtifactContent: 絶対パスのみサポートしています: ${filePath}`);
+      return null;
+    }
 
-    // 06_ARTIFACTS と 08_ARTIFACTS の両方を試す
-    const artifactsDirs = [
-      path.join(projectPath, 'RESULT', orderId, '06_ARTIFACTS'),
-      path.join(projectPath, 'RESULT', orderId, '08_ARTIFACTS'),
-    ];
-
-    for (const artifactsDir of artifactsDirs) {
-      const fullPath = path.join(artifactsDir, filePath);
-
-      // パストラバーサル対策: 正規化してartifactsDirの外に出ないか確認
-      const normalizedPath = path.normalize(fullPath);
-      if (!normalizedPath.startsWith(artifactsDir)) {
-        console.warn(`[ProjectService] Path traversal attempt detected: ${filePath}`);
-        return null;
-      }
-
-      if (fs.existsSync(normalizedPath) && fs.statSync(normalizedPath).isFile()) {
-        try {
-          return fs.readFileSync(normalizedPath, 'utf-8');
-        } catch (error) {
-          console.error(`[ProjectService] Failed to read artifact file:`, error);
-        }
+    if (fs.existsSync(normalizedPath) && fs.statSync(normalizedPath).isFile()) {
+      try {
+        return fs.readFileSync(normalizedPath, 'utf-8');
+      } catch (error) {
+        console.error(`[ProjectService] Failed to read artifact file:`, error);
       }
     }
 

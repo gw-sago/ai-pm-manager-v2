@@ -3139,6 +3139,147 @@ export class ScriptExecutionService extends EventEmitter {
     }
   }
 
+  // =============================================================================
+  // ORDER_062: フルオートORDER実行
+  // =============================================================================
+
+  /**
+   * フルオートORDER実行
+   *
+   * ORDER_062: PM処理→Worker→レビューを自動ループ実行する
+   * backend/worker/full_auto.py をspawnで呼び出す
+   *
+   * @param projectId プロジェクトID
+   * @param orderId ORDER ID
+   * @param options オプション（maxCycles, timeout, model, verbose）
+   * @returns 実行結果
+   */
+  async executeFullAuto(
+    projectId: string,
+    orderId: string,
+    options?: { maxCycles?: number; timeout?: number; model?: string; verbose?: boolean }
+  ): Promise<ExecutionResult> {
+    const frameworkPath = this.getFrameworkPath();
+    if (!frameworkPath) {
+      return this.createErrorResult('worker', projectId, orderId, 'Framework path not configured');
+    }
+
+    const backendPath = this.getBackendPath();
+    if (!backendPath) {
+      return this.createErrorResult('worker', projectId, orderId, 'Backend path not configured');
+    }
+
+    const fullAutoScriptPath = path.join(backendPath, 'worker', 'full_auto.py');
+    if (!fs.existsSync(fullAutoScriptPath)) {
+      return this.createErrorResult('worker', projectId, orderId, 'full_auto.py not found');
+    }
+
+    const maxCycles = options?.maxCycles ?? 50;
+    const timeout = options?.timeout ?? 1800;
+    const model = options?.model ?? 'sonnet';
+    const verbose = options?.verbose ?? false;
+
+    const executionId = this.generateExecutionId();
+    const startedAt = new Date();
+    const pythonCommand = this.getPythonCommand();
+
+    // ジョブを登録
+    const job: RunningJob = {
+      executionId,
+      type: 'worker',
+      projectId,
+      targetId: orderId,
+      process: null as unknown as ChildProcess,
+      stdout: '',
+      stderr: '',
+      startedAt,
+    };
+    this.runningJobs.set(executionId, job);
+
+    // 開始イベントを発行
+    this.emit('progress', {
+      executionId,
+      type: 'worker',
+      projectId,
+      targetId: orderId,
+      status: 'running',
+      lastOutput: 'フルオート実行を開始...',
+    } as ExecutionProgress);
+
+    try {
+      const args = [
+        fullAutoScriptPath,
+        projectId,
+        orderId,
+        '--max-cycles', String(maxCycles),
+        '--timeout', String(timeout),
+        '--model', model,
+        '--json',
+      ];
+
+      if (verbose) {
+        args.push('--verbose');
+      }
+
+      console.log(`[ScriptExecution] Executing full_auto.py: ${pythonCommand} ${args.join(' ')}`);
+
+      // タイムアウトは全タスクの合計時間を考慮（maxCycles * timeout + バッファ）
+      const totalTimeoutMs = maxCycles * timeout * 1000 + 60000;
+
+      const result = await this.runPythonScript(
+        pythonCommand,
+        args,
+        frameworkPath,
+        totalTimeoutMs,
+        (line) => {
+          job.stdout += line + '\n';
+          this.emit('progress', {
+            executionId,
+            type: 'worker',
+            projectId,
+            targetId: orderId,
+            status: 'running',
+            lastOutput: line,
+          } as ExecutionProgress);
+        }
+      );
+
+      this.runningJobs.delete(executionId);
+
+      if (!result.success) {
+        const errorResult = this.createExecutionResult(
+          'worker', projectId, orderId, executionId, startedAt,
+          false, result.stdout, result.stderr, result.exitCode || null,
+          result.error || 'フルオート実行が失敗しました'
+        );
+        this.addToHistory(errorResult);
+        this.emitComplete(errorResult);
+        return errorResult;
+      }
+
+      const successResult = this.createExecutionResult(
+        'worker', projectId, orderId, executionId, startedAt,
+        true, result.stdout, result.stderr, result.exitCode || 0
+      );
+      this.addToHistory(successResult);
+      this.emitComplete(successResult);
+      return successResult;
+
+    } catch (error) {
+      console.error(`[ScriptExecution] Full auto error:`, error);
+      this.runningJobs.delete(executionId);
+      const errorResult = this.createExecutionResult(
+        'worker', projectId, orderId, executionId, startedAt,
+        false, '', '',
+        null,
+        `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.addToHistory(errorResult);
+      this.emitComplete(errorResult);
+      return errorResult;
+    }
+  }
+
   /**
    * 実行中のジョブをキャンセル
    */
