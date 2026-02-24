@@ -48,24 +48,27 @@ if (started) {
 }
 
 /**
- * ORDER_164: パッケージ版起動時にresources/内リソースをSquirrelルートに展開
+ * パッケージ版起動時にresources/内リソースをuserDataPath（Roaming）に展開
  * 展開対象: backend/, python-embed/, .claude/, CLAUDE.md, data/schema_v2.sql
  * 保護対象: data/aipm.db, PROJECTS/（永続データは上書きしない）
+ *
+ * 重要: Squirrelルート（Local）には展開しない。
+ * Squirrelは再インストール時にルートを全削除するため、ロックされたファイルが
+ * あるとfatalエラーでインストール失敗する。
+ * userDataPath（%APPDATA%/Roaming）はSquirrelの管理外なので安全。
  */
 function deployResources(): void {
   if (!app.isPackaged) return;
 
-  const squirrelRoot = path.resolve(path.dirname(process.execPath), '..');
+  const userDataPath = app.getPath('userData');
   const resourcesDir = process.resourcesPath;
-  console.log('[Main] Deploying resources to Squirrel root:', squirrelRoot);
+  console.log('[Main] Deploying resources to userData:', userDataPath);
 
-  // ディレクトリごと削除→コピーする対象
-  // BUG: rmSyncがEBUSYで失敗すると中身だけ消えてコピーされない問題の対策
-  // → 削除失敗時もcpSync(force:true)で上書きコピーを試みる
+  // ディレクトリごとコピーする対象
   const dirTargets = ['backend', 'python-embed', '.claude'];
   for (const dir of dirTargets) {
     const src = path.join(resourcesDir, dir);
-    const dest = path.join(squirrelRoot, dir);
+    const dest = path.join(userDataPath, dir);
     if (!fs.existsSync(src)) {
       console.log(`[Main] Deploy skip (not found): ${src}`);
       continue;
@@ -89,7 +92,7 @@ function deployResources(): void {
   const claudeMdSrc = path.join(resourcesDir, 'CLAUDE.md');
   if (fs.existsSync(claudeMdSrc)) {
     try {
-      fs.copyFileSync(claudeMdSrc, path.join(squirrelRoot, 'CLAUDE.md'));
+      fs.copyFileSync(claudeMdSrc, path.join(userDataPath, 'CLAUDE.md'));
       console.log('[Main] Deployed: CLAUDE.md');
     } catch (err) {
       console.error('[Main] Deploy error for CLAUDE.md:', err);
@@ -97,7 +100,7 @@ function deployResources(): void {
   }
 
   // data/schema_v2.sql のみコピー（data/aipm.db は保護）
-  const dataDir = path.join(squirrelRoot, 'data');
+  const dataDir = path.join(userDataPath, 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -142,7 +145,7 @@ app.on('ready', async () => {
   configService.ensureProjectsDirectory();
   console.log('[Main] Framework path:', configService.getActiveFrameworkPath());
 
-  // ORDER_164: パッケージ版起動時にresources/内リソースをSquirrelルートに展開
+  // パッケージ版起動時にresources/内リソースをuserDataPath（Roaming）に展開
   try {
     deployResources();
   } catch (error) {
@@ -266,9 +269,33 @@ app.on('ready', async () => {
     };
   });
 
-  // ORDER_164: ターミナル起動IPCハンドラ
+  // CHANGELOG.md 読み込みIPCハンドラ（ORDER_049 / TASK_162）
+  ipcMain.handle('changelog:read', () => {
+    const changelogPaths = [
+      // パッケージ版: resources/CHANGELOG.md
+      app.isPackaged ? path.join(process.resourcesPath, 'CHANGELOG.md') : null,
+      // 開発版: プロジェクトルートのCHANGELOG.md
+      path.join(app.getAppPath(), '..', 'CHANGELOG.md'),
+      path.join(app.getAppPath(), 'CHANGELOG.md'),
+    ].filter(Boolean) as string[];
+
+    for (const p of changelogPaths) {
+      if (fs.existsSync(p)) {
+        try {
+          const content = fs.readFileSync(p, 'utf8');
+          console.log('[Main] CHANGELOG.md loaded from:', p);
+          return { success: true, content };
+        } catch (err) {
+          console.error('[Main] Failed to read CHANGELOG.md:', err);
+        }
+      }
+    }
+    return { success: false, content: null, error: 'CHANGELOG.md not found' };
+  });
+
+  // ターミナル起動IPCハンドラ
   ipcMain.handle('terminal:open', () => {
-    const cwd = configService.getActiveFrameworkPath();
+    const cwd = configService.getUserDataPath();
     console.log('[Main] Opening terminal at:', cwd);
     spawn('cmd.exe', ['/c', 'start', 'cmd.exe'], {
       cwd,

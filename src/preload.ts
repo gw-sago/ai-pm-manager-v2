@@ -2214,6 +2214,10 @@ export interface ElectronAPI {
   // ORDER_021 / TASK_067: プロジェクト紹介ページ生成・エクスポート
   generateProjectPage: (projectId: string) => Promise<{ success: boolean; html?: string; error?: string; }>;
   exportProjectPage: (projectId: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string; }>;
+
+  // CHANGELOG.mdèª­ã¿è¾¼ã¿ (ORDER_049 / TASK_162)
+  /** CHANGELOG.mdã®åå®¹ãåå¾ */
+  getChangelog: () => Promise<{ success: boolean; content: string | null; error?: string }>;
 }
 
 /**
@@ -2571,6 +2575,10 @@ const electronAPI: ElectronAPI = {
     ipcRenderer.invoke('generate-project-page', projectId),
   exportProjectPage: (projectId: string) =>
     ipcRenderer.invoke('export-project-page', projectId),
+
+  // CHANGELOG.md読み込み (ORDER_049 / TASK_162)
+  getChangelog: () =>
+    ipcRenderer.invoke('changelog:read'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

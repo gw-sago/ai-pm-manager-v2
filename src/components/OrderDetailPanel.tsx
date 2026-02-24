@@ -878,26 +878,39 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         )}
 
         {activeTab === 'artifacts' && (
-          <div className="h-full overflow-auto p-4">
-            {/* TASK_1150: ReleaseReadinessPanel統合 - リリース判定情報を成果物タブに表示 */}
-            {/* ORDER_019: リリースボタンはバックログ一覧に移動したため、ここでは非表示 */}
-            <ReleaseReadinessPanel
-              projectName={projectName}
-              orderId={order.id}
-              tasks={order.tasks}
-            />
-            {/* 既存のArtifactsBrowser */}
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4">成果物ファイル一覧</h3>
-              <ArtifactsBrowser projectName={projectName} orderId={order.id} />
+          <div className="h-full overflow-auto p-4 bg-gray-50">
+            {/* TASK_132: リリース判定パネルと成果物ブラウザの2カラムレイアウト */}
+            {/* TASK_133: 余白・ギャップ調整、カラム間の視覚的区切り */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 左カラム: リリース判定情報 */}
+              <div className="lg:border-r lg:border-gray-200 lg:pr-6">
+                <ReleaseReadinessPanel
+                  projectName={projectName}
+                  orderId={order.id}
+                  tasks={order.tasks}
+                />
+              </div>
+              {/* 右カラム: 成果物ファイルブラウザ */}
+              <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden bg-white" style={{ minHeight: '400px' }}>
+                <div className="bg-gray-50 border-b border-gray-200 px-4 py-2.5">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    成果物ファイル
+                  </h3>
+                </div>
+                <ArtifactsBrowser projectName={projectName} orderId={order.id} />
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* フッター: タスク情報 - TASK_239: 進捗率表示改善 */}
-      <div className="border-t border-gray-200 p-4">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+      {/* TASK_133: フッターの視認性改善 */}
+      <div className="border-t border-gray-200 p-4 bg-gray-50/50">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
           {progress.hasNoTasks ? (
             'タスク一覧'
           ) : (
@@ -926,7 +939,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
               return (
                 <button
                   key={task.id}
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs cursor-pointer hover:opacity-80 hover:shadow-sm transition-all ${style.badge}`}
+                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer hover:shadow-md hover:scale-105 active:scale-100 transition-all duration-150 ${style.badge}`}
                   title={task.title || task.id}
                   onClick={() => onTaskClick?.(task.id)}
                 >

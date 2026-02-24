@@ -45,6 +45,8 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     CANCELLED: { bg: 'bg-gray-300', text: 'text-gray-500' },
     REJECTED: { bg: 'bg-red-300', text: 'text-red-900' },
     SKIPPED: { bg: 'bg-gray-100', text: 'text-gray-400' },
+    ESCALATED: { bg: 'bg-yellow-200', text: 'text-yellow-900' },
+    INTERRUPTED: { bg: 'bg-orange-100', text: 'text-orange-800' },
   };
 
   const colors = colorMap[status] || colorMap.QUEUED;
@@ -635,17 +637,24 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         {activeTab === 'review' && (
           <>
             {/* 差し戻し情報 */}
-            {reviewHistory && (reviewHistory.rejectCount > 0 || task.status === 'REWORK' || task.status === 'REJECTED') && (
+            {reviewHistory && (reviewHistory.rejectCount > 0 || task.status === 'REWORK' || task.status === 'REJECTED' || task.status === 'ESCALATED') && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">差し戻し情報</h3>
-                <div className="bg-red-50 rounded-lg p-4">
+                <div className={`rounded-lg p-4 ${task.status === 'ESCALATED' ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-red-800">
+                    <span className={`text-sm font-medium ${task.status === 'ESCALATED' ? 'text-yellow-800' : 'text-red-800'}`}>
                       差し戻し: {reviewHistory.rejectCount}/{reviewHistory.maxRework}回
                     </span>
-                    {reviewHistory.rejectCount >= reviewHistory.maxRework && (
-                      <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded">上限到達</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {reviewHistory.rejectCount >= reviewHistory.maxRework && (
+                        <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded">上限到達</span>
+                      )}
+                      {task.status === 'ESCALATED' && (
+                        <span className="text-xs font-medium text-yellow-700 bg-yellow-200 px-2 py-0.5 rounded font-bold">
+                          ⚠ エスカレーション中（停止済み）
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="w-full bg-red-200 rounded-full h-2">
                     <div
@@ -657,7 +666,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                       }}
                     />
                   </div>
-                  {task.status === 'REWORK' && (() => {
+                  {(task.status === 'REWORK' || task.status === 'REJECTED' || task.status === 'ESCALATED') && (() => {
                     const latestRejection = reviewHistory.reviews
                       .filter((r) => r.status === 'REJECTED' && r.comment)
                       .sort((a, b) => {
@@ -668,7 +677,24 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     return latestRejection ? (
                       <div className="mt-3 p-3 bg-red-100 rounded border border-red-200">
                         <p className="text-xs font-semibold text-red-700 mb-1">最新の差し戻し理由:</p>
-                        <p className="text-sm text-red-800">{latestRejection.comment}</p>
+                        <p className="text-sm text-red-800 whitespace-pre-wrap">{latestRejection.comment}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDateTime(latestRejection.reviewedAt || latestRejection.submittedAt)}
+                        </p>
+                      </div>
+                    ) : null;
+                  })()}
+                  {task.status === 'ESCALATED' && (() => {
+                    const latestEscalation = reviewHistory.escalations
+                      .filter((e) => !e.resolvedAt)
+                      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+                    return latestEscalation?.reason ? (
+                      <div className="mt-3 p-3 bg-yellow-100 rounded border border-yellow-300">
+                        <p className="text-xs font-semibold text-yellow-800 mb-1">エスカレーション理由（問題サマリー）:</p>
+                        <p className="text-sm text-yellow-900 whitespace-pre-wrap">{latestEscalation.reason}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDateTime(latestEscalation.createdAt)}
+                        </p>
                       </div>
                     ) : null;
                   })()}
@@ -741,37 +767,61 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 defaultExpanded={true}
               >
                 <div className="space-y-2">
-                  {reviewHistory.escalations.map((esc) => (
-                    <div
-                      key={esc.id}
-                      className={`p-3 rounded-lg border ${
-                        esc.resolvedAt
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-yellow-50 border-yellow-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-sm font-semibold ${
-                          esc.resolvedAt ? 'text-green-700' : 'text-yellow-700'
-                        }`}>
-                          {esc.resolvedAt ? '解決済み' : '未解決'}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {formatDateTime(esc.createdAt)}
-                        </span>
-                      </div>
-                      {esc.reason && (
-                        <p className="text-sm text-gray-700">{esc.reason}</p>
-                      )}
-                      {esc.resolvedAt && esc.resolution && (
-                        <div className="mt-2 pt-2 border-t border-green-200">
-                          <p className="text-xs font-semibold text-green-700 mb-1">解決内容:</p>
-                          <p className="text-sm text-green-800">{esc.resolution}</p>
-                          <p className="text-xs text-gray-500 mt-1">{formatDateTime(esc.resolvedAt)}</p>
+                  {/* ESCALATED状態の場合、rework上限到達・停止済みの強調バナー */}
+                  {task.status === 'ESCALATED' && (
+                    <div className="p-3 rounded-lg border-2 border-yellow-400 bg-yellow-50 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-600 text-xl">⚠</span>
+                        <div>
+                          <p className="text-sm font-bold text-yellow-800">
+                            rework上限到達 — 自動処理を停止しました
+                          </p>
+                          <p className="text-xs text-yellow-700 mt-0.5">
+                            このタスクは差し戻し上限（{reviewHistory.maxRework}回）に達したためエスカレーションされました。
+                            手動での介入または復旧が必要です。
+                          </p>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  ))}
+                  )}
+                  {reviewHistory.escalations.length === 0 && task.status === 'ESCALATED' ? (
+                    <p className="text-sm text-yellow-700 italic">エスカレーション詳細が記録されていません</p>
+                  ) : (
+                    reviewHistory.escalations.map((esc) => (
+                      <div
+                        key={esc.id}
+                        className={`p-3 rounded-lg border ${
+                          esc.resolvedAt
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-yellow-50 border-yellow-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-sm font-semibold ${
+                            esc.resolvedAt ? 'text-green-700' : 'text-yellow-700'
+                          }`}>
+                            {esc.resolvedAt ? '✓ 解決済み' : '⚠ 未解決'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDateTime(esc.createdAt)}
+                          </span>
+                        </div>
+                        {esc.reason && (
+                          <div className="mt-1">
+                            <p className="text-xs font-semibold text-gray-600 mb-0.5">問題サマリー:</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{esc.reason}</p>
+                          </div>
+                        )}
+                        {esc.resolvedAt && esc.resolution && (
+                          <div className="mt-2 pt-2 border-t border-green-200">
+                            <p className="text-xs font-semibold text-green-700 mb-1">解決内容:</p>
+                            <p className="text-sm text-green-800">{esc.resolution}</p>
+                            <p className="text-xs text-gray-500 mt-1">{formatDateTime(esc.resolvedAt)}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </CollapsibleSection>
             )}

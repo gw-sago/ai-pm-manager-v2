@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="AI PM Manager V2">
+    <title>{title}</title>
+    <style>
+        /* ============================================================
+           AI PM Manager V2 - Report Template CSS
+           外部依存なし / Embedded CSS
+           md_to_html.py の _get_default_css() と整合性を保持
+           ============================================================ */
+
+        /* --- Reset & Base --- */
+        *, *::before, *::after {{
+            box-sizing: border-box;
+        }}
+
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 24px;
+            color: #24292f;
+            background-color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }}
+
+        /* --- Header --- */
+        .report-header {{
+            border-bottom: 2px solid #0366d6;
+            padding-bottom: 16px;
+            margin-bottom: 32px;
+        }}
+
+        .report-header h1 {{
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #24292f;
+            margin: 0 0 8px 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }}
+
+        .report-meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 0.875em;
+            color: #57606a;
+        }}
+
+        .report-meta-item {{
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }}
+
+        .report-meta-label {{
+            font-weight: 600;
+            color: #24292f;
+        }}
+
+        /* --- Content Area --- */
+        .content {{
+            padding: 0 8px;
+        }}
+
+        /* --- Headings (md_to_html.py 互換) --- */
+        h1, h2, h3, h4, h5, h6 {{
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #24292f;
+        }}
+
+        h1 {{
+            font-size: 2em;
+            border-bottom: 1px solid #d0d7de;
+            padding-bottom: 0.3em;
+        }}
+
+        h2 {{
+            font-size: 1.5em;
+            border-bottom: 1px solid #d0d7de;
+            padding-bottom: 0.3em;
+        }}
+
+        h3 {{
+            font-size: 1.25em;
+        }}
+
+        h4 {{
+            font-size: 1em;
+        }}
+
+        h5 {{
+            font-size: 0.875em;
+        }}
+
+        h6 {{
+            font-size: 0.85em;
+            color: #57606a;
+        }}
+
+        /* --- Paragraphs & Text --- */
+        p {{
+            margin: 0.75em 0;
+        }}
+
+        strong {{
+            font-weight: 600;
+        }}
+
+        /* --- Links (md_to_html.py 互換) --- */
+        a {{
+            color: #0366d6;
+            text-decoration: none;
+        }}
+
+        a:hover {{
+            text-decoration: underline;
+        }}
+
+        /* --- Tables (md_to_html.py 互換 + 拡張) --- */
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            font-size: 0.925em;
+            overflow-x: auto;
+            display: block;
+        }}
+
+        @media (min-width: 600px) {{
+            table {{
+                display: table;
+            }}
+        }}
+
+        th, td {{
+            border: 1px solid #d0d7de;
+            padding: 8px 12px;
+            text-align: left;
+        }}
+
+        th {{
+            background-color: #f6f8fa;
+            font-weight: 600;
+            white-space: nowrap;
+        }}
+
+        tr:nth-child(even) {{
+            background-color: #f6f8fa;
+        }}
+
+        tr:hover {{
+            background-color: #eef2f7;
+        }}
+
+        /* --- Code Blocks (md_to_html.py 互換 + 拡張) --- */
+        code {{
+            background-color: #f6f8fa;
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-size: 85%;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            border: 1px solid #e1e4e8;
+        }}
+
+        pre {{
+            background-color: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            line-height: 1.45;
+            border: 1px solid #e1e4e8;
+            margin: 1em 0;
+        }}
+
+        pre code {{
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            font-size: 85%;
+        }}
+
+        /* --- highlight クラス (codehilite 拡張互換) --- */
+        .highlight {{
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            border: 1px solid #e1e4e8;
+            margin: 1em 0;
+        }}
+
+        .highlight pre {{
+            background-color: transparent;
+            padding: 0;
+            margin: 0;
+            border: none;
+        }}
+
+        /* --- Lists (md_to_html.py 互換) --- */
+        ul, ol {{
+            padding-left: 2em;
+        }}
+
+        li {{
+            margin: 0.25em 0;
+        }}
+
+        li > ul, li > ol {{
+            margin-top: 0.25em;
+        }}
+
+        /* --- Blockquote (md_to_html.py 互換 + 拡張) --- */
+        blockquote {{
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            border-left: 4px solid #0366d6;
+            color: #57606a;
+            background-color: #f6f8fa;
+            border-radius: 0 4px 4px 0;
+        }}
+
+        blockquote p:first-child {{
+            margin-top: 0;
+        }}
+
+        blockquote p:last-child {{
+            margin-bottom: 0;
+        }}
+
+        /* --- Horizontal Rule (md_to_html.py 互換) --- */
+        hr {{
+            border: none;
+            border-top: 1px solid #d0d7de;
+            margin: 2em 0;
+        }}
+
+        /* --- Images --- */
+        img {{
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+        }}
+
+        /* --- Footer --- */
+        .report-footer {{
+            margin-top: 48px;
+            padding-top: 16px;
+            border-top: 1px solid #d0d7de;
+            font-size: 0.8em;
+            color: #8b949e;
+            text-align: center;
+        }}
+
+        /* --- Table of Contents --- */
+        .toc {{
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 16px 16px 16px 32px;
+            margin: 1em 0;
+        }}
+
+        .toc ul {{
+            list-style-type: none;
+        }}
+
+        /* --- Status Badges --- */
+        .status-badge {{
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }}
+
+        .status-done {{
+            background-color: #dafbe1;
+            color: #116329;
+        }}
+
+        .status-in-progress {{
+            background-color: #fff8c5;
+            color: #4d2d00;
+        }}
+
+        .status-pending {{
+            background-color: #ddf4ff;
+            color: #0550ae;
+        }}
+
+        .status-error {{
+            background-color: #ffebe9;
+            color: #82071e;
+        }}
+
+        /* ============================================================
+           Dark Mode
+           ============================================================ */
+        @media (prefers-color-scheme: dark) {{
+            body {{
+                color: #c9d1d9;
+                background-color: #0d1117;
+            }}
+
+            .report-header {{
+                border-bottom-color: #1f6feb;
+            }}
+
+            .report-header h1 {{
+                color: #e6edf3;
+            }}
+
+            .report-meta {{
+                color: #8b949e;
+            }}
+
+            .report-meta-label {{
+                color: #c9d1d9;
+            }}
+
+            h1, h2, h3, h4, h5, h6 {{
+                color: #e6edf3;
+            }}
+
+            h1, h2 {{
+                border-bottom-color: #21262d;
+            }}
+
+            h6 {{
+                color: #8b949e;
+            }}
+
+            a {{
+                color: #58a6ff;
+            }}
+
+            table {{
+                border-color: #30363d;
+            }}
+
+            th, td {{
+                border-color: #30363d;
+            }}
+
+            th {{
+                background-color: #161b22;
+            }}
+
+            tr:nth-child(even) {{
+                background-color: #161b22;
+            }}
+
+            tr:hover {{
+                background-color: #1c2128;
+            }}
+
+            code {{
+                background-color: #161b22;
+                border-color: #30363d;
+            }}
+
+            pre {{
+                background-color: #161b22;
+                border-color: #30363d;
+            }}
+
+            .highlight {{
+                background-color: #161b22;
+                border-color: #30363d;
+            }}
+
+            blockquote {{
+                border-left-color: #1f6feb;
+                color: #8b949e;
+                background-color: #161b22;
+            }}
+
+            hr {{
+                border-top-color: #21262d;
+            }}
+
+            .report-footer {{
+                border-top-color: #21262d;
+                color: #484f58;
+            }}
+
+            .toc {{
+                background-color: #161b22;
+                border-color: #30363d;
+            }}
+
+            .status-done {{
+                background-color: #0f2d16;
+                color: #3fb950;
+            }}
+
+            .status-in-progress {{
+                background-color: #2e1800;
+                color: #d29922;
+            }}
+
+            .status-pending {{
+                background-color: #0c2d6b;
+                color: #58a6ff;
+            }}
+
+            .status-error {{
+                background-color: #3d0912;
+                color: #f85149;
+            }}
+        }}
+
+        /* ============================================================
+           Print Styles
+           ============================================================ */
+        @media print {{
+            body {{
+                color: #000;
+                background-color: #fff;
+                max-width: none;
+                padding: 0;
+                font-size: 11pt;
+            }}
+
+            .report-header {{
+                border-bottom-color: #000;
+            }}
+
+            .report-header h1 {{
+                color: #000;
+            }}
+
+            h1, h2, h3, h4, h5, h6 {{
+                color: #000;
+                page-break-after: avoid;
+            }}
+
+            h1, h2 {{
+                border-bottom-color: #ccc;
+            }}
+
+            pre, code {{
+                background-color: #f5f5f5 !important;
+                border-color: #ccc !important;
+            }}
+
+            pre {{
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }}
+
+            table {{
+                page-break-inside: avoid;
+            }}
+
+            th {{
+                background-color: #eee !important;
+            }}
+
+            tr:nth-child(even) {{
+                background-color: #f5f5f5 !important;
+            }}
+
+            tr:hover {{
+                background-color: transparent !important;
+            }}
+
+            a {{
+                color: #000;
+                text-decoration: underline;
+            }}
+
+            a[href]::after {{
+                content: " (" attr(href) ")";
+                font-size: 0.8em;
+                color: #666;
+            }}
+
+            blockquote {{
+                border-left-color: #666;
+                background-color: #f5f5f5;
+            }}
+
+            .report-footer {{
+                border-top-color: #ccc;
+                color: #666;
+            }}
+
+            img {{
+                max-width: 100% !important;
+                page-break-inside: avoid;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <header class="report-header">
+        <h1>{title}</h1>
+        <div class="report-meta">
+            <span class="report-meta-item">
+                <span class="report-meta-label">Project:</span>
+                <span>{project_name}</span>
+            </span>
+            <span class="report-meta-item">
+                <span class="report-meta-label">Order:</span>
+                <span>{order_id}</span>
+            </span>
+            <span class="report-meta-item">
+                <span class="report-meta-label">Generated:</span>
+                <span>{generated_at}</span>
+            </span>
+        </div>
+    </header>
+
+    <main class="content">
+{content}
+    </main>
+
+    <footer class="report-footer">
+        <p>Generated by AI PM Manager V2 | {project_name} / {order_id} | {generated_at}</p>
+    </footer>
+</body>
+</html>

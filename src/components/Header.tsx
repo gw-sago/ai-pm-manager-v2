@@ -1,16 +1,91 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ManualModal } from './ManualModal';
+import { ReleaseNotesModal } from './ReleaseNotesModal';
+
+const LAST_SEEN_VERSION_KEY = 'aipm_last_seen_release_version';
 
 interface HeaderProps {}
 
 export const Header: React.FC<HeaderProps> = () => {
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
+  const [hasNewRelease, setHasNewRelease] = useState(false);
+
+  useEffect(() => {
+    const checkNewRelease = async () => {
+      try {
+        const result = await window.electronAPI?.getChangelog();
+        if (!result?.success || !result.content) return;
+
+        // Parse the latest version from CHANGELOG.md (first ## [x.y.z] entry)
+        const match = result.content.match(/^##\s+\[([^\]]+)\]/m);
+        if (!match) return;
+
+        const latestVersion = match[1];
+        const lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
+
+        if (lastSeen !== latestVersion) {
+          setHasNewRelease(true);
+        }
+      } catch {
+        // silently ignore
+      }
+    };
+
+    void checkNewRelease();
+  }, []);
+
+  const handleOpenReleaseNotes = async () => {
+    setIsReleaseNotesOpen(true);
+    setHasNewRelease(false);
+
+    // Record the latest version as seen
+    try {
+      const result = await window.electronAPI?.getChangelog();
+      if (result?.success && result.content) {
+        const match = result.content.match(/^##\s+\[([^\]]+)\]/m);
+        if (match) {
+          localStorage.setItem(LAST_SEEN_VERSION_KEY, match[1]);
+        }
+      }
+    } catch {
+      // silently ignore
+    }
+  };
 
   return (
     <>
       <header className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
         <h1 className="text-lg font-semibold text-gray-800">AI PM Manager</h1>
         <div className="flex items-center gap-1">
+          {/* リリースノートアイコン */}
+          <button
+            onClick={handleOpenReleaseNotes}
+            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+            aria-label="Open Release Notes"
+            title="リリースノート"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            {hasNewRelease && (
+              <span className="absolute top-1 right-1 flex items-center justify-center w-3.5 h-3.5 bg-purple-500 rounded-full">
+                <span className="text-white font-bold leading-none" style={{ fontSize: '6px' }}>N</span>
+              </span>
+            )}
+          </button>
+          {/* マニュアルアイコン */}
           <button
             onClick={() => setIsManualOpen(true)}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -56,6 +131,7 @@ export const Header: React.FC<HeaderProps> = () => {
         </div>
       </header>
       {isManualOpen && <ManualModal onClose={() => setIsManualOpen(false)} />}
+      {isReleaseNotesOpen && <ReleaseNotesModal onClose={() => setIsReleaseNotesOpen(false)} />}
     </>
   );
 };

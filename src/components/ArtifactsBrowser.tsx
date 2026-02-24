@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import type { ArtifactFile, OrderReleaseInfo, OrderRelatedInfo } from '../preload';
-import { ReleaseInfoCard } from './ReleaseInfoCard';
-import { ReleaseDetailSection } from './ReleaseDetailSection';
-import { RelatedInfoSection } from './RelatedInfoSection';
+import type { ArtifactFile } from '../preload';
 
 interface ArtifactsBrowserProps {
   /** プロジェクト名 */
@@ -33,11 +30,6 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
 
-  // ORDER_045: リリース情報・関連情報
-  const [releaseInfo, setReleaseInfo] = useState<OrderReleaseInfo | null>(null);
-  const [relatedInfo, setRelatedInfo] = useState<OrderRelatedInfo | null>(null);
-  const [metaLoading, setMetaLoading] = useState(true);
-
   // 成果物ファイル一覧を取得
   useEffect(() => {
     const fetchFiles = async () => {
@@ -61,31 +53,6 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
     };
 
     fetchFiles();
-  }, [projectName, orderId]);
-
-  // ORDER_045: リリース情報・関連情報を取得
-  useEffect(() => {
-    const fetchMetaInfo = async () => {
-      setMetaLoading(true);
-
-      try {
-        const [releaseResult, relatedResult] = await Promise.all([
-          window.electronAPI.getOrderReleaseInfo(projectName, orderId),
-          window.electronAPI.getOrderRelatedInfo(projectName, orderId),
-        ]);
-        setReleaseInfo(releaseResult);
-        setRelatedInfo(relatedResult);
-      } catch (err) {
-        console.error('[ArtifactsBrowser] Failed to fetch meta info:', err);
-        // エラーでもUIは表示する（グレースフルデグラデーション）
-        setReleaseInfo({ hasRelease: false, releases: [] });
-        setRelatedInfo({ relatedBacklogs: [], dependentOrders: [] });
-      } finally {
-        setMetaLoading(false);
-      }
-    };
-
-    fetchMetaInfo();
   }, [projectName, orderId]);
 
   // ファイル選択時に内容を取得
@@ -120,12 +87,6 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
   const fileList = useMemo(
     () => files.filter((f) => f.type === 'file'),
     [files]
-  );
-
-  // 関連バックログIDを抽出
-  const relatedBacklogIds = useMemo(
-    () => relatedInfo?.relatedBacklogs.map((b) => b.id) ?? [],
-    [relatedInfo]
   );
 
   // ファイルアイコンを取得
@@ -179,7 +140,7 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
   };
 
   // 初期ローディング表示
-  if (loading && metaLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-32">
         <svg
@@ -231,50 +192,12 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* ORDER_045: リリース情報・関連情報セクション */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 overflow-auto max-h-80">
-        {metaLoading ? (
-          <div className="flex items-center justify-center h-16">
-            <svg
-              className="animate-spin h-5 w-5 text-blue-500"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="ml-2 text-sm text-gray-500">メタ情報を読み込み中...</span>
-          </div>
-        ) : (
-          <>
-            {/* リリースサマリカード */}
-            {releaseInfo && (
-              <ReleaseInfoCard
-                releaseInfo={releaseInfo}
-                relatedBacklogIds={relatedBacklogIds}
-              />
-            )}
-
-            {/* リリース詳細セクション */}
-            {releaseInfo && releaseInfo.hasRelease && (
-              <ReleaseDetailSection releases={releaseInfo.releases} />
-            )}
-
-            {/* 関連情報セクション */}
-            {relatedInfo && (
-              <RelatedInfoSection relatedInfo={relatedInfo} />
-            )}
-          </>
-        )}
-      </div>
-
       {/* ファイル一覧・内容表示 */}
       <div className="flex flex-1 min-h-0">
         {/* ファイル一覧パネル */}
-        <div className="w-1/3 border-r border-gray-200 overflow-auto">
+        <div className="w-1/3 border-r border-gray-200 overflow-auto bg-gray-50">
           <div className="p-2">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2 py-1">
               成果物ファイル ({fileList.length})
             </h4>
             {fileList.length === 0 ? (
@@ -296,18 +219,18 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
               </div>
             ) : (
               <ul className="space-y-0.5">
-                {fileList.map((file) => (
+                {fileList.map((file, idx) => (
                   <li key={file.path}>
                     <button
                       onClick={() => setSelectedFile(file)}
-                      className={`w-full flex items-center px-2 py-1.5 text-left text-sm rounded-md transition-colors ${
+                      className={`w-full flex items-center px-3 py-2 text-left text-sm rounded-md transition-all duration-150 ${
                         selectedFile?.path === file.path
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'text-gray-700 hover:bg-gray-100'
+                          ? 'bg-blue-100 text-blue-700 shadow-sm border border-blue-200'
+                          : `text-gray-700 hover:bg-white hover:shadow-sm ${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white/50'}`
                       }`}
                       title={file.path}
                     >
-                      <span className="flex-shrink-0 mr-2">{getFileIcon(file)}</span>
+                      <span className="flex-shrink-0 mr-2.5 flex items-center">{getFileIcon(file)}</span>
                       <span className="truncate">{file.name}</span>
                     </button>
                   </li>
@@ -318,11 +241,11 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
         </div>
 
         {/* コンテンツ表示パネル */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-auto p-4 bg-white">
           {!selectedFile && (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <svg
-                className="w-12 h-12 text-gray-300 mb-3"
+                className="w-12 h-12 text-gray-200 mb-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -340,7 +263,7 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                 />
               </svg>
-              <p className="text-sm text-gray-500">ファイルを選択してください</p>
+              <p className="text-sm text-gray-400">ファイルを選択してください</p>
             </div>
           )}
 
@@ -382,9 +305,12 @@ export const ArtifactsBrowser: React.FC<ArtifactsBrowserProps> = ({
           {selectedFile && !contentLoading && fileContent !== null && (
             <div>
               {/* ファイルパスヘッダー */}
-              <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                <span className="flex-shrink-0 mr-2">{getFileIcon(selectedFile)}</span>
-                <span className="text-sm font-medium text-gray-700 truncate">
+              <div className="flex items-center mb-3 pb-2.5 border-b border-gray-200">
+                <span className="flex-shrink-0 mr-2.5 flex items-center">{getFileIcon(selectedFile)}</span>
+                <span className="text-sm font-semibold text-gray-700 truncate">
+                  {selectedFile.name}
+                </span>
+                <span className="text-xs text-gray-400 ml-2 truncate hidden sm:inline">
                   {selectedFile.path}
                 </span>
               </div>
