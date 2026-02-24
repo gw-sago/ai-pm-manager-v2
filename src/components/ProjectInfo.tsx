@@ -72,44 +72,73 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInfoEmpty, setIsInfoEmpty] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // トースト自動消去
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [toast]);
+
+  // プロジェクト情報をロード（初回＋リフレッシュ後の再取得に使用）
+  const loadProjectInfo = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setIsInfoEmpty(false);
+    setSelectedPageId(null);
+    setPageContent(null);
+
+    try {
+      const pages = await window.electronAPI.getInfoPages(projectId);
+      if (pages && pages.pages.length > 0) {
+        setInfoPages(pages);
+        setFallbackContent(null);
+      } else {
+        setInfoPages(null);
+        const mdContent = await window.electronAPI.getProjectInfoFile(projectId);
+        if (mdContent) {
+          setFallbackContent(mdContent);
+        } else {
+          setIsInfoEmpty(true);
+        }
+      }
+    } catch (err) {
+      console.error('[ProjectInfo] Failed to load project info:', err);
+      setError('プロジェクト情報の読み込みに失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId]);
 
   // INFO_PAGESの存在確認 + フォールバック読み込み
   useEffect(() => {
     if (!projectId) return;
-
-    const loadProjectInfo = async () => {
-      setIsLoading(true);
-      setError(null);
-      setIsInfoEmpty(false);
-      setSelectedPageId(null);
-      setPageContent(null);
-
-      try {
-        // まずINFO_PAGESを試す
-        const pages = await window.electronAPI.getInfoPages(projectId);
-        if (pages && pages.pages.length > 0) {
-          setInfoPages(pages);
-          setFallbackContent(null);
-        } else {
-          // フォールバック: PROJECT_INFO.md
-          setInfoPages(null);
-          const mdContent = await window.electronAPI.getProjectInfoFile(projectId);
-          if (mdContent) {
-            setFallbackContent(mdContent);
-          } else {
-            setIsInfoEmpty(true);
-          }
-        }
-      } catch (err) {
-        console.error('[ProjectInfo] Failed to load project info:', err);
-        setError('プロジェクト情報の読み込みに失敗しました');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadProjectInfo();
-  }, [projectId]);
+  }, [projectId, loadProjectInfo]);
+
+  // プロジェクト情報最新化ハンドラ
+  const handleRefreshProjectInfo = useCallback(async () => {
+    setIsRefreshing(true);
+    setToast(null);
+    try {
+      const result = await window.electronAPI.refreshProjectInfo(projectId);
+      if (result.success) {
+        setToast({ type: 'success', message: 'プロジェクト情報を最新化しました' });
+        await loadProjectInfo();
+      } else {
+        setToast({ type: 'error', message: result.error || '最新化に失敗しました' });
+      }
+    } catch (err) {
+      console.error('[ProjectInfo] Failed to refresh project info:', err);
+      setToast({ type: 'error', message: '最新化中にエラーが発生しました' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [projectId, loadProjectInfo]);
 
   // ページコンテンツ読み込み
   const loadPageContent = useCallback(async (pageId: string) => {
@@ -162,14 +191,70 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     );
   }
 
+  // 最新化ボタンUI（共通）
+  const refreshButton = (
+    <button
+      onClick={handleRefreshProjectInfo}
+      disabled={isRefreshing}
+      className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+        isRefreshing
+          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
+      }`}
+      title="AI がプロジェクト情報を最新の状態に更新します"
+    >
+      {isRefreshing ? (
+        <>
+          <svg className="animate-spin -ml-0.5 mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          最新化中...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          情報を最新化
+        </>
+      )}
+    </button>
+  );
+
+  // トーストUI（共通）
+  const toastUI = toast && (
+    <div className={`fixed bottom-4 right-4 z-50 flex items-center px-4 py-3 rounded-lg shadow-lg ${
+      toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+    }`}>
+      <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {toast.type === 'success' ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        )}
+      </svg>
+      <span className="text-sm font-medium">{toast.message}</span>
+      <button onClick={() => setToast(null)} className="ml-4 text-white hover:text-gray-200">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+
   // フォールバック: PROJECT_INFO.md表示
   if (!infoPages && fallbackContent) {
     return (
       <div className="space-y-4">
+        <div className="flex items-center justify-end px-2">
+          {refreshButton}
+        </div>
         <div className="bg-white rounded-lg shadow p-6">
           <MarkdownViewer content={fallbackContent} />
         </div>
         <ProjectPageGenerator projectId={projectId} />
+        {toastUI}
       </div>
     );
   }
@@ -207,6 +292,9 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   if (infoPages) {
     return (
       <div className="space-y-4 p-2">
+        <div className="flex items-center justify-end">
+          {refreshButton}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {infoPages.pages.map((page) => (
             <button
@@ -231,6 +319,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
           ))}
         </div>
         <ProjectPageGenerator projectId={projectId} />
+        {toastUI}
       </div>
     );
   }

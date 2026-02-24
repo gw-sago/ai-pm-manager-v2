@@ -304,6 +304,16 @@ export interface RefreshResult {
 }
 
 /**
+ * プロジェクト情報最新化結果（ORDER_051 / TASK_173）
+ */
+export interface RefreshProjectInfoResult {
+  success: boolean;
+  projectId: string;
+  message?: string;
+  error?: string;
+}
+
+/**
  * リフレッシュサービスステータス（TASK_256）
  */
 export interface RefreshServiceStatus {
@@ -1263,6 +1273,13 @@ export interface ElectronAPI {
    */
   getActiveFrameworkPath: () => Promise<string>;
 
+  /**
+   * ユーザーデータパスを取得（Roaming絶対パス）
+   * ORDER_053: 成果物パス構築のために公開
+   * @returns %APPDATA%/ai-pm-manager-v2/ のRoaming絶対パス
+   */
+  getUserDataPath: () => Promise<string>;
+
   // プロジェクト管理 (TASK_018)
   /**
    * プロジェクト一覧を取得
@@ -2218,6 +2235,30 @@ export interface ElectronAPI {
   // CHANGELOG.mdèª­ã¿è¾¼ã¿ (ORDER_049 / TASK_162)
   /** CHANGELOG.mdã®åå®¹ãåå¾ */
   getChangelog: () => Promise<{ success: boolean; content: string | null; error?: string }>;
+
+  // ORDER_051: プロジェクト情報最新化
+  /**
+   * プロジェクト情報を最新化（PROJECT_INFO.md を AI で再生成）
+   * @param projectId プロジェクトID
+   * @returns 最新化結果
+   */
+  refreshProjectInfo: (projectId: string) => Promise<RefreshProjectInfoResult>;
+
+  // ORDER_053: 成果物フォルダ・ファイル操作
+  /**
+   * 指定フォルダをOSのファイルマネージャーで開く（shell.openPath）
+   * @param folderPath 開くフォルダの絶対パス（Roaming）
+   * @returns 操作結果
+   */
+  openArtifactsFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * 保存ダイアログを開き、指定ファイルを任意パスへコピーする（dialog.showSaveDialog + fs.copyFile）
+   * @param srcPath コピー元ファイルの絶対パス（Roaming）
+   * @param defaultFileName 保存ダイアログのデフォルトファイル名（省略時はsrcPathのファイル名）
+   * @returns 操作結果
+   */
+  downloadArtifactFile: (srcPath: string, defaultFileName?: string) => Promise<{ success: boolean; canceled?: boolean; savedPath?: string; error?: string }>;
 }
 
 /**
@@ -2262,6 +2303,7 @@ const electronAPI: ElectronAPI = {
   saveConfig: (request: SaveConfigRequest) =>
     ipcRenderer.invoke('config:save', request),
   getActiveFrameworkPath: () => ipcRenderer.invoke('config:get-active-path'),
+  getUserDataPath: () => ipcRenderer.invoke('config:get-user-data-path'),
 
   // プロジェクト管理 (TASK_018)
   getProjects: () => ipcRenderer.invoke('project:get-projects'),
@@ -2579,6 +2621,16 @@ const electronAPI: ElectronAPI = {
   // CHANGELOG.md読み込み (ORDER_049 / TASK_162)
   getChangelog: () =>
     ipcRenderer.invoke('changelog:read'),
+
+  // ORDER_051: プロジェクト情報最新化
+  refreshProjectInfo: (projectId: string) =>
+    ipcRenderer.invoke('project:refresh-project-info', projectId),
+
+  // ORDER_053: 成果物フォルダ・ファイル操作
+  openArtifactsFolder: (folderPath: string) =>
+    ipcRenderer.invoke('shell:open-path', folderPath),
+  downloadArtifactFile: (srcPath: string, defaultFileName?: string) =>
+    ipcRenderer.invoke('shell:save-file-dialog', srcPath, defaultFileName),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

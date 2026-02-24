@@ -1335,6 +1335,66 @@ export function registerProjectHandlers(): void {
 
   console.log('[Project] Project page generation IPC handlers registered (ORDER_021 / TASK_067)');
 
+  // === プロジェクト情報最新化IPCハンドラ (ORDER_051 / TASK_171) ===
+
+  /**
+   * プロジェクト情報最新化
+   * refresh_info.py を spawn で呼び出して PROJECT_INFO.md を AI で再生成する
+   */
+  ipcMain.handle(
+    'project:refresh-project-info',
+    async (_event, projectId: string): Promise<{
+      success: boolean;
+      projectId: string;
+      message?: string;
+      error?: string;
+    }> => {
+      console.log(`[Project IPC] プロジェクト情報最新化リクエスト: ${projectId}`);
+      try {
+        const configService = getConfigService();
+        const backendPath = configService.getBackendPath();
+        if (!backendPath) {
+          return { success: false, projectId, error: 'Backend path not configured' };
+        }
+
+        const scriptPath = path.join(backendPath, 'project', 'refresh_info.py');
+        if (!fs.existsSync(scriptPath)) {
+          return { success: false, projectId, error: `refresh_info.py not found: ${scriptPath}` };
+        }
+
+        const pythonCommand = configService.getPythonPath();
+        const { stdout, stderr } = await execFileAsync(
+          pythonCommand,
+          [scriptPath, projectId, '--json'],
+          { cwd: path.dirname(scriptPath), timeout: 120000 }
+        );
+
+        if (stderr) {
+          console.warn('[Project IPC] refresh_info.py stderr:', stderr);
+        }
+
+        const result = JSON.parse(stdout);
+        if (!result.success) {
+          return { success: false, projectId, error: result.error || 'Unknown error' };
+        }
+        return { success: true, projectId, message: result.message };
+      } catch (error) {
+        console.error('[Project IPC] プロジェクト情報最新化エラー:', error);
+        const errObj = error as { code?: string; message?: string };
+        const errorMsg = errObj.code === 'ENOENT'
+          ? `Pythonが見つかりません。パス: ${getConfigService().getPythonPath()}`
+          : error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          projectId,
+          error: errorMsg,
+        };
+      }
+    }
+  );
+
+  console.log('[Project] Project info refresh IPC handler registered (ORDER_051 / TASK_171)');
+
   console.log('[Project] IPC handlers registered');
 }
 
