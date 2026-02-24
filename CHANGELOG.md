@@ -5,6 +5,19 @@ All notable changes to AI PM Manager V2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-snapshot] - 2026-02-24
+
+### Added
+- projectsテーブルにdev_workspace_pathカラム追加（ORDER_071）
+- execute_task.pyがDBからdev_workspace_pathを取得しWorkerプロンプトに開発環境パスを注入
+- Workerプロンプトに開発環境/Roamingの使い分けルールを明示的に指示
+- project CRUD (create.py, list.py) がdev_workspace_pathカラムに対応
+- db_config.pyのget_project_paths()にdev_workspace返却を追加
+- CLAUDE.mdにビルドルール・環境分離ルール追記
+
+### Fixed
+- Workerサブエージェントがソースコード変更をRoaming側で行いデグレする根本原因を解消
+
 ## [0.1.0] - 2026-02-24
 
 ### Added
