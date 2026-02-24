@@ -98,6 +98,7 @@ def create_project(
     path: Optional[str] = None,
     status: str = "INITIAL",
     is_active: bool = True,
+    dev_workspace_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     プロジェクトをDBに作成
@@ -108,6 +109,7 @@ def create_project(
         path: プロジェクトパス（省略時は PROJECTS/project_id）
         status: 初期ステータス（デフォルト: INITIAL）
         is_active: アクティブフラグ（デフォルト: True）
+        dev_workspace_path: 開発環境パス（省略時はNULL）
 
     Returns:
         作成されたプロジェクト情報
@@ -134,15 +136,29 @@ def create_project(
 
     conn = get_connection()
     try:
+        # dev_workspace_path カラムの存在チェック（後方互換性）
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()]
+        has_dev_ws = "dev_workspace_path" in cols
+
         # プロジェクト作成
-        execute_query(
-            conn,
-            """
-            INSERT INTO projects (id, name, path, status, is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (project_id, name, path, status, 1 if is_active else 0, now, now)
-        )
+        if has_dev_ws:
+            execute_query(
+                conn,
+                """
+                INSERT INTO projects (id, name, path, status, is_active, dev_workspace_path, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (project_id, name, path, status, 1 if is_active else 0, dev_workspace_path, now, now)
+            )
+        else:
+            execute_query(
+                conn,
+                """
+                INSERT INTO projects (id, name, path, status, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (project_id, name, path, status, 1 if is_active else 0, now, now)
+            )
         conn.commit()
 
         # 作成したプロジェクトを取得して返す
@@ -191,6 +207,8 @@ def main():
                         help="初期ステータス（デフォルト: INITIAL）")
     parser.add_argument("--inactive", action="store_true",
                         help="非アクティブとして作成")
+    parser.add_argument("--dev-workspace-path",
+                        help="開発環境パス（ソースリポジトリパス）")
     parser.add_argument("--json", action="store_true", help="JSON形式で出力")
 
     args = parser.parse_args()
@@ -202,6 +220,7 @@ def main():
             path=args.path,
             status=args.status,
             is_active=not args.inactive,
+            dev_workspace_path=args.dev_workspace_path,
         )
 
         if args.json:

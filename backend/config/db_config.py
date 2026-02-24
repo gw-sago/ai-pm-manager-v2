@@ -253,12 +253,35 @@ def get_project_paths(project_id: str) -> dict:
             - orders: ORDERSディレクトリパス
             - result: RESULTディレクトリパス
             - release_log: RELEASE_LOG.mdパス
+            - dev_workspace: 開発環境パス（DBから取得、未設定時はNone）
 
     Note:
         backlogパスは廃止されました（ORDER_090）。
         バックログはDBで管理されています。
     """
     base = USER_DATA_PATH / "PROJECTS" / project_id
+
+    # DBから dev_workspace_path を取得（利用可能な場合）
+    dev_workspace = None
+    try:
+        import sqlite3
+        db_path = USER_DATA_PATH / "data" / "aipm.db"
+        if db_path.exists():
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            try:
+                cols = [row[1] for row in conn.execute("PRAGMA table_info(projects)").fetchall()]
+                if "dev_workspace_path" in cols:
+                    row = conn.execute(
+                        "SELECT dev_workspace_path FROM projects WHERE id = ?",
+                        (project_id,),
+                    ).fetchone()
+                    if row and row["dev_workspace_path"]:
+                        dev_workspace = Path(row["dev_workspace_path"])
+            finally:
+                conn.close()
+    except Exception:
+        pass
 
     return {
         "base": base,
@@ -268,4 +291,5 @@ def get_project_paths(project_id: str) -> dict:
         "release_log": base / "RELEASE_LOG.md",
         "docs": base / "docs",
         "docs_index": base / "docs" / "INDEX.md",
+        "dev_workspace": dev_workspace,
     }

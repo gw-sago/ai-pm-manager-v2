@@ -74,8 +74,13 @@ CLI操作で使用可能なコマンド:
 
 ### 「ビルドお願いします」ルール
 ユーザーが「ビルド」「ビルドお願いします」と言った場合、以下を**すべて自動実行**する:
-1. ソースリポジトリでインストーラービルド: `cd /d/your_workspace/ai-pm-manager-v2 && npx electron-forge make`
-2. 生成されたSetup.exeを実行してインストール
+1. **CHANGELOG.md を更新**: 前回ビルド以降の`git log`差分を確認し、CHANGELOG.mdに追記する
+2. **インストーラービルド**: `cd /d/your_workspace/ai-pm-manager-v2 && npx electron-forge make`
+3. **Setup.exeを実行してインストール**
+4. **GitHub Releasesを更新**:
+   - `gh release delete v0.1.0-snapshot --yes` で既存リリースを削除
+   - `gh release create v0.1.0-snapshot` で再作成し、Setup.exeを添付
+   - **リリースノート**: CHANGELOG.mdの最新セクションの内容を使用する
 
 **補足**: Squirrelインストーラーはバージョンディレクトリ（app-X.X.X/）のみ差し替え、data/aipm.db と PROJECTS/ には触れない。deployResources()（main.ts）がbackend/等のリソースのみ展開し、永続データを保護する。バックアップ&リストアは不要。
 
@@ -99,6 +104,44 @@ out/make/squirrel.windows/x64/ai-pm-manager-v2-0.1.0 Setup.exe
 2. **better-sqlite3**: webpack.main.config.js で `externals: { 'better-sqlite3': 'commonjs better-sqlite3' }` が必要
 3. **preload.ts**: forge.config.js の entryPoints に preload 設定が必要
 4. **DB駆動のみ**: MDモードは廃止済み。全データはSQLite DBで管理
+5. **本番DB直接操作禁止**: 下記「開発環境と本番環境の分離」ルールを厳守すること
+6. **Roaming側スクリプト直接編集禁止**: `%APPDATA%\ai-pm-manager-v2\backend\` 配下のファイルを直接作成・変更・削除してはならない。スクリプトの変更は必ずソースリポジトリ（`d:\your_workspace\ai-pm-manager-v2\backend\`）で行い、ビルド＆インストールでデプロイすること。Roaming側を直接触るとソースとの乖離が生じ、次回ビルドで予期せず上書き・残存してデグレの原因になる
+
+## 開発環境と本番環境の分離（重要）
+
+**絶対ルール: 開発・テスト・マイグレーションで本番DBを直接操作してはならない。**
+
+### 環境定義
+
+| 環境 | パス | 用途 |
+|------|------|------|
+| **開発環境（ソース）** | `d:\your_workspace\ai-pm-manager-v2\` | コード編集・ビルド・テスト・マイグレーション開発 |
+| **本番環境（Roaming）** | `%APPDATA%\ai-pm-manager-v2\` | ユーザーが実際に使うアプリのデータ |
+
+### 開発時のDB操作ルール
+
+1. **マイグレーションの開発・テスト**: 開発環境のテスト用DBで実行する
+   ```bash
+   # テスト用DBを作成してマイグレーションを検証
+   cd d:/your_workspace/ai-pm-manager-v2
+   cp data/aipm.db data/test_aipm.db          # 本番のコピーでテスト
+   AIPM_DB_PATH=data/test_aipm.db python backend/migrations/XXX.py
+   ```
+2. **Workerサブエージェントのタスク実行（スクリプト開発・テスト）**: 開発環境内で完結させる
+3. **本番DBへの反映**: ビルド＆インストール後にアプリ起動時のマイグレーションで自動適用、または `/aipm-release` 経由のみ許可
+
+### 本番DBに触れてよい場合（限定的）
+
+- `/aipm-pm`, `/aipm-worker`, `/aipm-review` 等のスラッシュコマンド経由での通常運用操作
+- `/aipm-release` によるリリース処理
+- `/aipm-status`, `/aipm` 等の**読み取り専用**の状態確認
+
+### やってはいけないこと
+
+- マイグレーションスクリプトを本番DBに直接実行
+- テストデータを本番DBに作成
+- 開発中のスクリプトを本番DBパスで試し実行
+- `python backend/xxx.py` をRoaming環境のcwdで実行してDB変更を伴う処理を行う
 
 ## 永続データのパスルール（Roaming必須）
 

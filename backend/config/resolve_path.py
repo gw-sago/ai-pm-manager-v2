@@ -68,7 +68,7 @@ def main():
         print(json.dumps(result, ensure_ascii=False, indent=2))
         sys.exit(0 if result["is_roaming"] else 1)
 
-    output = {k: str(v) for k, v in paths.items()}
+    output = {k: str(v) if v is not None else None for k, v in paths.items()}
     output["user_data_path"] = str(USER_DATA_PATH)
 
     if args.json:

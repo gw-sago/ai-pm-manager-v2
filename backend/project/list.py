@@ -149,9 +149,15 @@ def list_projects(
         # is_active カラムの存在チェック（後方互換性）
         has_is_active_column = _check_is_active_column_exists(conn)
 
+        # dev_workspace_path カラムの存在チェック（後方互換性）
+        has_dev_workspace_path = "dev_workspace_path" in [
+            row["name"] for row in fetch_all(conn, "PRAGMA table_info(projects)")
+        ]
+
         # クエリ構築
+        dev_ws_col = ",\n                p.dev_workspace_path" if has_dev_workspace_path else ""
         if has_is_active_column:
-            query = """
+            query = f"""
             SELECT
                 p.id,
                 p.name,
@@ -160,12 +166,12 @@ def list_projects(
                 p.current_order_id,
                 p.created_at,
                 p.updated_at,
-                p.is_active
+                p.is_active{dev_ws_col}
             FROM projects p
             WHERE 1=1
             """
         else:
-            query = """
+            query = f"""
             SELECT
                 p.id,
                 p.name,
@@ -173,7 +179,7 @@ def list_projects(
                 p.status,
                 p.current_order_id,
                 p.created_at,
-                p.updated_at
+                p.updated_at{dev_ws_col}
             FROM projects p
             WHERE 1=1
             """
