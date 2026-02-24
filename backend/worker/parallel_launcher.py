@@ -266,6 +266,10 @@ class ParallelWorkerLauncher:
         # Track running review_worker processes {task_id: {"process": Popen, "pid": int, "log_file": str, "launched_at": str}}
         self._running_review_workers: Dict[str, Dict[str, Any]] = {}
 
+        # ORDER_055: REWORK loop control
+        self._rework_counters: Dict[str, int] = {}  # {task_id: rework_count}
+        self._max_rework: int = 3  # Maximum REWORK retries before ESCALATED
+
         # Daemon shutdown flag
         self._shutdown_requested = False
 
@@ -1209,9 +1213,68 @@ class ParallelWorkerLauncher:
                         f"[daemon] Failed to emit event for {task_id}: {e}"
                     )
 
+            # ORDER_055: Worker正常完了後にPMレビューを自動起動
+            if retcode == 0 and not self.no_review:
+                self._auto_launch_review_for_task(task_id)
+
         # Recover workers whose PID is dead but proc.poll() missed it (TASK_1156)
         for task_id in crashed_pids:
             self._recover_stuck_worker(task_id, detection_method="pid_alive_check")
+
+    # ------------------------------------------------------------------
+    # ORDER_055: Worker完了→PMレビュー自動起動
+    # ------------------------------------------------------------------
+
+    def _auto_launch_review_for_task(self, task_id: str) -> None:
+        """
+        Worker正常完了後にPMレビュー（review_worker.py）を自動起動する。
+
+        ORDER_055で追加。UIのWorkerボタン実行とCLIの/aipm-full-autoの
+        動作を一致させるため、Daemon内でWorker完了→レビュー→REWORK分岐を
+        自動制御する。
+
+        Args:
+            task_id: 完了したタスクID（例: TASK_185）
+        """
+        # Skip if already under review
+        if task_id in self._running_review_workers:
+            logger.debug(
+                f"[auto_review] {task_id} already under review, skipping"
+            )
+            return
+
+        # Build task info dict for _launch_review_worker
+        review_task = {
+            "task_id": task_id,
+            "project_id": self.project_id,
+            "order_id": self.order_id,
+        }
+
+        logger.info(
+            f"[auto_review] Worker {task_id} completed successfully. "
+            f"Auto-launching PM review..."
+        )
+
+        # Emit review start event for UI notification
+        if self._event_notifier:
+            try:
+                self._event_notifier.emit_resource_changed(
+                    task_id,
+                    metadata={"phase": "REVIEW_STARTED", "detail": "Auto-review after Worker completion"},
+                )
+            except Exception as e:
+                logger.debug(f"[auto_review] Failed to emit REVIEW_STARTED: {e}")
+
+        success = self._launch_review_worker(review_task)
+        if success:
+            logger.info(
+                f"[auto_review] Review worker launched for {task_id}"
+            )
+        else:
+            logger.warning(
+                f"[auto_review] Failed to launch review worker for {task_id}. "
+                f"Task will remain in DONE state for manual review."
+            )
 
     def _daemon_launch_batch(self, tasks: List[Dict[str, Any]]) -> None:
         """
@@ -1384,7 +1447,11 @@ class ParallelWorkerLauncher:
 
     def _reap_finished_review_workers(self) -> None:
         """
-        Check for finished review_worker processes and log their results.
+        Check for finished review_worker processes, handle review results,
+        and trigger REWORK loop if needed.
+
+        ORDER_055: Enhanced to read DB task status after review completion
+        and auto-restart Workers for REWORK tasks (up to _max_rework times).
 
         Removes completed review_workers from _running_review_workers.
         """
@@ -1396,7 +1463,7 @@ class ParallelWorkerLauncher:
 
             if retcode is not None:
                 # Process finished
-                finished_tasks.append(task_id)
+                finished_tasks.append((task_id, retcode, info))
                 log_file = info.get("log_file", "")
 
                 if retcode == 0:
@@ -1411,15 +1478,197 @@ class ParallelWorkerLauncher:
                         f"Check log: {log_file}"
                     )
 
-        # Remove finished review_workers from tracking
-        for task_id in finished_tasks:
+        # Remove finished review_workers from tracking and handle results
+        for task_id, retcode, info in finished_tasks:
             del self._running_review_workers[task_id]
+
+            # ORDER_055: Handle review verdict based on DB task status
+            if retcode == 0:
+                self._handle_review_result(task_id)
 
         if finished_tasks:
             logger.debug(
                 f"[review_worker] Reaped {len(finished_tasks)} finished review_worker(s): "
-                f"{', '.join(finished_tasks)}"
+                f"{', '.join(t[0] for t in finished_tasks)}"
             )
+
+    def _handle_review_result(self, task_id: str) -> None:
+        """
+        ORDER_055: Handle review result by checking DB task status
+        and triggering REWORK loop if needed.
+
+        After review_worker.py completes, process_review.py has already
+        updated the DB:
+        - APPROVED → status=COMPLETED
+        - REJECTED → status=REWORK, reject_count incremented
+        - ESCALATED → status=ESCALATED
+
+        This method reads the resulting status and acts accordingly.
+        """
+        try:
+            conn = get_connection()
+            try:
+                row = fetch_one(
+                    conn,
+                    """
+                    SELECT status, reject_count
+                    FROM tasks
+                    WHERE id = ? AND project_id = ?
+                    """,
+                    (task_id, self.project_id),
+                )
+            finally:
+                conn.close()
+
+            if not row:
+                logger.warning(f"[rework_loop] Task {task_id} not found in DB")
+                return
+
+            status = row["status"]
+            reject_count = row["reject_count"] or 0
+
+            if status == "COMPLETED":
+                # APPROVED: Task passed review
+                logger.info(
+                    f"[rework_loop] {task_id}: APPROVED (now COMPLETED)"
+                )
+                # Emit completion event for UI
+                if self._event_notifier:
+                    try:
+                        self._event_notifier.emit_resource_changed(
+                            task_id,
+                            metadata={"phase": "REVIEW_APPROVED", "status": "COMPLETED"},
+                        )
+                    except Exception:
+                        pass
+
+            elif status == "REWORK":
+                # REJECTED: Need to re-run Worker
+                rework_count = self._rework_counters.get(task_id, 0) + 1
+                self._rework_counters[task_id] = rework_count
+
+                if rework_count >= self._max_rework:
+                    # Exceeded max rework attempts → ESCALATE
+                    logger.warning(
+                        f"[rework_loop] {task_id}: REWORK count ({rework_count}) >= "
+                        f"MAX_REWORK ({self._max_rework}). Escalating."
+                    )
+                    try:
+                        update_task(
+                            self.project_id,
+                            task_id,
+                            status="ESCALATED",
+                            role="PM",
+                            reason=f"REWORK上限超過 ({rework_count}/{self._max_rework})",
+                        )
+                    except Exception as e:
+                        logger.error(f"[rework_loop] Failed to escalate {task_id}: {e}")
+
+                    # Emit escalation event for UI
+                    if self._event_notifier:
+                        try:
+                            self._event_notifier.emit_resource_changed(
+                                task_id,
+                                metadata={
+                                    "phase": "REWORK_ESCALATED",
+                                    "rework_count": rework_count,
+                                    "max_rework": self._max_rework,
+                                },
+                            )
+                        except Exception:
+                            pass
+                else:
+                    # Re-launch Worker for REWORK task
+                    logger.info(
+                        f"[rework_loop] {task_id}: REJECTED → REWORK "
+                        f"(attempt {rework_count}/{self._max_rework}). "
+                        f"Re-launching Worker..."
+                    )
+
+                    # Emit rework event for UI
+                    if self._event_notifier:
+                        try:
+                            self._event_notifier.emit_resource_changed(
+                                task_id,
+                                metadata={
+                                    "phase": "REWORK_RETRY",
+                                    "rework_count": rework_count,
+                                    "max_rework": self._max_rework,
+                                    "reject_count": reject_count,
+                                },
+                            )
+                        except Exception:
+                            pass
+
+                    # Fetch task info for worker launch
+                    self._relaunch_worker_for_rework(task_id)
+
+            elif status == "ESCALATED":
+                # ESCALATED: Needs user intervention
+                logger.warning(
+                    f"[rework_loop] {task_id}: Review resulted in ESCALATED. "
+                    f"User intervention required."
+                )
+                if self._event_notifier:
+                    try:
+                        self._event_notifier.emit_resource_changed(
+                            task_id,
+                            metadata={"phase": "REVIEW_ESCALATED", "status": "ESCALATED"},
+                        )
+                    except Exception:
+                        pass
+
+            else:
+                logger.debug(
+                    f"[rework_loop] {task_id}: Post-review status={status} "
+                    f"(no REWORK loop action)"
+                )
+
+        except Exception as e:
+            logger.error(f"[rework_loop] Error handling review result for {task_id}: {e}")
+
+    def _relaunch_worker_for_rework(self, task_id: str) -> None:
+        """
+        ORDER_055: Re-launch a Worker for a REWORK task.
+
+        Fetches task info from DB and launches via _daemon_launch_batch().
+        The task is already in REWORK status (set by process_review.py).
+        """
+        try:
+            conn = get_connection()
+            try:
+                row = fetch_one(
+                    conn,
+                    """
+                    SELECT id, title, priority, target_files, status
+                    FROM tasks
+                    WHERE id = ? AND project_id = ?
+                    """,
+                    (task_id, self.project_id),
+                )
+            finally:
+                conn.close()
+
+            if not row:
+                logger.error(f"[rework_loop] Cannot relaunch {task_id}: not found in DB")
+                return
+
+            # Build task dict compatible with _daemon_launch_batch
+            task_info = {
+                "id": row["id"],
+                "title": row["title"],
+                "priority": row["priority"],
+                "target_files": row["target_files"],
+                "status": row["status"],
+            }
+
+            logger.info(
+                f"[rework_loop] Relaunching Worker for REWORK task {task_id}"
+            )
+            self._daemon_launch_batch([task_info])
+
+        except Exception as e:
+            logger.error(f"[rework_loop] Failed to relaunch {task_id}: {e}")
 
     # ------------------------------------------------------------------
     # Worker health monitoring (TASK_1013)

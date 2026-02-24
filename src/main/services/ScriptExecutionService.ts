@@ -1451,6 +1451,16 @@ export class ScriptExecutionService extends EventEmitter {
     // ORDER_072: --loopオプションで依存関係を考慮した連続実行を有効化
     const args = [scriptPath, projectId, taskId, '--json', '--verbose', '--loop'];
 
+    // ORDER_055: REWORKタスクに--is-rework/--rework-commentフラグを追加
+    const taskStatus = await this.getTaskStatus(pythonCommand, cwd, projectId, taskId);
+    if (taskStatus === 'REWORK') {
+      args.push('--is-rework');
+      const commentResult = await this.getReworkComment(pythonCommand, cwd, projectId, taskId);
+      if (commentResult) {
+        args.push('--rework-comment', commentResult);
+      }
+    }
+
     this.emit('progress', {
       executionId: job.executionId,
       type: 'worker',
@@ -1540,6 +1550,17 @@ export class ScriptExecutionService extends EventEmitter {
 
     // --loopオプションで連続実行（execute_task.py側で依存関係をチェック）
     const taskArgs = [scriptPath, projectId, firstTask.id, '--json', '--verbose', '--loop'];
+
+    // ORDER_055: REWORKタスクに--is-rework/--rework-commentフラグを追加
+    if (firstTask.status === 'REWORK') {
+      taskArgs.push('--is-rework');
+      // change_historyからrework_commentを取得
+      const commentResult = await this.getReworkComment(pythonCommand, cwd, projectId, firstTask.id);
+      if (commentResult) {
+        taskArgs.push('--rework-comment', commentResult);
+      }
+    }
+
     const taskResult = await this.runPythonScript(pythonCommand, taskArgs, cwd, WORKER_TIMEOUT_MS);
 
     job.stdout += taskResult.stdout;
@@ -1580,6 +1601,72 @@ export class ScriptExecutionService extends EventEmitter {
       console.warn(`[ScriptExecution] Failed to parse task list:`, e);
     }
     return [];
+  }
+
+  // ------------------------------------------------------------------
+  // ORDER_055: REWORK support helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * ORDER_055: タスクのステータスをDBから取得
+   */
+  private async getTaskStatus(
+    pythonCommand: string,
+    cwd: string,
+    projectId: string,
+    taskId: string
+  ): Promise<string | null> {
+    try {
+      const getScript = path.join(cwd, 'backend', 'task', 'get.py');
+      const result = await this.runPythonScript(
+        pythonCommand, [getScript, projectId, taskId, '--json'], cwd
+      );
+      if (result.success && result.stdout) {
+        const jsonMatch = result.stdout.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return parsed.status || null;
+        }
+      }
+    } catch (e) {
+      console.warn(`[ScriptExecution] Failed to get task status for ${taskId}:`, e);
+    }
+    return null;
+  }
+
+  /**
+   * ORDER_055: change_historyから最新の差し戻しコメントを取得
+   */
+  private async getReworkComment(
+    pythonCommand: string,
+    cwd: string,
+    projectId: string,
+    taskId: string
+  ): Promise<string | null> {
+    try {
+      // historyから最新のREWORK遷移の理由を取得
+      const script = path.join(cwd, 'backend', 'task', 'get.py');
+      const result = await this.runPythonScript(
+        pythonCommand, [script, projectId, taskId, '--detail', '--json'], cwd
+      );
+      if (result.success && result.stdout) {
+        const jsonMatch = result.stdout.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          // historyから最新のREWORK関連コメントを取得
+          const history = parsed.history || [];
+          for (let i = history.length - 1; i >= 0; i--) {
+            const entry = history[i] as { new_value?: string; change_reason?: string };
+            if (entry.new_value === 'REWORK' && entry.change_reason) {
+              return entry.change_reason;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[ScriptExecution] Failed to get rework comment for ${taskId}:`, e);
+    }
+    return null;
   }
 
   /**

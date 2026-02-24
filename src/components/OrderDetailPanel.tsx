@@ -87,6 +87,30 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
 
   const progress = getOrderProgress();
 
+  // ORDER_055: Worker→Review→REWORKサイクルの現在フェーズを判定
+  const getWorkerCyclePhase = (): { phase: string; label: string; detail: string } => {
+    const tasks = order.tasks || [];
+    const inProgressCount = tasks.filter(t => t.status === 'IN_PROGRESS').length;
+    const doneCount = tasks.filter(t => t.status === 'DONE').length;
+    const reworkCount = tasks.filter(t => t.status === 'REWORK').length;
+
+    if (doneCount > 0) {
+      return { phase: 'review', label: 'レビュー中...', detail: `${doneCount}件レビュー待ち` };
+    }
+    if (reworkCount > 0 && inProgressCount > 0) {
+      return { phase: 'rework', label: 'REWORK対応中...', detail: `${reworkCount}件差し戻し` };
+    }
+    if (reworkCount > 0) {
+      return { phase: 'rework_pending', label: 'REWORK待機中', detail: `${reworkCount}件差し戻し` };
+    }
+    if (inProgressCount > 0) {
+      return { phase: 'working', label: 'Worker実行中...', detail: `${inProgressCount}件実行中` };
+    }
+    return { phase: 'idle', label: 'Worker実行中...', detail: '' };
+  };
+
+  const cyclePhase = isWorkerRunning ? getWorkerCyclePhase() : null;
+
   // ORDER_131 TASK_1137: ORDER状態判定hook（個別無効理由対応）
   const {
     canExecuteWorker,
@@ -540,7 +564,11 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Worker実行中...</span>
+                  {/* ORDER_055: サイクルフェーズに応じた表示 */}
+                  <span>{cyclePhase?.label || 'Worker実行中...'}</span>
+                  {cyclePhase?.detail && (
+                    <span className="text-xs opacity-75">({cyclePhase.detail})</span>
+                  )}
                 </>
               ) : (
                 <>
