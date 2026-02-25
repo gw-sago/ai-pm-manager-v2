@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - DashboardService.getAllBacklogs()のスクリプトをorder/list.pyに切り替え
   - レスポンスパースをorder/list.pyの直接配列形式に対応
   - BacklogFilterBarのステータス定数をORDER用に更新（PLANNING,REVIEW,COMPLETED等）
+- バックグラウンドログタブが7000件超のログで重い・読み込み停止する不具合を修正（ORDER_090）
+  - ステータス判定キャッシュ導入、表示件数を最新100件に制限
+  - リフレッシュ間隔を10秒→30秒に延長、非表示時はリフレッシュ停止
+- PMボタンがDB駆動ORDERで動作しない不具合を修正（ORDER_091）
 - ドキュメントタブのファイルツリーにファイル名が表示されないバグ修正（ORDER_087）
 
 ### Changed
+- 非推奨backlog関連コードを削除しORDER命名に統一（ORDER_089）
 - 「バックログ」タブを「ORDER一覧」に統一
 
 ### Added
