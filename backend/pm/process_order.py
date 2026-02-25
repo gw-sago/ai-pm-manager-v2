@@ -206,13 +206,17 @@ class PMProcessor:
                 else:
                     self._log_step("create_tasks", "warning", "タスクが作成されませんでした")
 
-            # Step 6: ORDERステータス更新（全ステップ成功時のみ）
+            # Step 6: ORDERステータス更新
+            # ORDER_093: タスクが作成されていればIN_PROGRESSに遷移（要件定義の成否は問わない）
             # skip_aiモードの場合はDB登録のみなのでステータス更新を実行
-            if self.skip_ai or (requirements_generated and tasks_created):
+            if self.skip_ai or tasks_created:
+                if not requirements_generated and tasks_created:
+                    self._log_step("update_order", "warning",
+                        "要件定義は未生成ですが、タスクが作成されたためIN_PROGRESSに遷移します")
                 self._step_update_order_status()
             else:
                 self._log_step("update_order", "skip",
-                    "要件定義またはタスク作成が未完了のため、PLANNINGステータスを維持します")
+                    "タスクが作成されなかったため、PLANNINGステータスを維持します")
                 # PLANNINGのまま維持 - ステータス更新はスキップ
 
             self.results["success"] = True

@@ -1194,8 +1194,8 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
           )}
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          {/* PM実行ボタン（ORDER_039追加、ORDER_123でツールチップ拡張, ORDER_065: DRAFT ORDERにも表示） */}
-          {(!item.relatedOrderId || item.orderStatus === 'DRAFT') && (
+          {/* PM実行ボタン（ORDER_039追加、ORDER_123でツールチップ拡張, ORDER_065: DRAFT ORDERにも表示, ORDER_093: PLANNING時もPMリトライ表示） */}
+          {(!item.relatedOrderId || item.orderStatus === 'DRAFT' || item.orderStatus === 'PLANNING') && (
             <button
               onClick={handleExecutePm}
               disabled={!canExecutePm}
@@ -1234,8 +1234,8 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
               )}
             </button>
           )}
-          {/* Worker実行ボタン（ORDER_039追加、TASK_1137でツールチップ拡張, ORDER_065: DRAFTでは非表示） */}
-          {item.relatedOrderId && item.orderStatus === 'IN_PROGRESS' && (
+          {/* Worker実行ボタン（ORDER_039追加、TASK_1137でツールチップ拡張, ORDER_065: DRAFTでは非表示, ORDER_093: PLANNING時もタスク存在時表示） */}
+          {item.relatedOrderId && (item.orderStatus === 'IN_PROGRESS' || item.orderStatus === 'PLANNING') && (
             <button
               onClick={handleExecuteWorker}
               disabled={!canExecuteWorker}
