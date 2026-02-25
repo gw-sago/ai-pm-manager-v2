@@ -5,8 +5,11 @@ AI PM Framework - Review処理親スクリプト
 REPORT読み込み → claude -p でレビュー実施 → 判定(APPROVED/REJECTED/ESCALATED) → DB更新
 を1コマンドで完結させる。
 
+BaseScript（utils/base_script.py）を継承した実装。
+
 Usage:
     python backend/review/process_review.py PROJECT_NAME TASK_ID [options]
+    python backend/review/process_review.py PROJECT_NAME --batch TASK_ID1,TASK_ID2,... [options]
 
 Options:
     --dry-run       実行計画のみ表示（AI呼び出し・DB更新なし）
@@ -16,11 +19,14 @@ Options:
     --timeout SEC   claude -p タイムアウト秒数（デフォルト: 300）
     --model MODEL   AIモデル（haiku/sonnet/opus、デフォルト: sonnet）
     --auto-approve  レビューなしで自動承認
+    --batch IDS     複数タスクを一括処理（カンマ区切りまたはファイルパス）
 
 Example:
     python backend/review/process_review.py AI_PM_PJ TASK_602
     python backend/review/process_review.py AI_PM_PJ TASK_602 --dry-run
     python backend/review/process_review.py AI_PM_PJ TASK_602 --auto-approve
+    python backend/review/process_review.py AI_PM_PJ --batch TASK_601,TASK_602,TASK_603
+    python backend/review/process_review.py AI_PM_PJ --batch task_ids.txt
 
 内部処理:
 1. タスク・REPORT情報取得（status='DONE' AND reviewed_at IS NULL）
@@ -48,6 +54,9 @@ _project_root = _package_root.parent
 
 if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
+
+# BaseScript インポート（utils/base_script.py から）
+from utils.base_script import BaseScript
 
 # ロギング設定
 logging.basicConfig(
@@ -1281,45 +1290,74 @@ JSONのみを出力し、説明文は含めないでください。"""
         return "\n".join(lines)
 
 
-def main():
-    """CLI エントリーポイント"""
-    # Windows環境でのUTF-8出力設定
-    try:
-        from config import setup_utf8_output
-        setup_utf8_output()
-    except ImportError:
-        pass
+class BatchReviewResult:
+    """バッチレビューの集計結果"""
 
-    parser = argparse.ArgumentParser(
-        description="レビュー処理を1コマンドで実行",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
-    )
+    def __init__(self, project_id: str):
+        self.project_id = project_id
+        self.task_results: list = []
+        self.total = 0
+        self.approved = 0
+        self.rejected = 0
+        self.escalated = 0
+        self.failed = 0
 
-    parser.add_argument("project_id", help="プロジェクトID")
-    parser.add_argument("task_id", help="タスクID（例: 602 または TASK_602）")
-    parser.add_argument("--dry-run", action="store_true", help="実行計画のみ表示")
-    parser.add_argument("--skip-ai", action="store_true", help="AI処理をスキップ")
-    parser.add_argument("--auto-approve", action="store_true", help="自動承認")
-    parser.add_argument("--verbose", "-v", action="store_true", help="詳細ログ出力")
-    parser.add_argument("--json", action="store_true", help="JSON形式で出力")
-    parser.add_argument("--timeout", type=int, default=300, help="タイムアウト秒数")
-    parser.add_argument("--model", default="sonnet", help="AIモデル（haiku/sonnet/opus）")
-    parser.add_argument("--auto-rework", action="store_true", default=True, help="REJECTED時にWorkerを自動起動してリワーク（デフォルト: 有効）")
-    parser.add_argument("--no-rework", action="store_true", help="自動リワークを無効化")
-    parser.add_argument("--rework-model", help="リワーク用AIモデル（デフォルト: レビューと同じ）")
-    parser.add_argument("--max-rework", type=int, default=3, help="リワーク回数上限（デフォルト: 3）")
+    def add(self, task_id: str, result: Dict[str, Any]) -> None:
+        self.task_results.append({"task_id": task_id, **result})
+        self.total += 1
+        if not result.get("success"):
+            self.failed += 1
+            return
+        verdict = result.get("verdict", "")
+        if verdict == ReviewVerdict.APPROVED:
+            self.approved += 1
+        elif verdict == ReviewVerdict.REJECTED:
+            self.rejected += 1
+        elif verdict == ReviewVerdict.ESCALATED:
+            self.escalated += 1
 
-    args = parser.parse_args()
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "total": self.total,
+            "approved": self.approved,
+            "rejected": self.rejected,
+            "escalated": self.escalated,
+            "failed": self.failed,
+            "results": self.task_results,
+        }
 
-    # 詳細ログモード
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
 
-    # レビュー処理実行
+def _parse_batch_task_ids(batch_arg: str) -> list:
+    """
+    --batch 引数からタスクIDリストを生成する。
+
+    Args:
+        batch_arg: カンマ区切りのタスクIDまたはファイルパス
+
+    Returns:
+        タスクIDのリスト
+    """
+    # ファイルパスとして試みる
+    path = Path(batch_arg)
+    if path.exists() and path.is_file():
+        raw = path.read_text(encoding="utf-8")
+        ids = [line.strip() for line in raw.splitlines() if line.strip()]
+    else:
+        ids = [t.strip() for t in batch_arg.split(",") if t.strip()]
+
+    return [t if t.startswith("TASK_") else f"TASK_{t}" for t in ids]
+
+
+def _run_single_review(
+    project_id: str,
+    task_id: str,
+    args: argparse.Namespace,
+) -> Dict[str, Any]:
+    """単一タスクのレビューを実行する"""
     processor = ReviewProcessor(
-        args.project_id,
-        args.task_id,
+        project_id,
+        task_id,
         dry_run=args.dry_run,
         skip_ai=args.skip_ai,
         auto_approve=args.auto_approve,
@@ -1330,31 +1368,146 @@ def main():
         rework_model=args.rework_model,
         max_rework=args.max_rework,
     )
+    return processor.process()
 
-    results = processor.process()
 
-    # 出力
-    if args.json:
-        output = {k: v for k, v in results.items() if k not in ("review_result",)}
-        print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
+def _print_single_result(results: Dict[str, Any]) -> None:
+    """単一レビュー結果を人間向けに表示する"""
+    if results["success"]:
+        verdict = results.get("verdict", "UNKNOWN")
+        print(f"【レビュー完了】{results['task_id']}")
+        print(f"  プロジェクト: {results['project_id']}")
+        print(f"  判定: {verdict}")
+        if results.get("review_file"):
+            print(f"  REVIEW: {results['review_file']}")
+        if results.get("rework_triggered"):
+            rework_result = results.get("rework_result", {})
+            rework_verdict = rework_result.get("verdict", "UNKNOWN")
+            print(f"  【自動リワーク】verdict={rework_verdict}")
+            if rework_result.get("review_file"):
+                print(f"  リワークREVIEW: {rework_result['review_file']}")
     else:
-        if results["success"]:
-            verdict = results.get("verdict", "UNKNOWN")
-            print(f"【レビュー完了】{results['task_id']}")
-            print(f"  プロジェクト: {results['project_id']}")
-            print(f"  判定: {verdict}")
-            if results.get("review_file"):
-                print(f"  REVIEW: {results['review_file']}")
-            # リワーク結果の表示
-            if results.get("rework_triggered"):
-                rework_result = results.get("rework_result", {})
-                rework_verdict = rework_result.get("verdict", "UNKNOWN")
-                print(f"  【自動リワーク】verdict={rework_verdict}")
-                if rework_result.get("review_file"):
-                    print(f"  リワークREVIEW: {rework_result['review_file']}")
+        print(f"【レビュー失敗】{results.get('error', '不明なエラー')}", file=sys.stderr)
+
+
+class ProcessReviewScript(BaseScript):
+    """
+    レビュー処理スクリプト。BaseScript を継承した実装。
+
+    ReviewProcessor を使用してレビュー処理を実行する。
+    単一タスク処理と --batch による複数タスク一括処理の両モードをサポートする。
+    """
+
+    def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        """レビュー処理固有の引数を追加する"""
+        parser.add_argument("project_id", help="プロジェクトID")
+        parser.add_argument(
+            "task_id",
+            nargs="?",
+            help="タスクID（例: 602 または TASK_602）。--batch 使用時は省略可能",
+        )
+        parser.add_argument("--dry-run", action="store_true", help="実行計画のみ表示")
+        parser.add_argument("--skip-ai", action="store_true", help="AI処理をスキップ")
+        parser.add_argument("--auto-approve", action="store_true", help="自動承認")
+        parser.add_argument("--verbose", "-v", action="store_true", help="詳細ログ出力")
+        parser.add_argument("--timeout", type=int, default=300, help="タイムアウト秒数")
+        parser.add_argument("--model", default="sonnet", help="AIモデル（haiku/sonnet/opus）")
+        parser.add_argument(
+            "--auto-rework",
+            action="store_true",
+            default=True,
+            help="REJECTED時にWorkerを自動起動してリワーク（デフォルト: 有効）",
+        )
+        parser.add_argument("--no-rework", action="store_true", help="自動リワークを無効化")
+        parser.add_argument(
+            "--rework-model",
+            help="リワーク用AIモデル（デフォルト: レビューと同じ）",
+        )
+        parser.add_argument(
+            "--max-rework",
+            type=int,
+            default=3,
+            help="リワーク回数上限（デフォルト: 3）",
+        )
+        parser.add_argument(
+            "--batch",
+            metavar="TASK_IDS",
+            help=(
+                "複数タスクを一括処理。カンマ区切りのタスクIDまたはタスクIDを1行ずつ"
+                "記載したファイルパス（例: TASK_601,TASK_602 または task_ids.txt）"
+            ),
+        )
+
+    def run(self, args: argparse.Namespace) -> Dict[str, Any]:
+        """レビュー処理を実行する（BaseScript.run() の実装）"""
+        # 詳細ログモード
+        if getattr(args, "verbose", False):
+            logging.getLogger().setLevel(logging.DEBUG)
+
+        # --batch モード
+        if args.batch:
+            task_ids = _parse_batch_task_ids(args.batch)
+            if not task_ids:
+                raise ValueError("--batch に有効なタスクIDが含まれていません")
+
+            batch_result = BatchReviewResult(args.project_id)
+
+            for task_id in task_ids:
+                logger.info(f"バッチレビュー開始: {task_id}")
+                try:
+                    result = _run_single_review(args.project_id, task_id, args)
+                    batch_result.add(task_id, result)
+                    if not getattr(args, "json", False):
+                        _print_single_result(result)
+                except Exception as e:
+                    error_result = {
+                        "success": False,
+                        "error": str(e),
+                        "task_id": task_id,
+                        "project_id": args.project_id,
+                    }
+                    batch_result.add(task_id, error_result)
+                    logger.error(f"バッチレビューエラー ({task_id}): {e}")
+
+            summary = batch_result.to_dict()
+            # バッチ失敗時は例外を発生させずに結果をそのまま返す
+            # (exit_code は main() で制御)
+            if batch_result.failed > 0:
+                # 部分失敗を result に記録して返す
+                summary["_batch_has_errors"] = True
+            return summary
+
+        # 通常モード（単一タスク）
+        if not args.task_id:
+            raise ValueError("task_id が必要です（--batch を使用しない場合）")
+
+        results = _run_single_review(args.project_id, args.task_id, args)
+        output = {k: v for k, v in results.items() if k not in ("review_result",)}
+        return output
+
+    def output_table(self, data: Dict[str, Any]) -> None:
+        """人間向けの出力（--table または JSON以外の出力）"""
+        # バッチモード出力
+        if "results" in data and "total" in data:
+            print(f"\n【バッチレビュー完了】プロジェクト: {data.get('project_id', '')}")
+            print(f"  合計: {data['total']} タスク")
+            print(f"  APPROVED: {data['approved']}")
+            print(f"  REJECTED: {data['rejected']}")
+            print(f"  ESCALATED: {data['escalated']}")
+            if data.get("failed", 0) > 0:
+                print(f"  エラー: {data['failed']}")
         else:
-            print(f"【レビュー失敗】{results.get('error', '不明なエラー')}", file=sys.stderr)
-            sys.exit(1)
+            # 単一タスクモード出力
+            _print_single_result(data)
+
+
+def main():
+    """CLI エントリーポイント（後方互換性のために維持）"""
+    script = ProcessReviewScript(
+        description="レビュー処理を1コマンドで実行",
+        epilog=__doc__ or "",
+    )
+    script.main()
 
 
 if __name__ == "__main__":
