@@ -111,8 +111,8 @@ def update_task(
     if priority:
         validate_priority(priority)
 
-    if role not in ("PM", "Worker"):
-        raise ValidationError(f"無効な役割: {role}（PM または Worker）", "role", role)
+    if role not in ("PM", "Worker", "System"):
+        raise ValidationError(f"無効な役割: {role}（PM、Worker または System）", "role", role)
 
     with transaction() as conn:
         # タスク存在確認（複合キー対応）

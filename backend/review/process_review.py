@@ -679,15 +679,10 @@ JSONのみを出力し、説明文は含めないでください。"""
         """
         self._log_step("escalation", "start", "")
 
-        # Step 1: タスクをESCALATEDに更新（正式な遷移ルートを使用）
-        from utils.transition import validate_transition, record_transition
-
+        # Step 1: reviewed_atを更新（update_task_statusはreviewed_atを管理しないため直接更新）
+        current_time = datetime.now().isoformat()
         conn = get_connection()
         try:
-            current_time = datetime.now().isoformat()
-            current_status = self.task_info.get("status", "DONE") if self.task_info else "DONE"
-
-            # reviewed_atを更新
             execute_query(
                 conn,
                 """
@@ -695,30 +690,27 @@ JSONのみを出力し、説明文は含めないでください。"""
                 """,
                 (current_time, self.task_id, self.project_id)
             )
-
-            # 正式な遷移ルートで検証
-            validate_transition(conn, "task", current_status, "ESCALATED", "PM")
-
-            execute_query(
-                conn,
-                """
-                UPDATE tasks SET status = 'ESCALATED', updated_at = ? WHERE id = ? AND project_id = ?
-                """,
-                (current_time, self.task_id, self.project_id)
-            )
-
-            record_transition(
-                conn, "task", self.task_id,
-                current_status, "ESCALATED", "PM",
-                "レビューESCALATED"
-            )
             conn.commit()
+        except Exception as e:
+            self._log_step("escalation", "warning", f"reviewed_at更新失敗: {e}")
+        finally:
+            conn.close()
+
+        # Step 2: update_task_status()経由でESCALATEDに遷移（validate_transition・record_transition込み）
+        try:
+            current_status = self.task_info.get("status", "DONE") if self.task_info else "DONE"
+            update_task_status(
+                self.project_id,
+                self.task_id,
+                "ESCALATED",
+                role="PM",
+                reason="レビューESCALATED",
+                render=False
+            )
             self._log_step("escalation", "info", f"task={current_status}→ESCALATED, reviewed_at={current_time}")
         except Exception as e:
             self._log_step("escalation", "warning", f"ESCALATED更新失敗: {e}")
             return
-        finally:
-            conn.close()
 
         # Step 2: PM自動判断（AI再設計）を試行
         try:
@@ -829,36 +821,18 @@ JSONのみを出力し、説明文は含めないでください。"""
 
     def _escalated_to_rejected(self, reason: str) -> None:
         """ESCALATED → REJECTED遷移"""
-        conn = get_connection()
         try:
-            execute_query(
-                conn,
-                """
-                UPDATE tasks
-                SET status = 'REJECTED', updated_at = ?
-                WHERE id = ? AND project_id = ?
-                """,
-                (datetime.now().isoformat(), self.task_id, self.project_id)
+            update_task_status(
+                self.project_id,
+                self.task_id,
+                "REJECTED",
+                role="PM",
+                reason=f"レビューESCALATED→PM自動判断→REJECTED: {reason}",
+                render=False
             )
-            conn.commit()
-
-            # 遷移記録
-            try:
-                from utils.transition import record_transition
-                record_transition(
-                    conn, "task", self.task_id,
-                    "ESCALATED", "REJECTED", "System",
-                    f"レビューESCALATED→PM自動判断→REJECTED: {reason}"
-                )
-            except Exception:
-                pass
-
             self._log_step("escalation", "success", f"ESCALATED→REJECTED: {reason}")
-
         except Exception as e:
             self._log_step("escalation", "error", f"REJECTED遷移失敗: {e}")
-        finally:
-            conn.close()
 
     def _step_create_review_file(self, verdict: str) -> None:
         """Step 5: REVIEWファイルを作成"""
@@ -1009,46 +983,38 @@ JSONのみを出力し、説明文は含めないでください。"""
                     "SELECT status, reject_count FROM tasks WHERE id = ? AND project_id = ?",
                     (self.task_id, self.project_id)
                 )
-                if task_status and task_status["status"] == "REWORK":
-                    execute_query(
-                        conn,
-                        """
-                        UPDATE tasks
-                        SET status = 'REJECTED', updated_at = ?
-                        WHERE id = ? AND project_id = ?
-                        """,
-                        (datetime.now().isoformat(), self.task_id, self.project_id)
-                    )
-                    conn.commit()
-
-                    from utils.transition import record_transition
-                    record_transition(
-                        conn, "task", self.task_id,
-                        "REWORK", "REJECTED", "System",
-                        f"リワーク回数上限 ({self.max_rework}) 超過 + PMエスカレーション失敗により自動REJECTED遷移"
-                    )
-
-                    self._log_step("fallback_reject", "success", f"REWORK → REJECTED (reject_count={task_status['reject_count']})")
-
-                    # エスカレーションログ記録
-                    try:
-                        from escalation.log_escalation import log_escalation, EscalationType
-                        log_escalation(
-                            project_id=self.project_id,
-                            task_id=self.task_id,
-                            escalation_type=EscalationType.REWORK_LIMIT_EXCEEDED,
-                            description=f"リワーク回数上限超過 ({rework_count}/{self.max_rework}) - PMエスカレーション失敗のためREJECTED遷移",
-                            order_id=self.task_info.get("order_id") if self.task_info else None,
-                            metadata={
-                                "rework_count": rework_count,
-                                "max_rework": self.max_rework,
-                                "reject_count": task_status["reject_count"],
-                            }
-                        )
-                    except Exception as log_err:
-                        logger.warning(f"エスカレーションログ記録失敗: {log_err}")
             finally:
                 conn.close()
+
+            if task_status and task_status["status"] == "REWORK":
+                # REWORK → REJECTED 遷移（allowed_role='System'のため role='System' で呼び出す）
+                update_task_status(
+                    self.project_id,
+                    self.task_id,
+                    "REJECTED",
+                    role="System",
+                    reason=f"リワーク回数上限 ({self.max_rework}) 超過 + PMエスカレーション失敗により自動REJECTED遷移",
+                    render=False
+                )
+                self._log_step("fallback_reject", "success", f"REWORK → REJECTED (reject_count={task_status['reject_count']})")
+
+                # エスカレーションログ記録
+                try:
+                    from escalation.log_escalation import log_escalation, EscalationType
+                    log_escalation(
+                        project_id=self.project_id,
+                        task_id=self.task_id,
+                        escalation_type=EscalationType.REWORK_LIMIT_EXCEEDED,
+                        description=f"リワーク回数上限超過 ({rework_count}/{self.max_rework}) - PMエスカレーション失敗のためREJECTED遷移",
+                        order_id=self.task_info.get("order_id") if self.task_info else None,
+                        metadata={
+                            "rework_count": rework_count,
+                            "max_rework": self.max_rework,
+                            "reject_count": task_status["reject_count"],
+                        }
+                    )
+                except Exception as log_err:
+                    logger.warning(f"エスカレーションログ記録失敗: {log_err}")
         except Exception as e:
             self._log_step("fallback_reject", "warning", f"フォールバックREJECTED遷移失敗: {e}")
 

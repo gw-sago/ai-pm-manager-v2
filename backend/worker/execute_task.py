@@ -271,6 +271,9 @@ class WorkerExecutor:
             if not self.skip_ai:
                 self._step_destructive_sql_check()
 
+            # Step 4.3: REPORTをHTMLに変換
+            self._step_convert_report_to_html()
+
             # Step 5: ステータス更新（DONE）
             self._step_update_status_done()
 
@@ -2162,6 +2165,61 @@ JSONのみを出力し、説明文は含めないでください。"""
         # REPORTファイルに追記
         existing = report_file.read_text(encoding="utf-8")
         report_file.write_text(existing + "\n".join(lines), encoding="utf-8")
+
+    def _step_convert_report_to_html(self) -> None:
+        """Step 4.3: MarkdownレポートをHTMLに変換して同ディレクトリに保存
+
+        backend/render/md_to_html.py を呼び出してREPORTファイルのMarkdownをHTMLに変換する。
+        変換失敗時はログ出力のみでフローを継続する（グレースフルスキップ）。
+        """
+        self._log_step("convert_report_to_html", "start", "")
+
+        if not self.order_id:
+            self._log_step("convert_report_to_html", "skip", "ORDER ID なし")
+            return
+
+        # REPORTファイルパスの構築
+        try:
+            validate_path_components(self.order_id, self.task_id)
+        except Exception as e:
+            self._log_step("convert_report_to_html", "skip", f"パス検証失敗: {e}")
+            return
+
+        report_dir = safe_path_join(
+            self.project_dir, "RESULT", self.order_id, "05_REPORT"
+        )
+        report_file = safe_path_join(
+            report_dir, f"REPORT_{self.task_id.replace('TASK_', '')}.md"
+        )
+
+        if not report_file.exists():
+            self._log_step("convert_report_to_html", "skip", f"REPORTファイルが存在しません: {report_file}")
+            return
+
+        try:
+            from render.md_to_html import convert_md_to_html, wrap_html_document
+        except ImportError as e:
+            self._log_step("convert_report_to_html", "skip", f"render.md_to_html インポート失敗: {e}")
+            return
+
+        try:
+            md_text = report_file.read_text(encoding="utf-8")
+            html_body = convert_md_to_html(md_text)
+            title = f"{self.task_id} 完了報告"
+            full_html = wrap_html_document(html_body, title=title)
+
+            html_file = report_file.with_suffix(".html")
+            html_file.write_text(full_html, encoding="utf-8")
+
+            self.results["report_html_file"] = str(html_file)
+            self._log_step(
+                "convert_report_to_html", "success",
+                f"{html_file} ({html_file.stat().st_size}バイト)"
+            )
+        except Exception as e:
+            # 変換失敗時はログのみでフロー継続
+            logger.warning(f"HTML変換に失敗しました（フロー継続）: {e}")
+            self._log_step("convert_report_to_html", "warning", f"HTML変換失敗（継続）: {e}")
 
     def _step_update_status_done(self) -> None:
         """Step 6: ステータスをDONEに更新"""
