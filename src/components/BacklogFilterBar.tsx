@@ -58,8 +58,8 @@ const PRIORITY_OPTIONS: Array<{ value: 'High' | 'Medium' | 'Low'; label: string;
   { value: 'Low', label: 'Low', color: 'bg-green-100 text-green-700 border-green-200' },
 ];
 
-/** デフォルトステータスオプション（ORDER_065: DRAFT追加） */
-const DEFAULT_STATUS_OPTIONS = ['DRAFT', 'TODO', 'IN_PROGRESS', 'DONE', 'BLOCKED', 'CANCELLED'];
+/** デフォルトステータスオプション（ORDER_088: ORDER用ステータスに変更） */
+const DEFAULT_STATUS_OPTIONS = ['DRAFT', 'PLANNING', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 
 /** ソートオプション */
 const SORT_OPTIONS: Array<{ value: BacklogFilters['sortBy']; label: string }> = [

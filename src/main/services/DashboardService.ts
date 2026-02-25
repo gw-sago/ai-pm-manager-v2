@@ -296,30 +296,24 @@ export class DashboardService {
    * @throws DashboardServiceError - スクリプト実行エラー晁E
    */
   async getAllBacklogs(filters?: BacklogFilters): Promise<BacklogItem[]> {
-    // backlog/list.py を使用して全件取征E
-    // NOTE: v2移行後、scripts/aipm-db は backend に統合
+    // order/list.py を使用してORDER一覧を取得
     const scriptPath = path.join(
       this.aiPmRoot,
       'backend',
-      'backlog',
+      'order',
       'list.py'
     );
 
     const args: string[] = ['--json'];
 
-    // プロジェクトフィルタ
+    // プロジェクトフィルタ（order/list.py は project_id が必須の位置引数）
     if (filters?.projectId) {
       args.unshift(filters.projectId);
     }
 
-    // 優先度フィルタ�E�褁E��値はスペ�Eス区刁E��で個別引数として渡す！E
-    if (filters?.priority && filters.priority.length > 0) {
-      args.push('--priority', ...filters.priority);
-    }
-
-    // スチE�Eタスフィルタ�E�褁E��値はスペ�Eス区刁E��で個別引数として渡す！E
+    // ステータスフィルタ（order/list.py は --status カンマ区切り）
     if (filters?.status && filters.status.length > 0) {
-      args.push('--status', ...filters.status);
+      args.push('--status', filters.status.join(','));
     }
 
     console.log('[DashboardService] getAllBacklogs called with filters:', filters);
@@ -351,7 +345,7 @@ export class DashboardService {
       });
 
       proc.on('error', (error: Error) => {
-        console.error('[DashboardService] backlog/list.py error:', error);
+        console.error('[DashboardService] order/list.py error:', error);
         resolve([]);
       });
 
@@ -362,60 +356,49 @@ export class DashboardService {
         if (code === 0) {
           try {
             const data = JSON.parse(stdout);
-            console.log('[DashboardService] Parsed data success:', data.success, 'items count:', data.items?.length);
-            if (data.success && Array.isArray(data.items)) {
-              const items: BacklogItem[] = data.items.map((item: {
-                id: string;
-                project_id: string;
-                title: string;
-                description?: string;
-                priority: string;
-                status: string;
-                related_order_id?: string;
-                created_at: string;
-                updated_at?: string;
-                // ORDER_032追加: ORDER紐付け情報
-                // ORDER_065: order_status は DRAFT | PLANNING | IN_PROGRESS | REVIEW | COMPLETED | ON_HOLD | CANCELLED
-                order_title?: string;
-                order_status?: string;
-                order_project_id?: string;
-                total_tasks?: number;
-                completed_tasks?: number;
-                progress_percent?: number;
-                // ORDER_106追加: sort_order
-                sort_order?: number;
-              }) => ({
-                id: item.id,
-                projectId: item.project_id,
-                title: item.title,
-                description: item.description,
-                priority: item.priority as 'High' | 'Medium' | 'Low',
-                status: item.status,
-                relatedOrderId: item.related_order_id,
-                createdAt: item.created_at,
-                updatedAt: item.updated_at,
-                // ORDER_032追加: ORDER紐付け情報
-                // ORDER_065: orderStatus は DRAFT を含む
-                orderTitle: item.order_title,
-                orderStatus: item.order_status,
-                orderProjectId: item.order_project_id,
-                totalTasks: item.total_tasks,
-                completedTasks: item.completed_tasks,
-                progressPercent: item.progress_percent,
-                // ORDER_106追加: sort_order
-                sortOrder: item.sort_order,
-              }));
-              resolve(items);
-            } else {
-              console.error('[DashboardService] Invalid backlog data:', data);
-              resolve([]);
-            }
+            // order/list.py は直接配列を返す
+            const orderArray = Array.isArray(data) ? data : (data.items || []);
+            console.log('[DashboardService] Parsed orders count:', orderArray.length);
+            const items: BacklogItem[] = orderArray.map((item: {
+              id: string;
+              project_id: string;
+              title: string;
+              description?: string;
+              priority: string;
+              status: string;
+              backlog_id?: string;
+              created_at: string;
+              updated_at?: string;
+              project_name?: string;
+              task_count?: number;
+              completed_task_count?: number;
+              progress_percent?: number;
+              sort_order?: number;
+            }) => ({
+              id: item.id,
+              projectId: item.project_id,
+              title: item.title,
+              description: item.description,
+              priority: item.priority as 'High' | 'Medium' | 'Low',
+              status: item.status,
+              relatedOrderId: item.backlog_id,
+              createdAt: item.created_at,
+              updatedAt: item.updated_at,
+              orderTitle: item.title,
+              orderStatus: item.status,
+              orderProjectId: item.project_id,
+              totalTasks: item.task_count,
+              completedTasks: item.completed_task_count,
+              progressPercent: item.progress_percent,
+              sortOrder: item.sort_order,
+            }));
+            resolve(items);
           } catch (e) {
             console.error('[DashboardService] JSON parse error:', e, stdout);
             resolve([]);
           }
         } else {
-          console.error('[DashboardService] backlog/list.py failed:', stderr);
+          console.error('[DashboardService] order/list.py failed:', stderr);
           resolve([]);
         }
       });

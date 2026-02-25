@@ -277,7 +277,7 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
                 compactFilterBar={true}
                 maxItems={10}
                 title="ORDER一覧"
-                initialFilters={{ status: ['DRAFT', 'TODO', 'IN_PROGRESS'], sortBy: 'priority', sortOrder: 'desc' }}
+                initialFilters={{ status: ['DRAFT', 'PLANNING', 'IN_PROGRESS', 'REVIEW'], sortBy: 'priority', sortOrder: 'desc' }}
                 onItemClick={handleBacklogItemClick}
                 onOrderClick={onOrderIdClick}
               />
