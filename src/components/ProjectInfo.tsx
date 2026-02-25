@@ -134,13 +134,13 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
         undefined
       );
       if (result.success) {
-        setToast({ type: 'success', message: 'バックログに追加しました' });
+        setToast({ type: 'success', message: 'DRAFT ORDERに追加しました' });
       } else {
-        setToast({ type: 'error', message: result.error || 'バックログへの追加に失敗しました' });
+        setToast({ type: 'error', message: result.error || 'DRAFT ORDERへの追加に失敗しました' });
       }
     } catch (err) {
       console.error('[ProjectInfo] Failed to add backlog item:', err);
-      setToast({ type: 'error', message: 'バックログ追加中にエラーが発生しました' });
+      setToast({ type: 'error', message: 'DRAFT ORDER追加中にエラーが発生しました' });
     } finally {
       setIsRefreshing(false);
     }

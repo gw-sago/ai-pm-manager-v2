@@ -12,7 +12,7 @@ import type { Project, TaskInfo, OrderInfo, BacklogItem, Supervisor, SupervisorP
 /**
  * メインコンテンツのタブ種別（ORDER_040追加, ORDER_156拡張）
  */
-type MainContentTab = 'backlog' | 'execution-log' | 'project-info' | 'docs';
+type MainContentTab = 'order-list' | 'execution-log' | 'project-info' | 'docs';
 
 
 /**
@@ -102,7 +102,7 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
 }) => {
   const [selectedBacklogItem, setSelectedBacklogItem] = useState<BacklogItem | null>(null);
   // タブ切り替え状態（ORDER_040追加）
-  const [activeTab, setActiveTab] = useState<MainContentTab>('backlog');
+  const [activeTab, setActiveTab] = useState<MainContentTab>('order-list');
 
   // フレームワークが設定済みかどうか
   const isFrameworkConfigured = frameworkConfigState === 'configured';
@@ -226,14 +226,14 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
           {selectedProject && selectedProject.state && (
             <div className="flex border-b border-gray-200">
               <button
-                onClick={() => setActiveTab('backlog')}
+                onClick={() => setActiveTab('order-list')}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'backlog'
+                  activeTab === 'order-list'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                バックログ
+                ORDER一覧
               </button>
               <button
                 onClick={() => setActiveTab('execution-log')}
@@ -268,16 +268,16 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
             </div>
           )}
 
-          {/* バックログ一覧（プロジェクト選択時 & バックログタブ選択時） */}
-          {selectedProject && selectedProject.state && activeTab === 'backlog' && (
+          {/* ORDER一覧（プロジェクト選択時 & ORDER一覧タブ選択時） */}
+          {selectedProject && selectedProject.state && activeTab === 'order-list' && (
             <div className="w-full">
               <BacklogList
                 projectName={selectedProject.name}
                 showFilterBar={true}
                 compactFilterBar={true}
                 maxItems={10}
-                title="バックログ一覧"
-                initialFilters={{ status: ['TODO', 'IN_PROGRESS'], sortBy: 'priority', sortOrder: 'desc' }}
+                title="ORDER一覧"
+                initialFilters={{ status: ['DRAFT', 'TODO', 'IN_PROGRESS'], sortBy: 'priority', sortOrder: 'desc' }}
                 onItemClick={handleBacklogItemClick}
                 onOrderClick={onOrderIdClick}
               />
@@ -328,7 +328,7 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
                   プロジェクトを選択してください
                 </h3>
                 <p className="text-xs text-gray-500">
-                  サイドバーからプロジェクトを選択すると、バックログ一覧が表示されます
+                  サイドバーからプロジェクトを選択すると、ORDER一覧が表示されます
                 </p>
               </div>
             </div>
@@ -391,7 +391,7 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
 
       {/* ORDER_135 TASK_1152: TaskDetailPanelはLayoutに集約したため削除 */}
 
-      {/* バックログ詳細モーダル（ORDER_123 TASK_1108追加） */}
+      {/* ORDER詳細モーダル（ORDER_123 TASK_1108追加） */}
       {selectedBacklogItem && (
         <BacklogDetailPanel
           item={selectedBacklogItem}

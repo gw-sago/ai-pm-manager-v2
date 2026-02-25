@@ -281,7 +281,7 @@ export const ExecutionLog: React.FC<ExecutionLogProps> = ({
               </div>
               <p className="text-sm text-gray-500 mb-1">実行ログがありません</p>
               <p className="text-xs text-gray-400">
-                バックログからPM/Worker実行を開始すると、ここにログが表示されます
+                ORDER一覧からPM/Worker実行を開始すると、ここにログが表示されます
               </p>
             </div>
           )}

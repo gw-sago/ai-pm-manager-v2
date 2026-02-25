@@ -99,16 +99,16 @@ export const ProjectInfoGuidance: React.FC<ProjectInfoGuidanceProps> = ({ projec
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">バックログに登録しました</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">DRAFT ORDERを登録しました</h2>
           <p className="text-gray-600 text-sm leading-relaxed">
-            バックログ一覧からORDER化してAIを実行すると、<br />
+            ORDER一覧からPM実行でタスクを自動分解すると、<br />
             プロジェクト情報ページが自動生成されます。
           </p>
           <div className="mt-6 bg-blue-50 rounded-lg p-4 text-left">
             <p className="text-sm font-medium text-blue-800 mb-2">次のステップ（UI操作）:</p>
             <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-              <li>「バックログ」タブを開く</li>
-              <li>登録したバックログを選択し「ORDER化」する</li>
+              <li>「ORDER一覧」タブを開く</li>
+              <li>登録したDRAFT ORDERを選択し「PM実行」する</li>
               <li>「PM実行」でタスクを自動分解</li>
               <li>「Worker実行」でAIがプロジェクト情報を生成</li>
             </ol>
@@ -155,7 +155,7 @@ export const ProjectInfoGuidance: React.FC<ProjectInfoGuidanceProps> = ({ projec
             <div>
               <h2 className="text-lg font-semibold text-gray-900">プロジェクト情報をまとめましょう</h2>
               <p className="text-sm text-gray-600 mt-1">
-                プロジェクトの基本情報を入力してバックログに登録すると、AIが自動でプロジェクト情報ページを生成します。
+                プロジェクトの基本情報を入力してDRAFT ORDERとして登録すると、AIが自動でプロジェクト情報ページを生成します。
               </p>
             </div>
           </div>

@@ -223,9 +223,9 @@ export const useBacklogActions = ({
         canExecutePm: false,
         canExecuteWorker: false,
         canRelease: false,
-        disabledReason: 'バックログ項目がありません',
-        pmDisabledReason: 'バックログ項目がありません',
-        workerDisabledReason: 'バックログ項目がありません',
+        disabledReason: 'ORDER項目がありません',
+        pmDisabledReason: 'ORDER項目がありません',
+        workerDisabledReason: 'ORDER項目がありません',
         releaseDisabledReason: 'リリース操作はバックログ単位ではサポートされていません',
       };
     }

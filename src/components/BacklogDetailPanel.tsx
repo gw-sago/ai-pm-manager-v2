@@ -1,7 +1,7 @@
 /**
- * BacklogDetailPanel - バックログ詳細表示パネル
+ * BacklogDetailPanel - ORDER詳細表示パネル
  *
- * バックログカードクリック時に詳細情報を表示するパネルコンポーネント。
+ * ORDERカードクリック時に詳細情報を表示するパネルコンポーネント。
  * ORDER詳細やタスク詳細と同様のUI/UXを提供。
  *
  * @module BacklogDetailPanel
@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import type { BacklogItem } from '../preload';
 
 interface BacklogDetailPanelProps {
-  /** バックログ項目 */
+  /** ORDER項目 */
   item: BacklogItem;
   /** 閉じるコールバック */
   onClose: () => void;
@@ -25,9 +25,9 @@ interface BacklogDetailPanelProps {
 }
 
 /**
- * バックログ詳細表示パネル
+ * ORDER詳細表示パネル
  *
- * バックログ項目の詳細情報を表示します。
+ * ORDER項目の詳細情報を表示します。
  * - タイトル
  * - 説明全文
  * - 優先度
@@ -161,11 +161,11 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
         // パネルを閉じてリフレッシュを促す
         handleClose();
       } else {
-        setError(result?.error || 'バックログの更新に失敗しました');
+        setError(result?.error || 'ORDERの更新に失敗しました');
       }
     } catch (err) {
       console.error('[BacklogDetailPanel] Failed to update backlog:', err);
-      setError('バックログの更新に失敗しました');
+      setError('ORDERの更新に失敗しました');
     } finally {
       setSaving(false);
     }

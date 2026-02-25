@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0-snapshot] - 2026-02-25
 
 ### Added
+- ordersテーブルにDRAFTステータス追加、DRAFT ORDER CRUD API実装（ORDER_065）
+- tasksテーブルにparent_task_id/depth/is_leader/decomposition_strategy/aggregation_task_id/task_phaseカラム追加（ORDER_065）
+- task/create.pyに循環参照防止バリデーション・depth自動計算（最大4階層）実装（ORDER_065）
+- order/create.pyに--status/--description/--sort-order/--category/--backlog-idオプション追加（ORDER_065）
+- order/list.pyに--draftフィルタオプション追加（ORDER_065）
+- orders.backlog_id逆引き補完マイグレーション新規作成（ORDER_065）
+- /aipm-pmに--draftオプション追加（DRAFT ORDER作成・PLANNING昇格）（ORDER_065）
+- /aipm-full-autoにDRAFT状態のハンドリング追加（ORDER_065）
+- フロントエンドにDRAFTステータス対応（色定義・ラベル・フィルタ・PM処理開始ボタン）（ORDER_065）
 - projectsテーブルにdev_workspace_pathカラム追加（ORDER_071）
 - execute_task.pyがDBからdev_workspace_pathを取得しWorkerプロンプトに開発環境パスを注入
 - project CRUD (create.py, list.py) がdev_workspace_pathカラムに対応
@@ -24,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLAUDE.mdにビルドルール・環境分離ルール追記
 
 ### Changed
+- backend/backlog/全11モジュールに非推奨警告追加、add.pyをorder/create.pyラッパーに変換（ORDER_065）
+- /aipm-backlog-add、/aipm-backlog-to-orderコマンドを非推奨化（ORDER_065）
+- BacklogList/BacklogAddForm等のフロントエンドUIをDRAFT ORDER対応に更新（ORDER_065）
 - spec_generator.py/process_order.pyのデフォルトモデルをSonnet→Opusに統一（ORDER_078）
 - process_review.pyの直接SQL 3箇所をupdate_task_status()経由に統一（ORDER_080）
 - process_review.pyにBaseScript共通基盤クラス導入（ORDER_083）

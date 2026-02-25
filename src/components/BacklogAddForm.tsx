@@ -1,7 +1,7 @@
 /**
  * BacklogAddForm - DRAFT ORDER作成フォームコンポーネント
  *
- * ORDER_065: バックログ追加からDRAFT ORDER作成に移行。
+ * ORDER_065: ORDER追加からDRAFT ORDER作成に移行。
  * 内部的には addBacklog IPC を呼び出し、バックエンド側で DRAFT ORDER として作成される。
  *
  * - タイトル（必須）
@@ -10,7 +10,7 @@
  * - カテゴリ選択（オプション）
  * - バリデーションとIPC呼び出しロジック
  *
- * @deprecated バックログ専用APIは非推奨。DRAFT ORDER統合APIへ移行中（ORDER_065）
+ * @deprecated 旧バックログ専用APIは非推奨。DRAFT ORDER統合APIへ移行中（ORDER_065）
  * @module BacklogAddForm
  * @created 2026-02-10
  * @order ORDER_139
@@ -32,9 +32,9 @@ export interface BacklogAddFormProps {
 }
 
 /**
- * バックログ新規追加フォーム
+ * DRAFT ORDER新規作成フォーム
  *
- * バックログ項目の新規追加フォームを表示します。
+ * DRAFT ORDERの新規作成フォームを表示します。
  * モーダルダイアログとして表示され、入力バリデーションとIPC呼び出しを実行します。
  *
  * @example
@@ -256,7 +256,7 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
                 maxLength={50}
               />
               <p className="mt-1 text-xs text-gray-500">
-                バックログ項目の分類に使用できます（50文字以内）
+                ORDER項目の分類に使用できます（50文字以内）
               </p>
             </div>
           </div>

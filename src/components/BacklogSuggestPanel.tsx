@@ -1,8 +1,8 @@
 /**
- * BacklogSuggestPanel - バックログ自動提案パネルコンポーネント
+ * BacklogSuggestPanel - ORDER自動提案パネルコンポーネント
  *
- * AIによるバックログ候補の自動提案と一括登録機能を提供します。
- * - 「自動提案」ボタンでバックログ候補を生成
+ * AIによるORDER候補の自動提案と一括登録機能を提供します。
+ * - 「自動提案」ボタンでORDER候補を生成
  * - 提案結果のリスト表示（タイトル・説明・優先度・カテゴリ・根拠）
  * - チェックボックスによる複数選択
  * - 「選択済みを登録」ボタンで一括登録
@@ -44,7 +44,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 // =============================================================================
 
 /**
- * バックログ自動提案パネル
+ * ORDER自動提案パネル
  */
 export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
   projectId,
@@ -147,15 +147,15 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
       const result = await window.electronAPI.bulkAddBacklogs(projectId, itemsToAdd);
       if (result.success) {
         const count = result.addedCount ?? itemsToAdd.length;
-        setSuccessMessage(`${count}件のバックログを登録しました`);
+        setSuccessMessage(`${count}件のORDERを登録しました`);
         setSuggestions([]);
         setSelectedIndices(new Set());
         onComplete?.();
       } else {
-        setError(result.error || 'バックログの登録に失敗しました');
+        setError(result.error || 'ORDERの登録に失敗しました');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'バックログの登録中にエラーが発生しました';
+      const message = err instanceof Error ? err.message : 'ORDERの登録中にエラーが発生しました';
       setError(message);
       console.error('[BacklogSuggestPanel] bulkAddBacklogs error:', err);
     } finally {
@@ -177,7 +177,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
           <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
-          <h3 className="font-medium text-gray-800">AI バックログ自動提案</h3>
+          <h3 className="font-medium text-gray-800">AI ORDER自動提案</h3>
         </div>
         <button
           onClick={handleSuggest}
@@ -305,7 +305,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
             </svg>
           </div>
           <p className="text-sm text-gray-500">
-            「自動提案」ボタンをクリックすると、AIがプロジェクト情報を分析してバックログ候補を提案します
+            「自動提案」ボタンをクリックすると、AIがプロジェクト情報を分析してORDER候補を提案します
           </p>
         </div>
       )}

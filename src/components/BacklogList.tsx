@@ -1,7 +1,7 @@
 /**
- * BacklogList - バックログ一覧コンポーネント
+ * BacklogList - ORDER一覧コンポーネント
  *
- * バックログ項目の一覧表示とフィルタ・ソート機能を提供するコンポーネント。
+ * ORDER項目の一覧表示とフィルタ・ソート機能を提供するコンポーネント。
  * BacklogFilterBarを統合し、以下の機能を実装:
  * - 優先度フィルタ（High/Medium/Low）
  * - ステータスフィルタ（TODO/IN_PROGRESS/DONE等）
@@ -41,11 +41,11 @@ export interface BacklogListProps {
   showFilterBar?: boolean;
   /** コンパクトモードのフィルタバー（デフォルト: false） */
   compactFilterBar?: boolean;
-  /** プロジェクト横断モード（全プロジェクトのバックログを表示） */
+  /** プロジェクト横断モード（全プロジェクトのORDERを表示） */
   crossProject?: boolean;
   /** 利用可能なプロジェクト一覧（プロジェクト横断モード用） */
   projects?: ProjectOption[];
-  /** バックログ項目クリック時のコールバック */
+  /** ORDER項目クリック時のコールバック */
   onItemClick?: (item: BacklogItem) => void;
   /** ORDER IDクリック時のコールバック（後方互換性用） */
   onOrderClick?: (orderId: string) => void;
@@ -124,9 +124,9 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 // =============================================================================
 
 /**
- * バックログ一覧コンポーネント
+ * ORDER一覧コンポーネント
  *
- * バックログ項目の一覧を表示し、フィルタ・ソート機能を提供します。
+ * ORDER項目の一覧を表示し、フィルタ・ソート機能を提供します。
  *
  * @example
  * ```tsx
@@ -163,7 +163,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   initialFilters = {},
   maxItems,
   title = 'Backlog',
-  emptyMessage = 'バックログ項目がありません',
+  emptyMessage = 'ORDER項目がありません',
 }) => {
   // ==========================================================================
   // 状態管理
@@ -171,7 +171,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 
   /** フィルタ状態 */
   const [filters, setFilters] = useState<BacklogFilters>(initialFilters);
-  /** バックログ項目リスト */
+  /** ORDER項目リスト */
   const [items, setItems] = useState<BacklogItem[]>([]);
   /** ローディング状態 */
   const [isLoading, setIsLoading] = useState(true);
@@ -187,7 +187,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
   // ORDER_053: 初回ロード完了フラグ（チラつき防止用）
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
-  // ORDER_139: バックログ追加モーダル状態
+  // ORDER_139: ORDER追加モーダル状態
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // ORDER_139: 削除確認ダイアログ状態
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<BacklogItem | null>(null);
@@ -199,7 +199,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   // ==========================================================================
 
   /**
-   * フィルタ適用後のバックログ項目（クライアントサイドフィルタリング）
+   * フィルタ適用後のORDER項目（クライアントサイドフィルタリング）
    */
   const filteredItems = useMemo(() => {
     let result = [...items];
@@ -226,7 +226,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [items, filters, crossProject, projectName]);
 
   /**
-   * ソート適用後のバックログ項目
+   * ソート適用後のORDER項目
    * ORDER_123: IN_PROGRESS最上部固定、優先度順ソート（High→Medium→Low）、同一優先度内はsort_order順
    */
   const sortedItems = useMemo(() => {
@@ -300,7 +300,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [filteredItems, filters]);
 
   /**
-   * 表示するバックログ項目
+   * 表示するORDER項目
    * ORDER_123: ページネーション廃止、全件表示（スクロールリスト化）
    */
   const displayItems = useMemo(() => {
@@ -316,7 +316,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   // ==========================================================================
 
   /**
-   * バックログデータを取得
+   * ORDERデータを取得
    *
    * ORDER_053: バックグラウンド更新対応
    * @param silent trueの場合、ローディング表示を抑制（定期リフレッシュ用）
@@ -346,7 +346,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
         filters: apiFilters,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'バックログの読み込みに失敗しました';
+      const message = err instanceof Error ? err.message : 'ORDERの読み込みに失敗しました';
       setError(message);
       console.error('[BacklogList] Failed to load backlogs:', err);
     } finally {
@@ -419,7 +419,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [fetchBacklogs]);
 
   // DB変更イベントの購読（ORDER_004 / TASK_011）
-  // スクリプト実行完了・タスクステータス変更時にバックログを自動更新
+  // スクリプト実行完了・タスクステータス変更時にORDERを自動更新
   useEffect(() => {
     const unsubscribe = window.electronAPI.onDbChanged((event) => {
       // 単一プロジェクトモードの場合、対象プロジェクトのイベントのみ再フェッチ
@@ -456,7 +456,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [isCollapsed, onCollapsedChange]);
 
   /**
-   * バックログ項目クリックハンドラ
+   * ORDER項目クリックハンドラ
    */
   const handleItemClick = useCallback(
     (item: BacklogItem) => {
@@ -641,21 +641,21 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [runningJobs]);
 
   /**
-   * バックログ追加モーダルを開く（ORDER_139追加）
+   * ORDER追加モーダルを開く（ORDER_139追加）
    */
   const handleOpenAddModal = useCallback(() => {
     setIsAddModalOpen(true);
   }, []);
 
   /**
-   * バックログ追加モーダルを閉じる（ORDER_139追加）
+   * ORDER追加モーダルを閉じる（ORDER_139追加）
    */
   const handleCloseAddModal = useCallback(() => {
     setIsAddModalOpen(false);
   }, []);
 
   /**
-   * バックログ追加完了ハンドラ（ORDER_139追加）
+   * ORDER追加完了ハンドラ（ORDER_139追加）
    */
   const handleAddComplete = useCallback(() => {
     setIsAddModalOpen(false);
@@ -664,7 +664,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, [handleShowToast, fetchBacklogs]);
 
   /**
-   * バックログ削除確認ダイアログを開く（ORDER_139追加）
+   * ORDER削除確認ダイアログを開く（ORDER_139追加）
    */
   const handleOpenDeleteConfirm = useCallback((item: BacklogItem, e: React.MouseEvent) => {
     e.stopPropagation(); // 親のonClickを発火させない
@@ -672,14 +672,14 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   }, []);
 
   /**
-   * バックログ削除確認ダイアログを閉じる（ORDER_139追加）
+   * ORDER削除確認ダイアログを閉じる（ORDER_139追加）
    */
   const handleCloseDeleteConfirm = useCallback(() => {
     setDeleteConfirmItem(null);
   }, []);
 
   /**
-   * バックログ削除実行ハンドラ（ORDER_139追加）
+   * ORDER削除実行ハンドラ（ORDER_139追加）
    */
   const handleDeleteBacklog = useCallback(async () => {
     if (!deleteConfirmItem) return;
@@ -687,10 +687,10 @@ export const BacklogList: React.FC<BacklogListProps> = ({
     try {
       // IPC呼び出し（TASK_1161で実装予定）
       await window.electronAPI.deleteBacklog(deleteConfirmItem.projectId, deleteConfirmItem.id);
-      handleShowToast('バックログを削除しました', 'success');
+      handleShowToast('ORDERを削除しました', 'success');
       fetchBacklogs(true); // silentモードで再取得
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'バックログの削除に失敗しました';
+      const message = err instanceof Error ? err.message : 'ORDERの削除に失敗しました';
       handleShowToast(message, 'error');
       console.error('[BacklogList] Failed to delete backlog:', err);
     } finally {
@@ -753,7 +753,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
                   ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                   : 'bg-purple-600 text-white hover:bg-purple-700'
               }`}
-              title="AIによるバックログ自動提案"
+              title="AIによるORDER自動提案"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -885,7 +885,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           </div>
         )}
 
-        {/* バックログ項目リスト（ORDER_123: 全件表示、スクロール対応） */}
+        {/* ORDER項目リスト（ORDER_123: 全件表示、スクロール対応） */}
         {!isLoading && !error && displayItems.length > 0 && (
           <div className="space-y-2">
             {displayItems.map((item) => (
@@ -914,7 +914,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
         <Toast message={toastMessage} type={toastType} onClose={() => setToastMessage(null)} />
       )}
 
-      {/* ORDER_139: バックログ追加モーダル */}
+      {/* ORDER_139: ORDER追加モーダル */}
       {isAddModalOpen && (
         <BacklogAddModal
           onClose={handleCloseAddModal}
@@ -940,7 +940,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 // =============================================================================
 
 /**
- * バックログ項目カード
+ * ORDER項目カード
  */
 interface BacklogItemCardProps {
   item: BacklogItem;
@@ -1330,8 +1330,8 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
           {/* ORDER_139: 削除ボタン */}
           <button
             onClick={handleDelete}
-            title="バックログを削除"
-            aria-label="バックログを削除"
+            title="ORDERを削除"
+            aria-label="ORDERを削除"
             className="p-1 rounded transition-colors bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1456,7 +1456,7 @@ const Toast: React.FC<ToastProps> = ({ message, onClose, type = 'success' }) => 
 };
 
 /**
- * バックログ追加モーダル（ORDER_139追加）
+ * ORDER追加モーダル（ORDER_139追加）
  * TASK_1160で実装されるBacklogAddFormをラップするモーダルダイアログ
  */
 interface BacklogAddModalProps {
@@ -1562,12 +1562,12 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({ item, onConfi
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-gray-800">バックログを削除</h2>
+          <h2 className="text-lg font-semibold text-gray-800">ORDERを削除</h2>
         </div>
         {/* コンテンツ */}
         <div className="p-4">
           <p className="text-sm text-gray-700 mb-4">
-            以下のバックログを削除してもよろしいですか？
+            以下のORDERを削除してもよろしいですか？
           </p>
           <div className="bg-gray-50 rounded-lg p-3 mb-4">
             <div className="flex items-center gap-2 mb-2">
@@ -1587,7 +1587,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({ item, onConfi
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
             <p className="text-xs text-yellow-800">
-              <strong>注意:</strong> この操作は取り消せません。バックログのステータスがCANCELLEDに変更されます。
+              <strong>注意:</strong> この操作は取り消せません。ORDERのステータスがCANCELLEDに変更されます。
             </p>
           </div>
         </div>

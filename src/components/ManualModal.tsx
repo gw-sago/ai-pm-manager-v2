@@ -31,20 +31,20 @@ const sections: Section[] = [
   },
   {
     id: 'backlog-add',
-    title: 'バックログ追加',
+    title: 'ORDER追加',
     content: (
       <div className="space-y-3 text-sm text-gray-300">
-        <p>プロジェクトにバックログ項目を追加する手順です。</p>
+        <p>プロジェクトにDRAFT ORDERを追加する手順です。</p>
         <ol className="list-decimal list-inside space-y-2">
           <li>左サイドバーでプロジェクトを選択します。</li>
-          <li><strong className="text-white">「バックログ」</strong> タブをクリックします。</li>
-          <li><strong className="text-white">「＋ バックログ追加」</strong> ボタンをクリックします。</li>
+          <li><strong className="text-white">「ORDER一覧」</strong> タブをクリックします。</li>
+          <li><strong className="text-white">「＋ 追加」</strong> ボタンをクリックします。</li>
           <li>タイトル、説明、優先度（P0〜P3）を入力します。</li>
-          <li><strong className="text-white">「追加」</strong> をクリックして保存します。</li>
+          <li><strong className="text-white">「DRAFT作成」</strong> をクリックして保存します。</li>
         </ol>
         <div className="bg-gray-700 rounded p-3 text-xs">
           <span className="text-blue-400">CLIコマンド:</span>
-          <code className="block mt-1 text-green-400">/aipm-backlog-add</code>
+          <code className="block mt-1 text-green-400">/aipm-pm PROJECT_NAME --draft "タイトル"</code>
         </div>
       </div>
     ),
@@ -54,15 +54,14 @@ const sections: Section[] = [
     title: 'ORDER作成（PM実行）',
     content: (
       <div className="space-y-3 text-sm text-gray-300">
-        <p>バックログからORDERを作成し、PM実行でタスクを自動分解します。</p>
+        <p>DRAFT ORDERをPLANNINGに昇格し、PM実行でタスクを自動分解します。</p>
         <ol className="list-decimal list-inside space-y-2">
-          <li><strong className="text-white">「バックログ」</strong> タブでバックログ項目を選択します。</li>
-          <li><strong className="text-white">「PM実行」</strong> をクリックすると、ORDER化とタスク自動分解が実行されます。</li>
+          <li><strong className="text-white">「ORDER一覧」</strong> タブでDRAFT ORDER項目を選択します。</li>
+          <li><strong className="text-white">「PM実行」</strong> をクリックすると、PLANNING昇格とタスク自動分解が実行されます。</li>
         </ol>
         <div className="bg-gray-700 rounded p-3 text-xs">
           <span className="text-blue-400">CLIコマンド:</span>
-          <code className="block mt-1 text-green-400">/aipm-backlog-to-order  # ORDER化</code>
-          <code className="block text-green-400">/aipm-pm                # PM実行（タスク分解）</code>
+          <code className="block mt-1 text-green-400">/aipm-pm PROJECT_NAME ORDER_XXX  # DRAFT→PLANNING昇格＋タスク分解</code>
         </div>
       </div>
     ),
@@ -104,8 +103,8 @@ const sections: Section[] = [
             <span className="text-gray-400 ml-4">ORDER化→PM→Worker→レビューを全自動実行</span>
           </div>
           <div className="space-y-1">
-            <code className="block text-green-400">/aipm-backlog-to-order</code>
-            <span className="text-gray-400 ml-4">バックログをORDERに昇格</span>
+            <code className="block text-green-400">/aipm-pm PROJECT_NAME ORDER_XXX</code>
+            <span className="text-gray-400 ml-4">DRAFT ORDERをPLANNINGに昇格</span>
           </div>
           <div className="space-y-1">
             <code className="block text-green-400">/aipm-pm</code>

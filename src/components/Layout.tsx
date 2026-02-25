@@ -299,7 +299,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, []);
 
   /**
-   * バックログ項目クリック時のハンドラ（ORDER_038追加）
+   * ORDER項目クリック時のハンドラ（ORDER_038追加）
    * 関連ORDERがある場合、そのORDERを選択状態にする
    */
   const handleBacklogItemClick = useCallback((item: BacklogItem) => {
@@ -327,7 +327,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   /**
    * ORDER IDクリック時のハンドラ
-   * バックログ一覧からORDER IDがクリックされた場合、そのORDERを選択状態にする
+   * ORDER一覧からORDER IDがクリックされた場合、そのORDERを選択状態にする
    */
   const handleOrderIdClick = useCallback((orderId: string) => {
     console.log('[Layout] Order ID clicked:', orderId);
