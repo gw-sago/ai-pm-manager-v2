@@ -683,14 +683,14 @@ export const ReleaseReadinessPanel: React.FC<ReleaseReadinessPanelProps> = ({
               <div>
                 <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">関連バックログ ({relatedInfo.relatedBacklogs.length})</span>
                 <div className="mt-1.5 space-y-1">
-                  {relatedInfo.relatedBacklogs.map((backlog) => (
-                    <div key={backlog.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-gray-50 transition-colors">
+                  {relatedInfo.relatedBacklogs.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-gray-50 transition-colors">
                       <div className="flex items-center min-w-0">
-                        <span className="font-mono text-blue-600 font-semibold mr-2 flex-shrink-0">{backlog.id}</span>
-                        <span className="text-gray-600 truncate">{backlog.title}</span>
+                        <span className="font-mono text-blue-600 font-semibold mr-2 flex-shrink-0">{item.id}</span>
+                        <span className="text-gray-600 truncate">{item.title}</span>
                       </div>
                       <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium ml-2 flex-shrink-0">
-                        {backlog.status}
+                        {item.status}
                       </span>
                     </div>
                   ))}

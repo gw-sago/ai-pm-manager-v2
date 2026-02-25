@@ -1,8 +1,8 @@
 /**
- * BacklogAddForm - DRAFT ORDER作成フォームコンポーネント
+ * OrderAddForm - DRAFT ORDER作成フォームコンポーネント
  *
  * ORDER_065: ORDER追加からDRAFT ORDER作成に移行。
- * 内部的には addBacklog IPC を呼び出し、バックエンド側で DRAFT ORDER として作成される。
+ * 内部的には createDraftOrder IPC を呼び出し、バックエンド側で DRAFT ORDER として作成される。
  *
  * - タイトル（必須）
  * - 説明（Markdownテキストエリア）
@@ -11,7 +11,7 @@
  * - バリデーションとIPC呼び出しロジック
  *
  * @deprecated 旧バックログ専用APIは非推奨。DRAFT ORDER統合APIへ移行中（ORDER_065）
- * @module BacklogAddForm
+ * @module OrderAddForm
  * @created 2026-02-10
  * @order ORDER_139
  * @task TASK_1160, TASK_314
@@ -20,9 +20,9 @@
 import React, { useState } from 'react';
 
 /**
- * BacklogAddFormのProps
+ * OrderAddFormのProps
  */
-export interface BacklogAddFormProps {
+export interface OrderAddFormProps {
   /** プロジェクトID */
   projectId: string;
   /** 閉じるコールバック */
@@ -39,14 +39,14 @@ export interface BacklogAddFormProps {
  *
  * @example
  * ```tsx
- * <BacklogAddForm
+ * <OrderAddForm
  *   projectId="ai_pm_manager"
  *   onClose={() => setShowAddForm(false)}
  *   onSuccess={() => handleRefresh()}
  * />
  * ```
  */
-export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
+export const OrderAddForm: React.FC<OrderAddFormProps> = ({
   projectId,
   onClose,
   onSuccess,
@@ -82,8 +82,8 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
     setError(null);
 
     try {
-      // IPC呼び出し（addBacklog）
-      const result = await window.electronAPI.addBacklog(
+      // IPC呼び出し（createDraftOrder）
+      const result = await window.electronAPI.createDraftOrder(
         projectId,
         title.trim(),
         description.trim() || null,
@@ -101,7 +101,7 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
         setError(result?.error || 'DRAFT ORDERの作成に失敗しました');
       }
     } catch (err) {
-      console.error('[BacklogAddForm] Failed to create DRAFT ORDER:', err);
+      console.error('[OrderAddForm] Failed to create DRAFT ORDER:', err);
       setError('DRAFT ORDERの作成に失敗しました');
     } finally {
       setSubmitting(false);
@@ -286,4 +286,4 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
   );
 };
 
-export default BacklogAddForm;
+export default OrderAddForm;

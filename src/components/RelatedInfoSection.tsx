@@ -98,20 +98,20 @@ export const RelatedInfoSection: React.FC<RelatedInfoSectionProps> = ({
               </span>
             </div>
             <ul className="space-y-1.5">
-              {relatedInfo.relatedBacklogs.map((backlog) => (
+              {relatedInfo.relatedBacklogs.map((item) => (
                 <li
-                  key={backlog.id}
+                  key={item.id}
                   className="flex items-center justify-between text-sm"
                 >
                   <div className="flex items-center min-w-0">
                     <span className="font-mono text-xs text-blue-600 mr-2 flex-shrink-0">
-                      {backlog.id}
+                      {item.id}
                     </span>
                     <span className="text-gray-600 truncate">
-                      {backlog.title}
+                      {item.title}
                     </span>
                   </div>
-                  {getStatusBadge(backlog.status)}
+                  {getStatusBadge(item.status)}
                 </li>
               ))}
             </ul>

@@ -5,7 +5,7 @@
  * - INFO_PAGES が存在する場合: カード一覧 → ページコンテンツ表示
  * - INFO_PAGES が存在しない場合: PROJECT_INFO.md をMarkdownで表示（フォールバック）
  *
- * ORDER_002 / BACKLOG_002: プロジェクト情報の深化
+ * ORDER_002: プロジェクト情報の深化
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -121,12 +121,12 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     loadProjectInfo();
   }, [projectId, loadProjectInfo]);
 
-  // PROJECT_INFO.md最新化バックログ追加ハンドラ
-  const handleAddBacklogItem = useCallback(async () => {
+  // PROJECT_INFO.md最新化DRAFT ORDER追加ハンドラ
+  const handleAddOrderItem = useCallback(async () => {
     setIsRefreshing(true);
     setToast(null);
     try {
-      const result = await window.electronAPI.addBacklog(
+      const result = await window.electronAPI.createDraftOrder(
         projectId,
         'PROJECT_INFO.md の最新化',
         'プロジェクト情報（PROJECT_INFO.md）を最新の状態に更新してください。',
@@ -139,7 +139,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
         setToast({ type: 'error', message: result.error || 'DRAFT ORDERへの追加に失敗しました' });
       }
     } catch (err) {
-      console.error('[ProjectInfo] Failed to add backlog item:', err);
+      console.error('[ProjectInfo] Failed to add order item:', err);
       setToast({ type: 'error', message: 'DRAFT ORDER追加中にエラーが発生しました' });
     } finally {
       setIsRefreshing(false);
@@ -220,7 +220,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   // 最新化リクエストボタンUI（共通）
   const refreshButton = (
     <button
-      onClick={handleAddBacklogItem}
+      onClick={handleAddOrderItem}
       disabled={isRefreshing}
       className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
         isRefreshing

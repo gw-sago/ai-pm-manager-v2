@@ -1,13 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { TaskDependencyView } from './TaskDependencyView';
 import { OrderDetailPanel } from './OrderDetailPanel';
-import { BacklogList } from './BacklogList';
-import { BacklogDetailPanel } from './BacklogDetailPanel';
+import { OrderManageList } from './OrderManageList';
+import { OrderItemPanel } from './OrderItemPanel';
 import { ExecutionLog } from './ExecutionLog';
 import { SupervisorDashboard } from './SupervisorDashboard';
 import { ProjectInfo } from './ProjectInfo';
 import { DocsPanel } from './DocsPanel';
-import type { Project, TaskInfo, OrderInfo, BacklogItem, Supervisor, SupervisorProject } from '../preload';
+import type { Project, TaskInfo, OrderInfo, OrderItem, Supervisor, SupervisorProject } from '../preload';
 
 /**
  * メインコンテンツのタブ種別（ORDER_040追加, ORDER_156拡張）
@@ -28,8 +28,8 @@ interface MainContentProps {
   selectedOrder?: OrderInfo | null;
   /** フレームワーク設定の状態（Layout.tsxから渡される） */
   frameworkConfigState?: FrameworkConfigState;
-  /** バックログ項目クリック時のコールバック（ORDER_038追加） */
-  onBacklogItemClick?: (item: BacklogItem) => void;
+  /** ORDER項目クリック時のコールバック（ORDER_038追加） */
+  onOrderItemClick?: (item: OrderItem) => void;
   /** ORDER IDクリック時のコールバック */
   onOrderIdClick?: (orderId: string) => void;
   /** 選択中のSupervisor（ORDER_060追加） */
@@ -45,7 +45,7 @@ export const MainContent: React.FC<MainContentProps> = ({
   selectedProject,
   selectedOrder,
   frameworkConfigState = 'loading',
-  onBacklogItemClick,
+  onOrderItemClick,
   onOrderIdClick,
   selectedSupervisor,
   onSupervisorProjectSelect,
@@ -66,7 +66,7 @@ export const MainContent: React.FC<MainContentProps> = ({
               selectedProject={selectedProject}
               selectedOrder={selectedOrder}
               frameworkConfigState={frameworkConfigState}
-              onBacklogItemClick={onBacklogItemClick}
+              onOrderItemClick={onOrderItemClick}
               onOrderIdClick={onOrderIdClick}
               onTaskDetailPanelOpen={onTaskDetailPanelOpen}
             />
@@ -84,8 +84,8 @@ interface DefaultContentProps {
   selectedOrder?: OrderInfo | null;
   /** フレームワーク設定の状態（Layout.tsxから渡される） */
   frameworkConfigState?: FrameworkConfigState;
-  /** バックログ項目クリック時のコールバック（ORDER_038追加） */
-  onBacklogItemClick?: (item: BacklogItem) => void;
+  /** ORDER項目クリック時のコールバック（ORDER_038追加） */
+  onOrderItemClick?: (item: OrderItem) => void;
   /** ORDER IDクリック時のコールバック */
   onOrderIdClick?: (orderId: string) => void;
   /** ORDER_135 TASK_1152: タスク詳細パネル表示時のコールバック（Layoutから渡される） */
@@ -96,11 +96,11 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
   selectedProject,
   selectedOrder,
   frameworkConfigState = 'loading',
-  onBacklogItemClick,
+  onOrderItemClick,
   onOrderIdClick,
   onTaskDetailPanelOpen,
 }) => {
-  const [selectedBacklogItem, setSelectedBacklogItem] = useState<BacklogItem | null>(null);
+  const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
   // タブ切り替え状態（ORDER_040追加）
   const [activeTab, setActiveTab] = useState<MainContentTab>('order-list');
 
@@ -108,33 +108,33 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
   const isFrameworkConfigured = frameworkConfigState === 'configured';
 
   /**
-   * バックログ項目クリックハンドラ（ORDER_123 TASK_1108追加）
+   * ORDER項目クリックハンドラ（ORDER_123 TASK_1108追加）
    */
-  const handleBacklogItemClick = useCallback((item: BacklogItem) => {
-    console.log('[MainContent] Backlog item clicked:', {
+  const handleOrderItemClick = useCallback((item: OrderItem) => {
+    console.log('[MainContent] Order item clicked:', {
       id: item.id,
       title: item.title,
       projectId: item.projectId,
     });
-    setSelectedBacklogItem(item);
+    setSelectedOrderItem(item);
     // 親コンポーネントのコールバックも呼び出し（互換性維持）
-    onBacklogItemClick?.(item);
-  }, [onBacklogItemClick]);
+    onOrderItemClick?.(item);
+  }, [onOrderItemClick]);
 
   /**
-   * バックログ詳細を閉じるハンドラ（ORDER_123 TASK_1108追加）
+   * ORDER項目詳細を閉じるハンドラ（ORDER_123 TASK_1108追加）
    */
-  const handleBacklogDetailClose = useCallback(() => {
-    setSelectedBacklogItem(null);
+  const handleOrderItemDetailClose = useCallback(() => {
+    setSelectedOrderItem(null);
   }, []);
 
   /**
-   * バックログ詳細からORDER IDクリック時のハンドラ（ORDER_123 TASK_1108追加）
+   * ORDER項目詳細からORDER IDクリック時のハンドラ（ORDER_123 TASK_1108追加）
    */
-  const handleBacklogOrderClick = useCallback((orderId: string) => {
-    console.log('[MainContent] Order clicked from backlog detail:', orderId);
-    // バックログ詳細を閉じる
-    setSelectedBacklogItem(null);
+  const handleOrderItemOrderClick = useCallback((orderId: string) => {
+    console.log('[MainContent] Order clicked from order item detail:', orderId);
+    // ORDER項目詳細を閉じる
+    setSelectedOrderItem(null);
     // 親コンポーネントのORDERクリックコールバックを呼び出し
     onOrderIdClick?.(orderId);
   }, [onOrderIdClick]);
@@ -271,14 +271,14 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
           {/* ORDER一覧（プロジェクト選択時 & ORDER一覧タブ選択時） */}
           {selectedProject && selectedProject.state && activeTab === 'order-list' && (
             <div className="w-full">
-              <BacklogList
+              <OrderManageList
                 projectName={selectedProject.name}
                 showFilterBar={true}
                 compactFilterBar={true}
                 maxItems={10}
                 title="ORDER一覧"
                 initialFilters={{ status: ['DRAFT', 'PLANNING', 'IN_PROGRESS', 'REVIEW'], sortBy: 'priority', sortOrder: 'desc' }}
-                onItemClick={handleBacklogItemClick}
+                onItemClick={handleOrderItemClick}
                 onOrderClick={onOrderIdClick}
               />
             </div>
@@ -391,12 +391,12 @@ const DefaultContent: React.FC<DefaultContentProps> = ({
 
       {/* ORDER_135 TASK_1152: TaskDetailPanelはLayoutに集約したため削除 */}
 
-      {/* ORDER詳細モーダル（ORDER_123 TASK_1108追加） */}
-      {selectedBacklogItem && (
-        <BacklogDetailPanel
-          item={selectedBacklogItem}
-          onClose={handleBacklogDetailClose}
-          onOrderClick={handleBacklogOrderClick}
+      {/* ORDER項目詳細モーダル（ORDER_123 TASK_1108追加） */}
+      {selectedOrderItem && (
+        <OrderItemPanel
+          item={selectedOrderItem}
+          onClose={handleOrderItemDetailClose}
+          onOrderClick={handleOrderItemOrderClick}
         />
       )}
     </div>

@@ -244,9 +244,9 @@ export interface ArtifactFile {
 export type DataSource = 'db' | 'file';
 
 /**
- * バックログ項目（TASK_241, ORDER_032で拡張）
+ * ORDER項目（旧BacklogItem。TASK_241, ORDER_032で拡張）
  */
-export interface BacklogItem {
+export interface OrderItem {
   id: string;
   projectId: string;
   title: string;
@@ -269,9 +269,9 @@ export interface BacklogItem {
 }
 
 /**
- * バックログ自動提案候補（ORDER_020 / TASK_062）
+ * ORDER自動提案候補（ORDER_020 / TASK_062）
  */
-export interface BacklogSuggestItem {
+export interface OrderSuggestItem {
   title: string;
   description: string;
   priority: string;
@@ -280,9 +280,9 @@ export interface BacklogSuggestItem {
 }
 
 /**
- * バックログ更新パラメータ（ORDER_139 / TASK_1161）
+ * ORDER更新パラメータ（ORDER_139 / TASK_1161）
  */
-export interface BacklogUpdateParams {
+export interface OrderUpdateParams {
   title?: string;
   description?: string;
   priority?: string;
@@ -291,13 +291,28 @@ export interface BacklogUpdateParams {
 }
 
 /**
- * バックログ操作結果（ORDER_139 / TASK_1161）
+ * ORDER操作結果（ORDER_139 / TASK_1161）
  */
-export interface BacklogOperationResult {
+export interface OrderOperationResult {
   success: boolean;
   backlogId?: string;
+  orderId?: string;
   error?: string;
 }
+
+// 後方互換エイリアス（TASK_325: Backlog→Orderリネーム移行）
+/** @deprecated Use OrderItem instead */
+export type BacklogItem = OrderItem;
+/** @deprecated Use OrderSuggestItem instead */
+export type BacklogSuggestItem = OrderSuggestItem;
+/** @deprecated Use OrderUpdateParams instead */
+export type BacklogUpdateParams = OrderUpdateParams;
+/** @deprecated Use OrderOperationResult instead */
+export type BacklogOperationResult = OrderOperationResult;
+/** @deprecated Use OrderSummaryData instead */
+export type BacklogSummaryData = OrderSummaryData;
+/** @deprecated Use OrderFilters instead */
+export type BacklogFilters = OrderFilters;
 
 /**
  * リフレッシュ結果（TASK_256）
@@ -429,9 +444,9 @@ export interface PendingReviewSummary {
 }
 
 /**
- * バックログ集約（TASK_323）
+ * ORDER集約（TASK_323）
  */
-export interface BacklogSummaryData {
+export interface OrderSummaryData {
   /** 全項目数 */
   totalItems: number;
   /** ORDER_065: DRAFT ORDER数（バックエンドが未対応の場合はundefined） */
@@ -487,7 +502,7 @@ export interface DashboardContext {
   /** 承認待ち集約 */
   reviewSummary: PendingReviewSummary;
   /** バックログ集約 */
-  backlogSummary: BacklogSummaryData;
+  backlogSummary: OrderSummaryData;
   /** 全プロジェクト数 */
   totalProjects: number;
   /** 正常プロジェクト数 */
@@ -503,9 +518,9 @@ export interface DashboardContext {
 }
 
 /**
- * バックログフィルタ（TASK_323）
+ * ORDERフィルタ（TASK_323）
  */
-export interface BacklogFilters {
+export interface OrderFilters {
   /** 優先度フィルタ */
   priority?: ('High' | 'Medium' | 'Low')[];
   /** ステータスフィルタ */
@@ -1495,63 +1510,63 @@ export interface ElectronAPI {
    */
   getDataSource: () => Promise<DataSource>;
 
-  // バックログ一覧 (TASK_241)
+  // ORDER一覧 (TASK_241)
   /**
-   * バックログ一覧を取得
+   * ORDER一覧を取得
    * @param projectName プロジェクト名
-   * @returns バックログ項目一覧
+   * @returns ORDER項目一覧
    */
-  getBacklogs: (projectName: string) => Promise<BacklogItem[]>;
+  getOrders: (projectName: string) => Promise<OrderItem[]>;
 
-  // バックログ操作（ORDER_139 / TASK_1161）
+  // ORDER操作（ORDER_139 / TASK_1161）
   /**
-   * バックログ項目を追加
+   * DRAFT ORDER項目を作成
    * @param projectId プロジェクトID
    * @param title タイトル
    * @param description 説明
    * @param priority 優先度（High/Medium/Low）
    * @param category カテゴリ（省略可）
-   * @returns 追加結果
+   * @returns 作成結果
    */
-  addBacklog: (
+  createDraftOrder: (
     projectId: string,
     title: string,
     description: string | null,
     priority: string,
     category?: string
-  ) => Promise<BacklogOperationResult>;
+  ) => Promise<OrderOperationResult>;
 
   /**
-   * バックログ項目を更新
+   * ORDER項目を更新
    * @param projectId プロジェクトID
-   * @param backlogId バックログID
+   * @param orderId ORDER ID
    * @param updates 更新内容
    * @returns 更新結果
    */
-  updateBacklog: (
+  updateOrder: (
     projectId: string,
-    backlogId: string,
-    updates: BacklogUpdateParams
-  ) => Promise<BacklogOperationResult>;
+    orderId: string,
+    updates: OrderUpdateParams
+  ) => Promise<OrderOperationResult>;
 
   /**
-   * バックログ項目を削除（CANCELEDステータスに変更）
+   * ORDER項目を削除（CANCELEDステータスに変更）
    * @param projectId プロジェクトID
-   * @param backlogId バックログID
+   * @param orderId ORDER ID
    * @returns 削除結果
    */
-  deleteBacklog: (
+  deleteOrder: (
     projectId: string,
-    backlogId: string
-  ) => Promise<BacklogOperationResult>;
+    orderId: string
+  ) => Promise<OrderOperationResult>;
 
   /**
-   * バックログ優先度を自動整理（ORDER_144 / TASK_1188）
+   * ORDER優先度を自動整理（ORDER_144 / TASK_1188）
    * @param projectId プロジェクトID
    * @param options オプション（dryRun, days, verbose）
    * @returns 優先度整理結果
    */
-  prioritizeBacklogs: (
+  prioritizeOrders: (
     projectId: string,
     options?: {
       dryRun?: boolean;
@@ -1563,7 +1578,7 @@ export interface ElectronAPI {
     updatedCount?: number;
     totalCount?: number;
     changes?: Array<{
-      backlogId: string;
+      orderId: string;
       title: string;
       oldPriority: string;
       newPriority: string;
@@ -1576,25 +1591,25 @@ export interface ElectronAPI {
     analysis?: string;
   }>;
 
-  // ORDER_020 / TASK_062: バックログ自動提案・一括登録
+  // ORDER_020 / TASK_062: ORDER自動提案・一括登録
   /**
-   * バックログ候補を自動提案
+   * ORDER候補を自動提案
    * @param projectId プロジェクトID
    * @returns 提案候補リスト
    */
-  suggestBacklogs: (projectId: string) => Promise<{
+  suggestOrders: (projectId: string) => Promise<{
     success: boolean;
-    suggestions?: BacklogSuggestItem[];
+    suggestions?: OrderSuggestItem[];
     error?: string;
   }>;
 
   /**
    * 選択された候補を一括登録
    * @param projectId プロジェクトID
-   * @param items 登録するバックログ候補リスト
+   * @param items 登録するORDER候補リスト
    * @returns 一括登録結果
    */
-  bulkAddBacklogs: (
+  bulkAddOrders: (
     projectId: string,
     items: Array<{
       title: string;
@@ -1638,20 +1653,15 @@ export interface ElectronAPI {
   getDashboard: (includeInactive?: boolean) => Promise<DashboardContext>;
 
   /**
-   * 全プロジェクトのバックログを取得（フィルタ付き）
+   * 全プロジェクトのORDERを取得（フィルタ付き）
    * @param filters フィルタ条件
-   * @returns バックログ項目一覧
+   * @returns ORDER項目一覧
    */
-  getAllBacklogs: (filters?: BacklogFilters) => Promise<BacklogItem[]>;
-
-  /**
-   * 全アクティブプロジェクトのBACKLOG sort_orderを再計算
-   */
-  reorderAllBacklogs: () => Promise<Array<{ project: string; success: boolean; message: string }>>;
+  getAllOrders: (filters?: OrderFilters) => Promise<OrderItem[]>;
 
   // スクリプト実行 (ORDER_039 / TASK_566)
   /**
-   * PM処理を実行（バックログ→ORDER化→PM処理）
+   * PM処理を実行（ORDER化→PM処理）
    * @param projectId プロジェクトID
    * @param backlogId バックログID
    * @returns 実行結果
@@ -2493,37 +2503,37 @@ const electronAPI: ElectronAPI = {
   // データソース表示 (TASK_200)
   getDataSource: () => ipcRenderer.invoke('project:get-data-source'),
 
-  // バックログ一覧 (TASK_241)
-  getBacklogs: (projectName: string) =>
+  // ORDER一覧 (TASK_241)
+  getOrders: (projectName: string) =>
     ipcRenderer.invoke('project:get-backlogs', projectName),
 
-  // バックログ操作（ORDER_139 / TASK_1161）
-  addBacklog: (
+  // ORDER操作（ORDER_139 / TASK_1161）
+  createDraftOrder: (
     projectId: string,
     title: string,
     description: string | null,
     priority: string,
     category?: string
   ) => ipcRenderer.invoke('project:add-backlog', projectId, title, description, priority, category),
-  updateBacklog: (
+  updateOrder: (
     projectId: string,
-    backlogId: string,
-    updates: BacklogUpdateParams
-  ) => ipcRenderer.invoke('project:update-backlog', projectId, backlogId, updates),
-  deleteBacklog: (projectId: string, backlogId: string) =>
-    ipcRenderer.invoke('project:delete-backlog', projectId, backlogId),
+    orderId: string,
+    updates: OrderUpdateParams
+  ) => ipcRenderer.invoke('project:update-backlog', projectId, orderId, updates),
+  deleteOrder: (projectId: string, orderId: string) =>
+    ipcRenderer.invoke('project:delete-backlog', projectId, orderId),
 
-  // ORDER_144 / TASK_1188: バックログ優先度自動整理
-  prioritizeBacklogs: (projectId: string, options?: {
+  // ORDER_144 / TASK_1188: ORDER優先度自動整理
+  prioritizeOrders: (projectId: string, options?: {
     dryRun?: boolean;
     days?: number;
     verbose?: boolean;
   }) => ipcRenderer.invoke('project:prioritize-backlogs', projectId, options),
 
-  // ORDER_020 / TASK_062: バックログ自動提案・一括登録
-  suggestBacklogs: (projectId: string) =>
+  // ORDER_020 / TASK_062: ORDER自動提案・一括登録
+  suggestOrders: (projectId: string) =>
     ipcRenderer.invoke('backlog:suggest', projectId),
-  bulkAddBacklogs: (
+  bulkAddOrders: (
     projectId: string,
     items: Array<{
       title: string;
@@ -2542,10 +2552,8 @@ const electronAPI: ElectronAPI = {
   // ダッシュボード (ORDER_021 / TASK_323)
   getDashboard: (includeInactive?: boolean) =>
     ipcRenderer.invoke('project:get-dashboard', includeInactive),
-  getAllBacklogs: (filters?: BacklogFilters) =>
+  getAllOrders: (filters?: OrderFilters) =>
     ipcRenderer.invoke('project:get-all-backlogs', filters),
-  reorderAllBacklogs: () =>
-    ipcRenderer.invoke('project:reorder-all-backlogs'),
 
   // スクリプト実行 (ORDER_039 / TASK_566)
   executePmProcess: (projectId: string, backlogId: string) =>

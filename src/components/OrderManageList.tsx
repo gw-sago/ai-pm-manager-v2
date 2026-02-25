@@ -1,36 +1,36 @@
 /**
- * BacklogList - ORDER一覧コンポーネント
+ * OrderManageList - ORDER管理一覧コンポーネント（旧OrderManageList）
  *
  * ORDER項目の一覧表示とフィルタ・ソート機能を提供するコンポーネント。
- * BacklogFilterBarを統合し、以下の機能を実装:
+ * OrderFilterBarを統合し、以下の機能を実装:
  * - 優先度フィルタ（High/Medium/Low）
  * - ステータスフィルタ（TODO/IN_PROGRESS/DONE等）
  * - プロジェクト横断検索
  * - ソート機能（優先度順/作成日順/ステータス順）
  * - フィルタ状態の管理
  *
- * @module BacklogList
+ * @module OrderManageList
  * @created 2026-02-02
  * @order ORDER_021
  * @task TASK_328
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BacklogFilterBar, type ProjectOption } from './BacklogFilterBar';
-import type { BacklogFilters } from '../main/services/DashboardService';
-import type { BacklogItem } from '../preload';
-import { useBacklogActions } from '../hooks/useOrderActions';
-import { BacklogAddForm } from './BacklogAddForm';
-import { BacklogSuggestPanel } from './BacklogSuggestPanel';
+import { OrderFilterBar, type ProjectOption } from './OrderFilterBar';
+import type { OrderFilters } from '../main/services/DashboardService';
+import type { OrderItem } from '../preload';
+import { useOrderItemActions } from '../hooks/useOrderActions';
+import { OrderAddForm } from './OrderAddForm';
+import { OrderSuggestPanel } from './OrderSuggestPanel';
 
 // =============================================================================
 // 型定義
 // =============================================================================
 
 /**
- * BacklogListのProps
+ * OrderManageListのProps
  */
-export interface BacklogListProps {
+export interface OrderManageListProps {
   /** プロジェクト名（単一プロジェクト表示用、オプション） */
   projectName?: string;
   /** 折りたたみ状態（後方互換性用） */
@@ -46,11 +46,11 @@ export interface BacklogListProps {
   /** 利用可能なプロジェクト一覧（プロジェクト横断モード用） */
   projects?: ProjectOption[];
   /** ORDER項目クリック時のコールバック */
-  onItemClick?: (item: BacklogItem) => void;
+  onItemClick?: (item: OrderItem) => void;
   /** ORDER IDクリック時のコールバック（後方互換性用） */
   onOrderClick?: (orderId: string) => void;
   /** 初期フィルタ設定 */
-  initialFilters?: BacklogFilters;
+  initialFilters?: OrderFilters;
   /** 最大表示件数（デフォルト: 制限なし） */
   maxItems?: number;
   /** タイトル（オプション） */
@@ -131,10 +131,10 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
  * @example
  * ```tsx
  * // 単一プロジェクト表示（後方互換）
- * <BacklogList projectName="ai_pm_manager" />
+ * <OrderManageList projectName="ai_pm_manager" />
  *
  * // プロジェクト横断表示（フィルタ付き）
- * <BacklogList
+ * <OrderManageList
  *   crossProject
  *   projects={[
  *     { id: 'ai_pm_manager', name: 'AI PM Manager' },
@@ -144,13 +144,13 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
  * />
  *
  * // カスタム初期フィルタ
- * <BacklogList
+ * <OrderManageList
  *   initialFilters={{ priority: ['High'], sortBy: 'priority' }}
  *   onItemClick={(item) => console.log('Clicked:', item)}
  * />
  * ```
  */
-export const BacklogList: React.FC<BacklogListProps> = ({
+export const OrderManageList: React.FC<OrderManageListProps> = ({
   projectName,
   collapsed = false,
   onCollapsedChange,
@@ -162,7 +162,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   onOrderClick,
   initialFilters = {},
   maxItems,
-  title = 'Backlog',
+  title = 'ORDER',
   emptyMessage = 'ORDER項目がありません',
 }) => {
   // ==========================================================================
@@ -170,9 +170,9 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   // ==========================================================================
 
   /** フィルタ状態 */
-  const [filters, setFilters] = useState<BacklogFilters>(initialFilters);
+  const [filters, setFilters] = useState<OrderFilters>(initialFilters);
   /** ORDER項目リスト */
-  const [items, setItems] = useState<BacklogItem[]>([]);
+  const [items, setItems] = useState<OrderItem[]>([]);
   /** ローディング状態 */
   const [isLoading, setIsLoading] = useState(true);
   /** エラー状態 */
@@ -190,7 +190,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   // ORDER_139: ORDER追加モーダル状態
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // ORDER_139: 削除確認ダイアログ状態
-  const [deleteConfirmItem, setDeleteConfirmItem] = useState<BacklogItem | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<OrderItem | null>(null);
   // ORDER_020: 自動提案パネル表示状態
   const [isSuggestPanelOpen, setIsSuggestPanelOpen] = useState(false);
 
@@ -321,7 +321,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
    * ORDER_053: バックグラウンド更新対応
    * @param silent trueの場合、ローディング表示を抑制（定期リフレッシュ用）
    */
-  const fetchBacklogs = useCallback(async (silent = false) => {
+  const fetchOrders = useCallback(async (silent = false) => {
     // silentモード時、または初回ロード完了後はローディング表示をスキップ（チラつき防止）
     // ORDER_053: 初回ロード後はバックグラウンドで更新
     if (!silent && !isInitialLoadDone) {
@@ -331,24 +331,24 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 
     try {
       // API呼び出し（フィルタ付き）
-      const apiFilters: BacklogFilters = { ...filters };
+      const apiFilters: OrderFilters = { ...filters };
 
       // 単一プロジェクトモードの場合、projectIdを設定
       if (!crossProject && projectName) {
         apiFilters.projectId = projectName;
       }
 
-      const data = await window.electronAPI.getAllBacklogs(apiFilters);
+      const data = await window.electronAPI.getAllOrders(apiFilters);
       setItems(data);
 
-      console.log('[BacklogList] Data loaded:', {
+      console.log('[OrderManageList] Data loaded:', {
         count: data.length,
         filters: apiFilters,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'ORDERの読み込みに失敗しました';
       setError(message);
-      console.error('[BacklogList] Failed to load backlogs:', err);
+      console.error('[OrderManageList] Failed to load orders:', err);
     } finally {
       setIsLoading(false);
       // ORDER_053: 初回ロード完了をマーク
@@ -371,7 +371,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           setRunningJobs(keys);
         })
         .catch((err) => {
-          console.error('[BacklogList] Failed to sync running jobs:', err);
+          console.error('[OrderManageList] Failed to sync running jobs:', err);
         });
     };
 
@@ -382,41 +382,41 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 
   // 初回読み込み＆フィルタ変更時の再取得
   useEffect(() => {
-    fetchBacklogs();
-  }, [fetchBacklogs]);
+    fetchOrders();
+  }, [fetchOrders]);
 
   // スクリプト実行完了イベントのリスナー（ORDER_039追加）
   useEffect(() => {
     // 完了イベントをリスニングして自動リフレッシュ
     // ORDER_053: silentモードでバックグラウンド更新（チラつき防止）
     const unsubscribe = window.electronAPI.onExecutionComplete((result) => {
-      console.log('[BacklogList] Execution complete event received:', {
+      console.log('[OrderManageList] Execution complete event received:', {
         type: result.type,
         success: result.success,
         targetId: result.targetId,
       });
       // 成功・失敗に関わらずリフレッシュ（状態が変わっている可能性があるため）
-      fetchBacklogs(true);
+      fetchOrders(true);
     });
 
     return () => {
       unsubscribe();
     };
-  }, [fetchBacklogs]);
+  }, [fetchOrders]);
 
   // プロジェクトリフレッシュイベントのリスナー（ORDER_051追加: リアルタイム性向上）
   useEffect(() => {
     // RefreshServiceからの更新通知をリスニング
     // ORDER_053: silentモードでバックグラウンド更新（チラつき防止）
     const unsubscribe = window.electronAPI.onRefreshed(() => {
-      console.log('[BacklogList] Project refreshed event received, fetching backlogs (silent)...');
-      fetchBacklogs(true);
+      console.log('[OrderManageList] Project refreshed event received, fetching orders (silent)...');
+      fetchOrders(true);
     });
 
     return () => {
       unsubscribe();
     };
-  }, [fetchBacklogs]);
+  }, [fetchOrders]);
 
   // DB変更イベントの購読（ORDER_004 / TASK_011）
   // スクリプト実行完了・タスクステータス変更時にORDERを自動更新
@@ -425,15 +425,15 @@ export const BacklogList: React.FC<BacklogListProps> = ({
       // 単一プロジェクトモードの場合、対象プロジェクトのイベントのみ再フェッチ
       // crossProjectモードの場合は全イベントで再フェッチ
       if (crossProject || !projectName || event.projectId === projectName) {
-        console.log('[BacklogList] db:changed event received:', event.source, event.projectId);
-        fetchBacklogs(true); // silentモードでバックグラウンド更新
+        console.log('[OrderManageList] db:changed event received:', event.source, event.projectId);
+        fetchOrders(true); // silentモードでバックグラウンド更新
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [fetchBacklogs, crossProject, projectName]);
+  }, [fetchOrders, crossProject, projectName]);
 
   // ==========================================================================
   // イベントハンドラ
@@ -442,7 +442,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   /**
    * フィルタ変更ハンドラ
    */
-  const handleFiltersChange = useCallback((newFilters: BacklogFilters) => {
+  const handleFiltersChange = useCallback((newFilters: OrderFilters) => {
     setFilters(newFilters);
   }, []);
 
@@ -459,7 +459,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
    * ORDER項目クリックハンドラ
    */
   const handleItemClick = useCallback(
-    (item: BacklogItem) => {
+    (item: OrderItem) => {
       onItemClick?.(item);
       // 後方互換性: relatedOrderIdがあればonOrderClickも呼び出す
       if (item.relatedOrderId && onOrderClick) {
@@ -491,7 +491,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
       // 優先度自動整理を実行（プロジェクトIDがある場合のみ）
       // crossProjectモードでない場合のみ実行
       if (!crossProject && projectName) {
-        const result = await window.electronAPI.prioritizeBacklogs(projectName, {});
+        const result = await window.electronAPI.prioritizeOrders(projectName, {});
 
         if (result.success) {
           const updatedCount = result.updatedCount || 0;
@@ -502,49 +502,49 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           }
         } else {
           // エラーでも警告表示のみ（一覧取得は続行）
-          console.warn('[BacklogList] 優先度整理失敗:', result.error);
+          console.warn('[OrderManageList] 優先度整理失敗:', result.error);
           handleShowToast('優先度整理に失敗しました', 'error');
         }
       }
     } catch (err) {
-      console.error('[BacklogList] 優先度整理エラー:', err);
+      console.error('[OrderManageList] 優先度整理エラー:', err);
       handleShowToast('優先度整理でエラーが発生しました', 'error');
     } finally {
       // 一覧を再取得
-      await fetchBacklogs(isInitialLoadDone);
+      await fetchOrders(isInitialLoadDone);
       setIsLoading(false);
     }
-  }, [fetchBacklogs, isInitialLoadDone, crossProject, projectName, handleShowToast]);
+  }, [fetchOrders, isInitialLoadDone, crossProject, projectName, handleShowToast]);
 
   /**
    * PM実行ハンドラ（ORDER_039追加、ORDER_042でバックグラウンド実行化）
    * 実行を開始したら即座に返し、結果はFloatingProgressPanelで表示
    */
-  const handleExecutePm = useCallback((projectId: string, backlogId: string) => {
-    const jobKey = `pm:${projectId}:${backlogId}`;
+  const handleExecutePm = useCallback((projectId: string, orderItemId: string) => {
+    const jobKey = `pm:${projectId}:${orderItemId}`;
     if (runningJobs.has(jobKey)) {
       return;
     }
 
     // ローカル状態で実行中フラグを立てる（UI即時反映用）
     setRunningJobs((prev) => new Set(prev).add(jobKey));
-    handleShowToast(`PM処理を開始: ${backlogId}`, 'info');
+    handleShowToast(`PM処理を開始: ${orderItemId}`, 'info');
 
     // バックグラウンドで実行（awaitしない）
-    window.electronAPI.executePmProcess(projectId, backlogId)
+    window.electronAPI.executePmProcess(projectId, orderItemId)
       .then((result) => {
         if (result.success) {
-          handleShowToast(`PM処理が完了しました: ${backlogId}`, 'success');
+          handleShowToast(`PM処理が完了しました: ${orderItemId}`, 'success');
         } else {
           handleShowToast(`PM処理失敗: ${result.error || 'Unknown error'}`, 'error');
         }
         // 完了後にリフレッシュ（ORDER_053: silentモード）
-        fetchBacklogs(true);
+        fetchOrders(true);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Unknown error';
         handleShowToast(`PM処理エラー: ${message}`, 'error');
-        console.error('[BacklogList] PM execution error:', err);
+        console.error('[OrderManageList] PM execution error:', err);
       })
       .finally(() => {
         setRunningJobs((prev) => {
@@ -553,7 +553,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           return next;
         });
       });
-  }, [runningJobs, handleShowToast, fetchBacklogs]);
+  }, [runningJobs, handleShowToast, fetchOrders]);
 
   /**
    * Worker実行ハンドラ（ORDER_039追加、ORDER_042でバックグラウンド実行化）
@@ -578,12 +578,12 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           handleShowToast(`Worker処理失敗: ${result.error || 'Unknown error'}`, 'error');
         }
         // 完了後にリフレッシュ（ORDER_053: silentモード）
-        fetchBacklogs(true);
+        fetchOrders(true);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Unknown error';
         handleShowToast(`Worker処理エラー: ${message}`, 'error');
-        console.error('[BacklogList] Worker execution error:', err);
+        console.error('[OrderManageList] Worker execution error:', err);
       })
       .finally(() => {
         setRunningJobs((prev) => {
@@ -592,7 +592,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           return next;
         });
       });
-  }, [runningJobs, handleShowToast, fetchBacklogs]);
+  }, [runningJobs, handleShowToast, fetchOrders]);
 
   /**
    * リリース実行ハンドラ（ORDER_019追加）
@@ -617,12 +617,12 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           handleShowToast(`リリース失敗: ${(result as { error?: string }).error || 'Unknown error'}`, 'error');
         }
         // 完了後にリフレッシュ（ORDER_053: silentモード）
-        fetchBacklogs(true);
+        fetchOrders(true);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Unknown error';
         handleShowToast(`リリースエラー: ${message}`, 'error');
-        console.error('[BacklogList] Release execution error:', err);
+        console.error('[OrderManageList] Release execution error:', err);
       })
       .finally(() => {
         setRunningJobs((prev) => {
@@ -631,7 +631,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
           return next;
         });
       });
-  }, [runningJobs, handleShowToast, fetchBacklogs]);
+  }, [runningJobs, handleShowToast, fetchOrders]);
 
   /**
    * 特定のジョブが実行中かどうかを確認（ORDER_039追加）
@@ -660,13 +660,13 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   const handleAddComplete = useCallback(() => {
     setIsAddModalOpen(false);
     handleShowToast('DRAFT ORDERを作成しました', 'success');
-    fetchBacklogs(true); // silentモードで再取得
-  }, [handleShowToast, fetchBacklogs]);
+    fetchOrders(true); // silentモードで再取得
+  }, [handleShowToast, fetchOrders]);
 
   /**
    * ORDER削除確認ダイアログを開く（ORDER_139追加）
    */
-  const handleOpenDeleteConfirm = useCallback((item: BacklogItem, e: React.MouseEvent) => {
+  const handleOpenDeleteConfirm = useCallback((item: OrderItem, e: React.MouseEvent) => {
     e.stopPropagation(); // 親のonClickを発火させない
     setDeleteConfirmItem(item);
   }, []);
@@ -681,22 +681,22 @@ export const BacklogList: React.FC<BacklogListProps> = ({
   /**
    * ORDER削除実行ハンドラ（ORDER_139追加）
    */
-  const handleDeleteBacklog = useCallback(async () => {
+  const handleDeleteOrder = useCallback(async () => {
     if (!deleteConfirmItem) return;
 
     try {
       // IPC呼び出し（TASK_1161で実装予定）
-      await window.electronAPI.deleteBacklog(deleteConfirmItem.projectId, deleteConfirmItem.id);
+      await window.electronAPI.deleteOrder(deleteConfirmItem.projectId, deleteConfirmItem.id);
       handleShowToast('ORDERを削除しました', 'success');
-      fetchBacklogs(true); // silentモードで再取得
+      fetchOrders(true); // silentモードで再取得
     } catch (err) {
       const message = err instanceof Error ? err.message : 'ORDERの削除に失敗しました';
       handleShowToast(message, 'error');
-      console.error('[BacklogList] Failed to delete backlog:', err);
+      console.error('[OrderManageList] Failed to delete order:', err);
     } finally {
       setDeleteConfirmItem(null);
     }
-  }, [deleteConfirmItem, handleShowToast, fetchBacklogs]);
+  }, [deleteConfirmItem, handleShowToast, fetchOrders]);
 
   // ==========================================================================
   // レンダリング
@@ -801,7 +801,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
       {/* フィルタバー */}
       {showFilterBar && (
         <div className="p-4 border-b border-gray-100">
-          <BacklogFilterBar
+          <OrderFilterBar
             filters={filters}
             onFiltersChange={handleFiltersChange}
             projects={crossProject ? projects : undefined}
@@ -814,10 +814,10 @@ export const BacklogList: React.FC<BacklogListProps> = ({
       {/* ORDER_020: 自動提案パネル */}
       {isSuggestPanelOpen && !crossProject && projectName && (
         <div className="p-4 border-b border-gray-100">
-          <BacklogSuggestPanel
+          <OrderSuggestPanel
             projectId={projectName}
             onComplete={() => {
-              fetchBacklogs(true);
+              fetchOrders(true);
             }}
           />
         </div>
@@ -889,7 +889,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
         {!isLoading && !error && displayItems.length > 0 && (
           <div className="space-y-2">
             {displayItems.map((item) => (
-              <BacklogItemCard
+              <OrderItemCard
                 key={`${item.projectId}-${item.id}`}
                 item={item}
                 showProject={crossProject || !projectName}
@@ -916,7 +916,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 
       {/* ORDER_139: ORDER追加モーダル */}
       {isAddModalOpen && (
-        <BacklogAddModal
+        <OrderAddModal
           onClose={handleCloseAddModal}
           onComplete={handleAddComplete}
           projectId={!crossProject && projectName ? projectName : undefined}
@@ -927,7 +927,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
       {deleteConfirmItem && (
         <DeleteConfirmDialog
           item={deleteConfirmItem}
-          onConfirm={handleDeleteBacklog}
+          onConfirm={handleDeleteOrder}
           onCancel={handleCloseDeleteConfirm}
         />
       )}
@@ -942,8 +942,8 @@ export const BacklogList: React.FC<BacklogListProps> = ({
 /**
  * ORDER項目カード
  */
-interface BacklogItemCardProps {
-  item: BacklogItem;
+interface OrderItemCardProps {
+  item: OrderItem;
   showProject?: boolean;
   onClick?: () => void;
   onCopyCommand?: (message: string) => void;
@@ -956,13 +956,13 @@ interface BacklogItemCardProps {
   /** リリース実行中フラグ */
   isReleaseRunning?: boolean;
   /** PM実行コールバック */
-  onExecutePm?: (projectId: string, backlogId: string) => void;
+  onExecutePm?: (projectId: string, orderItemId: string) => void;
   /** Worker実行コールバック */
   onExecuteWorker?: (projectId: string, orderId: string) => void;
   /** リリース実行コールバック */
   onExecuteRelease?: (projectId: string, orderId: string) => void;
   /** 削除ボタンクリックコールバック（ORDER_139追加） */
-  onDelete?: (item: BacklogItem, e: React.MouseEvent) => void;
+  onDelete?: (item: OrderItem, e: React.MouseEvent) => void;
 }
 
 /**
@@ -971,7 +971,7 @@ interface BacklogItemCardProps {
  * itemのIDと主要プロパティ、実行状態フラグを比較し、
  * 変更がない場合は再レンダリングをスキップする
  */
-const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
+const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
   item,
   showProject = false,
   onClick,
@@ -989,14 +989,14 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
   const priorityColor = PRIORITY_COLORS[item.priority] || 'bg-gray-100 text-gray-600';
   const statusColor = STATUS_COLORS[item.status] || 'bg-gray-100 text-gray-600';
 
-  // TASK_1137: useBacklogActionsを使用してボタン活性制御を精緻化
+  // TASK_1137: useOrderItemActionsを使用してボタン活性制御を精緻化
   const {
     canExecutePm,
     canExecuteWorker,
     pmDisabledReason,
     workerDisabledReason,
-  } = useBacklogActions({
-    backlogItem: item,
+  } = useOrderItemActions({
+    orderItem: item,
     isPmRunning,
     isWorkerRunning,
   });
@@ -1082,15 +1082,15 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
     const nextPriority = priorityOrder[nextIndex];
 
     try {
-      // updateBacklog IPCを呼び出して優先度を更新
-      await window.electronAPI.updateBacklog(item.projectId, item.id, {
+      // updateOrder IPCを呼び出して優先度を更新
+      await window.electronAPI.updateOrder(item.projectId, item.id, {
         priority: nextPriority,
       });
 
       // 成功時にトースト通知（親コンポーネントから渡される場合）
       onCopyCommand?.(`優先度を${nextPriority}に変更しました`);
     } catch (err) {
-      console.error('[BacklogItemCard] Failed to update priority:', err);
+      console.error('[OrderItemCard] Failed to update priority:', err);
       onCopyCommand?.('優先度の変更に失敗しました');
     }
   }, [item.priority, item.projectId, item.id, onCopyCommand]);
@@ -1397,7 +1397,7 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
 });
 
 // コンポーネント名を明示（デバッグ用）
-BacklogItemCard.displayName = 'BacklogItemCard';
+OrderItemCard.displayName = 'OrderItemCard';
 
 /**
  * トースト通知コンポーネント（ORDER_051: 成功/エラー色分け対応）
@@ -1457,15 +1457,15 @@ const Toast: React.FC<ToastProps> = ({ message, onClose, type = 'success' }) => 
 
 /**
  * ORDER追加モーダル（ORDER_139追加）
- * TASK_1160で実装されるBacklogAddFormをラップするモーダルダイアログ
+ * TASK_1160で実装されるOrderAddFormをラップするモーダルダイアログ
  */
-interface BacklogAddModalProps {
+interface OrderAddModalProps {
   onClose: () => void;
   onComplete: () => void;
   projectId?: string;
 }
 
-const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, projectId }) => {
+const OrderAddModal: React.FC<OrderAddModalProps> = ({ onClose, onComplete, projectId }) => {
   // クロスプロジェクト時のプロジェクト選択状態
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
   const [projects, setProjects] = useState<{ name: string }[]>([]);
@@ -1488,10 +1488,10 @@ const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, 
     return () => { cancelled = true; };
   }, [projectId]);
 
-  // projectIdが指定されている、またはプロジェクトが選択済みの場合 → BacklogAddFormを表示
+  // projectIdが指定されている、またはプロジェクトが選択済みの場合 → OrderAddFormを表示
   if (selectedProjectId) {
     return (
-      <BacklogAddForm
+      <OrderAddForm
         projectId={selectedProjectId}
         onClose={onClose}
         onSuccess={onComplete}
@@ -1546,7 +1546,7 @@ const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, 
  * 削除確認ダイアログ（ORDER_139追加）
  */
 interface DeleteConfirmDialogProps {
-  item: BacklogItem;
+  item: OrderItem;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -1635,4 +1635,4 @@ function formatDate(dateStr: string): string {
 // デフォルトエクスポート
 // =============================================================================
 
-export default BacklogList;
+export default OrderManageList;

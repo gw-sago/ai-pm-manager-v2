@@ -143,9 +143,9 @@ export interface DashboardContext {
 }
 
 /**
- * バックログフィルタ
+ * ORDERフィルタ（旧BacklogFilters）
  */
-export interface BacklogFilters {
+export interface OrderFilters {
   priority?: ('High' | 'Medium' | 'Low')[];
   status?: string[];
   projectId?: string;
@@ -153,11 +153,14 @@ export interface BacklogFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
+/** @deprecated Use OrderFilters instead */
+export type BacklogFilters = OrderFilters;
+
 /**
- * バックログ項目（ORDER_032で拡張: ORDER紐付け情報追加）
+ * ORDER項目（旧BacklogItem。ORDER_032で拡張: ORDER紐付け情報追加）
  * ORDER_065: orderStatus に DRAFT を追加。DRAFT ORDERも一覧に含まれる。
  */
-export interface BacklogItem {
+export interface OrderItemData {
   id: string;
   projectId: string;
   title: string;
@@ -179,6 +182,9 @@ export interface BacklogItem {
   // ORDER_106追加: sort_order（数値優先度）
   sortOrder?: number;
 }
+
+/** @deprecated Use OrderItemData instead */
+export type BacklogItem = OrderItemData;
 
 /**
  * サービスエラー

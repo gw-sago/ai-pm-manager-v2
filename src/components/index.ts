@@ -10,9 +10,11 @@ export { ProgressBar } from './ProgressBar';
 export { OrderList } from './OrderList';
 export { TaskList } from './TaskList';
 export { TaskCard } from './TaskCard';
-export { BacklogList } from './BacklogList';
-export { BacklogFilterBar } from './BacklogFilterBar';
-export { BacklogSuggestPanel } from './BacklogSuggestPanel';
+export { OrderManageList } from './OrderManageList';
+export { OrderFilterBar } from './OrderFilterBar';
+export { OrderSuggestPanel } from './OrderSuggestPanel';
+export { OrderAddForm } from './OrderAddForm';
+export { OrderItemPanel } from './OrderItemPanel';
 export { TaskDetail } from './TaskDetail';
 export { ReportViewer } from './ReportViewer';
 export { OrderDetailPanel } from './OrderDetailPanel';
@@ -30,6 +32,6 @@ export { ProjectInfo } from './ProjectInfo';
 export { DocsPanel } from './DocsPanel';
 export { RecoveryAlert } from './RecoveryAlert';
 
-// Hooks (ORDER_131 TASK_1137: useBacklogActions追加)
-export { useOrderActions, useBacklogActions } from '../hooks/useOrderActions';
-export type { OrderActionsResult, UseOrderActionsOptions, UseBacklogActionsOptions } from '../hooks/useOrderActions';
+// Hooks (ORDER_131 TASK_1137: useOrderItemActions - 旧useBacklogActions)
+export { useOrderActions, useOrderItemActions, useBacklogActions } from '../hooks/useOrderActions';
+export type { OrderActionsResult, UseOrderActionsOptions, UseOrderItemActionsOptions, UseBacklogActionsOptions } from '../hooks/useOrderActions';

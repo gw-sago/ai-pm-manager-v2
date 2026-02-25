@@ -18,7 +18,7 @@ ai-pm-manager-v2/
 │       ├── ORDERS/
 │       └── RESULT/
 ├── templates/              # プロジェクトテンプレート
-├── .claude/commands/       # スラッシュコマンド定義（16本）
+├── .claude/commands/       # スラッシュコマンド定義（14本）
 └── CLAUDE.md               # このファイル
 ```
 
@@ -55,8 +55,6 @@ CLI操作で使用可能なコマンド:
 | `/aipm-review` | レビュー（タスク承認/差し戻し） |
 | `/aipm-full-auto` | 完全自動実行（PM→Worker→レビュー） |
 | `/aipm-status` | 詳細状態確認 |
-| `/aipm-backlog-add` | バックログ追加 |
-| `/aipm-backlog-to-order` | バックログからORDER作成 |
 | `/aipm-release` | リリース処理 |
 | `/aipm-release-review` | リリース承認フロー |
 | `/aipm-recover` | 中断タスクのリカバリ |

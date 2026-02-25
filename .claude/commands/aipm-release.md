@@ -105,51 +105,18 @@ git status --short
 
 ## Step 3: 関連BACKLOG検出・完了処理
 
-### 3.1 各ORDERに紐づくBACKLOGを取得
+関連BACKLOGの完了処理は `release/git_release.py` 内の `_complete_backlogs()` により自動実行される。
+`git_release.py` の `--skip-backlog` オプションでスキップ可能。
 
-```bash
-python backend/backlog/list.py $PROJECT_NAME --json
-```
-
-結果から `related_order_id` が対象ORDER_IDと一致するBACKLOGを抽出。
-
-### 3.2 BACKLOG完了処理
-
-抽出したBACKLOGのうち、statusが `IN_PROGRESS` のものをDONEに更新:
-
-```bash
-python backend/backlog/update.py $PROJECT_NAME $BACKLOG_ID --status DONE
-```
+**処理内容**:
+- 各ORDERに紐づくBACKLOGをDBから直接検索（backlog_itemsテーブル）
+- IN_PROGRESS → DONE に遷移
+- 状態遷移履歴を記録
 
 **スキップ条件**（エラーにしない）:
 - 関連BACKLOGがない → スキップ
 - 既にDONE → スキップ
 - CANCELED → スキップ
-
-### 3.3 結果を記録
-
-更新したBACKLOG情報を後続ステップで使用するために保持:
-- BACKLOG_ID
-- タイトル
-- 旧ステータス → DONE
-
-### 3.4 バックログ再整理
-
-BACKLOG完了処理後、優先順位・依存関係・ステータスに基づいてsort_orderを再計算:
-
-```bash
-python backend/backlog/reorder.py $PROJECT_NAME --json
-```
-
-**再整理ルール**:
-- IN_PROGRESSは最上位固定（sort_order: 0〜）
-- 優先度順: High → Medium → Low
-- 同一priority内は依存関係順（前提未達は後ろ）
-- DONEは最下位
-
-**スキップ条件**（エラーにしない）:
-- バックログが存在しない → スキップ
-- reorder.py実行エラー → 警告表示して続行
 
 ---
 

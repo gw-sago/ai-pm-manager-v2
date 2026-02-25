@@ -1,21 +1,21 @@
 /**
- * BacklogDetailPanel - ORDER詳細表示パネル
+ * OrderItemPanel - ORDER詳細表示パネル
  *
  * ORDERカードクリック時に詳細情報を表示するパネルコンポーネント。
  * ORDER詳細やタスク詳細と同様のUI/UXを提供。
  *
- * @module BacklogDetailPanel
+ * @module OrderItemPanel
  * @created 2026-02-10
  * @order ORDER_123
  * @task TASK_1108
  */
 
 import React, { useState, useEffect } from 'react';
-import type { BacklogItem } from '../preload';
+import type { OrderItem } from '../preload';
 
-interface BacklogDetailPanelProps {
+interface OrderItemPanelProps {
   /** ORDER項目 */
-  item: BacklogItem;
+  item: OrderItem;
   /** 閉じるコールバック */
   onClose: () => void;
   /** ORDER IDクリック時のコールバック */
@@ -40,14 +40,14 @@ interface BacklogDetailPanelProps {
  *
  * @example
  * ```tsx
- * <BacklogDetailPanel
- *   item={backlogItem}
+ * <OrderItemPanel
+ *   item={orderItem}
  *   onClose={() => setSelectedItem(null)}
  *   onOrderClick={(orderId) => handleOrderClick(orderId)}
  * />
  * ```
  */
-export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
+export const OrderItemPanel: React.FC<OrderItemPanelProps> = ({
   item,
   onClose,
   onOrderClick,
@@ -141,8 +141,8 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
     setError(null);
 
     try {
-      // IPC呼び出し（updateBacklog）
-      const result = await window.electronAPI.updateBacklog(
+      // IPC呼び出し（updateOrder）
+      const result = await window.electronAPI.updateOrder(
         item.projectId,
         item.id,
         {
@@ -164,7 +164,7 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
         setError(result?.error || 'ORDERの更新に失敗しました');
       }
     } catch (err) {
-      console.error('[BacklogDetailPanel] Failed to update backlog:', err);
+      console.error('[OrderItemPanel] Failed to update order item:', err);
       setError('ORDERの更新に失敗しました');
     } finally {
       setSaving(false);
@@ -443,7 +443,7 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
                     <button
                       onClick={() => {
                         if (item.relatedOrderId) {
-                          // PM処理を開始するには BacklogList の handleExecutePm を経由する必要がある
+                          // PM処理を開始するには OrderManageList の handleExecutePm を経由する必要がある
                           // ここではORDER表示へ遷移してそこからPM実行を促す
                           handleOrderIdClick();
                         }
@@ -593,4 +593,4 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
   );
 };
 
-export default BacklogDetailPanel;
+export default OrderItemPanel;

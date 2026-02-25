@@ -2,7 +2,7 @@
  * ProjectInfoGuidance.tsx - 初回ガイダンスUIコンポーネント
  *
  * プロジェクト情報が未作成の場合に表示し、
- * プロジェクト関連情報の入力を促してバックログに登録する。
+ * プロジェクト関連情報の入力を促してDRAFT ORDERに登録する。
  */
 
 import React, { useState } from 'react';
@@ -55,7 +55,7 @@ export const ProjectInfoGuidance: React.FC<ProjectInfoGuidanceProps> = ({ projec
     setSubmitting(true);
     setError(null);
     try {
-      const result = await window.electronAPI.addBacklog(
+      const result = await window.electronAPI.createDraftOrder(
         projectId,
         title.trim(),
         description.trim() || null,
@@ -65,10 +65,10 @@ export const ProjectInfoGuidance: React.FC<ProjectInfoGuidanceProps> = ({ projec
       if (result && result.success) {
         setIsSubmitted(true);
       } else {
-        setError(result?.error || 'バックログの追加に失敗しました');
+        setError(result?.error || 'DRAFT ORDERの追加に失敗しました');
       }
     } catch {
-      setError('バックログの追加に失敗しました');
+      setError('DRAFT ORDERの追加に失敗しました');
     } finally {
       setSubmitting(false);
     }

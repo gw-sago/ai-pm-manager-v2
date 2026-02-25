@@ -6,7 +6,7 @@ import { ReportViewer } from './ReportViewer';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { TaskLogModal } from './TaskLogModal';
 import { TaskDetailPanel } from './TaskDetailPanel';
-import type { Project, OrderInfo, TaskInfo, BacklogItem, Supervisor, SupervisorProject } from '../preload';
+import type { Project, OrderInfo, TaskInfo, OrderItem, Supervisor, SupervisorProject } from '../preload';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -299,15 +299,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, []);
 
   /**
-   * ORDER項目クリック時のハンドラ（ORDER_038追加）
+   * ORDER項目（DRAFT ORDER）クリック時のハンドラ（ORDER_038追加）
    * 関連ORDERがある場合、そのORDERを選択状態にする
    */
-  const handleBacklogItemClick = useCallback((item: BacklogItem) => {
-    console.log('[Layout] Backlog item clicked:', item.id, item.relatedOrderId);
+  const handleOrderItemClick = useCallback((item: OrderItem) => {
+    console.log('[Layout] Order item clicked:', item.id, item.relatedOrderId);
 
     // 関連ORDERがない場合は何もしない
     if (!item.relatedOrderId) {
-      console.log('[Layout] No related order for backlog item');
+      console.log('[Layout] No related order for order item');
       return;
     }
 
@@ -318,7 +318,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       );
       if (targetOrder) {
         setSelectedOrder(targetOrder);
-        console.log('[Layout] Selected order from backlog:', targetOrder.id, targetOrder.title);
+        console.log('[Layout] Selected order from order item:', targetOrder.id, targetOrder.title);
       } else {
         console.warn('[Layout] Related order not found in project orders:', item.relatedOrderId);
       }
@@ -389,7 +389,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           selectedProject={selectedProject}
           selectedOrder={selectedOrder}
           frameworkConfigState={frameworkConfigState}
-          onBacklogItemClick={handleBacklogItemClick}
+          onOrderItemClick={handleOrderItemClick}
           onOrderIdClick={handleOrderIdClick}
           selectedSupervisor={selectedSupervisor}
           onSupervisorProjectSelect={handleSupervisorProjectSelect}

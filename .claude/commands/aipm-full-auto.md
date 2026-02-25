@@ -890,15 +890,8 @@ python backend/task/list.py $PROJECT_NAME --order ORDER_$ORDER_ID --json
 
 ### 6.4 BACKLOG自動更新
 
-ORDER完了時、関連BACKLOGをDONEに更新:
-
-```bash
-# 関連BACKLOG取得
-python backend/backlog/list.py $PROJECT_NAME --order-id ORDER_$ORDER_ID --json
-
-# BACKLOG更新
-python backend/backlog/update.py $PROJECT_NAME {BACKLOG_ID} --status DONE
-```
+ORDER完了時、関連BACKLOGは `order/update.py` 内の `_complete_related_backlog()` により自動的にDONEに更新される。
+個別のスクリプト呼び出しは不要。
 
 ---
 

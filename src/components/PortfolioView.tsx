@@ -1,8 +1,8 @@
 /**
  * PortfolioView.tsx
  *
- * ポートフォリオ統合ビュー - 全プロジェクトのORDER・バックログを一覧表示
- * ORDER_068 / BACKLOG_116
+ * ポートフォリオ統合ビュー - 全プロジェクトのORDER・DRAFT ORDER項目を一覧表示
+ * ORDER_068
  */
 
 import React, { useState, useEffect } from 'react';
@@ -24,8 +24,8 @@ interface PortfolioOrder {
   updatedAt: string;
 }
 
-// ポートフォリオ用のバックログ型定義
-interface PortfolioBacklog {
+// ポートフォリオ用のDRAFT ORDER型定義
+interface PortfolioDraftOrder {
   id: string;
   portfolioId: string; // "projectName/BACKLOG_XXX"
   projectId: string;
@@ -51,7 +51,7 @@ interface PortfolioTask {
 // ポートフォリオデータ型定義
 interface PortfolioData {
   orders: PortfolioOrder[];
-  backlogs: PortfolioBacklog[];
+  backlogs: PortfolioDraftOrder[];
 }
 
 interface PortfolioViewProps {
@@ -100,7 +100,7 @@ const PortfolioIcon: React.FC = () => (
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) => {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PortfolioOrder | null>(null);
-  const [selectedBacklog, setSelectedBacklog] = useState<PortfolioBacklog | null>(null);
+  const [selectedDraftOrder, setSelectedDraftOrder] = useState<PortfolioDraftOrder | null>(null);
   const [orderTasks, setOrderTasks] = useState<PortfolioTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,9 +155,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) =>
     return true;
   }) || [];
 
-  const filteredBacklogs = portfolioData?.backlogs.filter(backlog => {
-    if (statusFilter.length > 0 && !statusFilter.includes(backlog.status)) return false;
-    if (priorityFilter.length > 0 && !priorityFilter.includes(backlog.priority)) return false;
+  const filteredDraftOrders = portfolioData?.backlogs.filter(item => {
+    if (statusFilter.length > 0 && !statusFilter.includes(item.status)) return false;
+    if (priorityFilter.length > 0 && !priorityFilter.includes(item.priority)) return false;
     return true;
   }) || [];
 
@@ -191,7 +191,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) =>
         <PortfolioIcon />
         <h2 className="text-lg font-semibold text-gray-900">ポートフォリオビュー</h2>
         <span className="text-sm text-gray-500">
-          ({filteredOrders.length} ORDER / {filteredBacklogs.length} BACKLOG)
+          ({filteredOrders.length} ORDER / {filteredDraftOrders.length} DRAFT)
         </span>
       </div>
 
@@ -232,7 +232,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) =>
                     key={order.id}
                     onClick={() => {
                       setSelectedOrder(order);
-                      setSelectedBacklog(null);
+                      setSelectedDraftOrder(null);
                     }}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
                       selectedOrder?.id === order.id
@@ -272,41 +272,41 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) =>
           </div>
         </div>
 
-        {/* 中央カラム: バックログ一覧 */}
+        {/* 中央カラム: DRAFT ORDER一覧 */}
         <div className="bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden">
           <div className="p-3 bg-gray-50 border-b border-gray-200">
-            <h3 className="font-medium text-gray-700">バックログ一覧</h3>
+            <h3 className="font-medium text-gray-700">DRAFT ORDER一覧</h3>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            {filteredBacklogs.length === 0 ? (
+            {filteredDraftOrders.length === 0 ? (
               <div className="text-center text-gray-400 py-8">該当なし</div>
             ) : (
               <div className="space-y-2">
-                {filteredBacklogs.map(backlog => (
+                {filteredDraftOrders.map(item => (
                   <div
-                    key={backlog.id}
+                    key={item.id}
                     onClick={() => {
-                      setSelectedBacklog(backlog);
+                      setSelectedDraftOrder(item);
                       setSelectedOrder(null);
                     }}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedBacklog?.id === backlog.id
+                      selectedDraftOrder?.id === item.id
                         ? 'bg-indigo-50 border-2 border-indigo-400'
                         : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium text-purple-600">
-                        {backlog.portfolioId}
+                        {item.portfolioId}
                       </span>
-                      <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(backlog.status)}`}>
-                        {backlog.status}
+                      <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(item.status)}`}>
+                        {item.status}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-900 truncate">{backlog.title}</div>
+                    <div className="text-sm text-gray-900 truncate">{item.title}</div>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-1.5 py-0.5 text-xs rounded ${getPriorityColor(backlog.priority)}`}>
-                        {backlog.priority}
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${getPriorityColor(item.priority)}`}>
+                        {item.priority}
                       </span>
                     </div>
                   </div>
@@ -381,46 +381,46 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) =>
                   )}
                 </div>
               </div>
-            ) : selectedBacklog ? (
+            ) : selectedDraftOrder ? (
               <div>
                 <div className="mb-4">
                   <div className="text-xs text-purple-600 font-medium mb-1">
-                    {selectedBacklog.portfolioId}
+                    {selectedDraftOrder.portfolioId}
                   </div>
-                  <h4 className="text-lg font-semibold text-gray-900">{selectedBacklog.title}</h4>
+                  <h4 className="text-lg font-semibold text-gray-900">{selectedDraftOrder.title}</h4>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-gray-50 p-2 rounded">
                     <div className="text-xs text-gray-500">ステータス</div>
-                    <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(selectedBacklog.status)}`}>
-                      {selectedBacklog.status}
+                    <span className={`px-2 py-0.5 text-xs rounded ${getStatusColor(selectedDraftOrder.status)}`}>
+                      {selectedDraftOrder.status}
                     </span>
                   </div>
                   <div className="bg-gray-50 p-2 rounded">
                     <div className="text-xs text-gray-500">優先度</div>
-                    <span className={`px-1.5 py-0.5 text-xs rounded ${getPriorityColor(selectedBacklog.priority)}`}>
-                      {selectedBacklog.priority}
+                    <span className={`px-1.5 py-0.5 text-xs rounded ${getPriorityColor(selectedDraftOrder.priority)}`}>
+                      {selectedDraftOrder.priority}
                     </span>
                   </div>
                   <div className="bg-gray-50 p-2 rounded col-span-2">
                     <div className="text-xs text-gray-500">プロジェクト</div>
-                    <div className="text-sm font-medium">{selectedBacklog.projectName}</div>
+                    <div className="text-sm font-medium">{selectedDraftOrder.projectName}</div>
                   </div>
                 </div>
 
-                {selectedBacklog.description && (
+                {selectedDraftOrder.description && (
                   <div className="mt-4">
                     <h5 className="text-sm font-medium text-gray-700 mb-2">説明</h5>
                     <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded whitespace-pre-wrap">
-                      {selectedBacklog.description}
+                      {selectedDraftOrder.description}
                     </div>
                   </div>
                 )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400">
-                ORDERまたはバックログを選択してください
+                ORDERまたはDRAFT ORDERを選択してください
               </div>
             )}
           </div>

@@ -11,7 +11,7 @@
  */
 
 import { useMemo } from 'react';
-import type { OrderInfo, BacklogItem } from '../preload';
+import type { OrderInfo, OrderItem } from '../preload';
 
 /**
  * アクション判定結果
@@ -48,12 +48,12 @@ export interface UseOrderActionsOptions {
 }
 
 /**
- * useBacklogActionsの引数（バックログ項目単位）
- * TASK_1137: BacklogList.tsx向けのバックログ項目単位判定
+ * useOrderItemActionsの引数（ORDER項目単位）
+ * TASK_1137: OrderManageList.tsx向けのORDER項目単位判定
  */
-export interface UseBacklogActionsOptions {
-  /** バックログ項目 */
-  backlogItem: BacklogItem | null;
+export interface UseOrderItemActionsOptions {
+  /** ORDER項目 */
+  orderItem: OrderItem | null;
   /** PM実行中フラグ */
   isPmRunning?: boolean;
   /** Worker実行中フラグ */
@@ -198,26 +198,27 @@ export const useOrderActions = ({
 };
 
 /**
- * バックログ項目アクション判定hook
+ * ORDER項目アクション判定hook（旧useBacklogActions）
  *
- * BacklogList.tsx向けに、バックログ項目単位でPM/Worker実行可否を判定します。
- * TASK_1137: BacklogList.tsxのボタン活性制御精緻化
+ * OrderManageList.tsx向けに、ORDER項目単位でPM/Worker実行可否を判定します。
+ * TASK_1137: OrderManageList.tsxのボタン活性制御精緻化
  *
  * @example
  * ```tsx
- * const { canExecutePm, canExecuteWorker, pmDisabledReason } = useBacklogActions({
- *   backlogItem: item,
+ * const { canExecutePm, canExecuteWorker, pmDisabledReason } = useOrderItemActions({
+ *   orderItem: item,
  *   isPmRunning: false,
  *   isWorkerRunning: false,
  * });
  * ```
  */
-export const useBacklogActions = ({
-  backlogItem,
+export const useOrderItemActions = ({
+  orderItem,
   isPmRunning = false,
   isWorkerRunning = false,
-}: UseBacklogActionsOptions): OrderActionsResult => {
+}: UseOrderItemActionsOptions): OrderActionsResult => {
   return useMemo(() => {
+    const backlogItem = orderItem;
     if (!backlogItem) {
       return {
         canExecutePm: false,
@@ -301,7 +302,19 @@ export const useBacklogActions = ({
       workerDisabledReason,
       releaseDisabledReason,
     };
-  }, [backlogItem, isPmRunning, isWorkerRunning]);
+  }, [orderItem, isPmRunning, isWorkerRunning]);
 };
+
+/** @deprecated Use useOrderItemActions instead */
+export const useBacklogActions = ({
+  backlogItem,
+  isPmRunning = false,
+  isWorkerRunning = false,
+}: { backlogItem: OrderItem | null; isPmRunning?: boolean; isWorkerRunning?: boolean }): OrderActionsResult => {
+  return useOrderItemActions({ orderItem: backlogItem, isPmRunning, isWorkerRunning });
+};
+
+/** @deprecated Use UseOrderItemActionsOptions instead */
+export type UseBacklogActionsOptions = UseOrderItemActionsOptions;
 
 export default useOrderActions;

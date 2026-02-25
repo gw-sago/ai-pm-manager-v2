@@ -750,50 +750,19 @@ python backend/task/list.py $PROJECT_NAME --order $ORDER_ID --json
 
 ORDER未完了の場合は、このステップ全体をスキップ。
 
-#### 8.2 関連BACKLOG検出
+#### 8.2 関連BACKLOG自動更新
 
-DBから関連BACKLOGを取得：
+ORDER完了時、`order/update.py` 内の `_complete_related_backlog()` が自動的に関連BACKLOGをDONEに更新する。
+個別のスクリプト呼び出しは不要。
 
-```bash
-python backend/backlog/list.py $PROJECT_NAME --order-id $ORDER_ID --json
-```
+**自動処理内容**:
+- backlog_itemsテーブルから `related_order_id` で検索
+- IN_PROGRESS → DONE に遷移
+- 完了日時・状態遷移履歴を記録
 
-または、DBのordersテーブルから`related_backlog_id`フィールドを参照。
-
-#### 8.3 スキップ条件
-
-以下の場合はBACKLOG更新をスキップ（エラーにしない）：
-
-| 条件 | 処理 |
-|------|------|
-| 関連BACKLOGが検出されない | スキップ（メッセージなし） |
-| BACKLOGが既にDONE | スキップ（メッセージなし） |
-| BACKLOGが既にCANCELED | スキップ（メッセージなし） |
-| ORDER内に未完了タスクあり | スキップ（メッセージなし） |
-
-#### 8.4 BACKLOG更新処理（スクリプト呼び出し）
-
-スキップ条件に該当しない場合、以下のスクリプトを実行：
-
-```bash
-python backend/backlog/update.py $PROJECT_NAME $BACKLOG_ID --status DONE --json
-```
-
-**成功時の出力例**:
-```json
-{
-  "success": true,
-  "backlog_id": "BACKLOG_029",
-  "old_status": "IN_PROGRESS",
-  "new_status": "DONE",
-  "message": "BACKLOGを更新しました: BACKLOG_029"
-}
-```
-
-**スクリプトが自動実行する処理**:
-- ステータス更新: IN_PROGRESS → DONE
-- 完了日時の記録
-- 状態遷移履歴の記録
+**スキップ条件**（自動判定、エラーにしない）:
+- 関連BACKLOGが検出されない → スキップ
+- BACKLOGが既にDONE → スキップ
 
 #### 8.5 完了メッセージへの追記
 

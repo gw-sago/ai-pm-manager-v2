@@ -1,5 +1,5 @@
 /**
- * BacklogSuggestPanel - ORDER自動提案パネルコンポーネント
+ * OrderSuggestPanel - ORDER自動提案パネルコンポーネント
  *
  * AIによるORDER候補の自動提案と一括登録機能を提供します。
  * - 「自動提案」ボタンでORDER候補を生成
@@ -8,20 +8,20 @@
  * - 「選択済みを登録」ボタンで一括登録
  * - ローディング状態・エラー表示
  *
- * @module BacklogSuggestPanel
+ * @module OrderSuggestPanel
  * @created 2026-02-19
  * @order ORDER_020
  * @task TASK_063
  */
 
 import React, { useState, useCallback } from 'react';
-import type { BacklogSuggestItem } from '../preload';
+import type { OrderSuggestItem } from '../preload';
 
 // =============================================================================
 // 型定義
 // =============================================================================
 
-export interface BacklogSuggestPanelProps {
+export interface OrderSuggestPanelProps {
   /** プロジェクトID */
   projectId: string;
   /** 一括登録完了時のコールバック */
@@ -46,7 +46,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 /**
  * ORDER自動提案パネル
  */
-export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
+export const OrderSuggestPanel: React.FC<OrderSuggestPanelProps> = ({
   projectId,
   onComplete,
 }) => {
@@ -55,7 +55,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
   // --------------------------------------------------------------------------
 
   /** 提案候補リスト */
-  const [suggestions, setSuggestions] = useState<BacklogSuggestItem[]>([]);
+  const [suggestions, setSuggestions] = useState<OrderSuggestItem[]>([]);
   /** 選択済みインデックスのセット */
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   /** 提案ローディング状態 */
@@ -82,7 +82,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
     setSelectedIndices(new Set());
 
     try {
-      const result = await window.electronAPI.suggestBacklogs(projectId);
+      const result = await window.electronAPI.suggestOrders(projectId);
       if (result.success && result.suggestions) {
         setSuggestions(result.suggestions);
         if (result.suggestions.length === 0) {
@@ -94,7 +94,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
     } catch (err) {
       const message = err instanceof Error ? err.message : '提案の生成中にエラーが発生しました';
       setError(message);
-      console.error('[BacklogSuggestPanel] suggestBacklogs error:', err);
+      console.error('[OrderSuggestPanel] suggestOrders error:', err);
     } finally {
       setIsSuggesting(false);
     }
@@ -144,7 +144,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
     setSuccessMessage(null);
 
     try {
-      const result = await window.electronAPI.bulkAddBacklogs(projectId, itemsToAdd);
+      const result = await window.electronAPI.bulkAddOrders(projectId, itemsToAdd);
       if (result.success) {
         const count = result.addedCount ?? itemsToAdd.length;
         setSuccessMessage(`${count}件のORDERを登録しました`);
@@ -157,7 +157,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'ORDERの登録中にエラーが発生しました';
       setError(message);
-      console.error('[BacklogSuggestPanel] bulkAddBacklogs error:', err);
+      console.error('[OrderSuggestPanel] bulkAddOrders error:', err);
     } finally {
       setIsRegistering(false);
     }
@@ -318,7 +318,7 @@ export const BacklogSuggestPanel: React.FC<BacklogSuggestPanelProps> = ({
 // =============================================================================
 
 interface SuggestionCardProps {
-  item: BacklogSuggestItem;
+  item: OrderSuggestItem;
   index: number;
   isSelected: boolean;
   onToggle: (index: number) => void;
@@ -389,4 +389,4 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ item, index, isSelected
 // デフォルトエクスポート
 // =============================================================================
 
-export default BacklogSuggestPanel;
+export default OrderSuggestPanel;

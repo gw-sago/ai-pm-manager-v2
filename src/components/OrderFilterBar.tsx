@@ -1,5 +1,5 @@
 /**
- * BacklogFilterBar - バックログフィルタUIコンポーネント
+ * OrderFilterBar - バックログフィルタUIコンポーネント
  *
  * バックログ一覧のフィルタ・ソート機能を提供するUIコンポーネント。
  * - 優先度フィルタ（High/Medium/Low）
@@ -8,14 +8,14 @@
  * - ソート機能（優先度順/作成日順/ステータス順）
  * - フィルタリセットボタン
  *
- * @module BacklogFilterBar
+ * @module OrderFilterBar
  * @created 2026-02-02
  * @order ORDER_021
  * @task TASK_327
  */
 
 import React, { useCallback, useMemo } from 'react';
-import type { BacklogFilters } from '../main/services/DashboardService';
+import type { OrderFilters } from '../main/services/DashboardService';
 
 // =============================================================================
 // 型定義
@@ -30,13 +30,13 @@ export interface ProjectOption {
 }
 
 /**
- * BacklogFilterBarのProps
+ * OrderFilterBarのProps
  */
-export interface BacklogFilterBarProps {
+export interface OrderFilterBarProps {
   /** 現在のフィルタ状態 */
-  filters: BacklogFilters;
+  filters: OrderFilters;
   /** フィルタ変更時のコールバック */
-  onFiltersChange: (filters: BacklogFilters) => void;
+  onFiltersChange: (filters: OrderFilters) => void;
   /** 利用可能なプロジェクト一覧 */
   projects?: ProjectOption[];
   /** 利用可能なステータス一覧 */
@@ -62,7 +62,7 @@ const PRIORITY_OPTIONS: Array<{ value: 'High' | 'Medium' | 'Low'; label: string;
 const DEFAULT_STATUS_OPTIONS = ['DRAFT', 'PLANNING', 'IN_PROGRESS', 'REVIEW', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 
 /** ソートオプション */
-const SORT_OPTIONS: Array<{ value: BacklogFilters['sortBy']; label: string }> = [
+const SORT_OPTIONS: Array<{ value: OrderFilters['sortBy']; label: string }> = [
   { value: 'priority', label: '優先度順' },
   { value: 'createdAt', label: '作成日順' },
   { value: 'status', label: 'ステータス順' },
@@ -156,16 +156,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({ label, children, compact 
  *
  * @example
  * ```tsx
- * const [filters, setFilters] = useState<BacklogFilters>({});
+ * const [filters, setFilters] = useState<OrderFilters>({});
  *
- * <BacklogFilterBar
+ * <OrderFilterBar
  *   filters={filters}
  *   onFiltersChange={setFilters}
  *   projects={[{ id: 'proj1', name: 'Project 1' }]}
  * />
  * ```
  */
-export const BacklogFilterBar: React.FC<BacklogFilterBarProps> = ({
+export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
   filters,
   onFiltersChange,
   projects = [],
@@ -238,7 +238,7 @@ export const BacklogFilterBar: React.FC<BacklogFilterBarProps> = ({
    * ソートの変更
    */
   const handleSortChange = useCallback(
-    (sortBy: BacklogFilters['sortBy']) => {
+    (sortBy: OrderFilters['sortBy']) => {
       onFiltersChange({
         ...filters,
         sortBy: sortBy || undefined,
@@ -417,7 +417,7 @@ export const BacklogFilterBar: React.FC<BacklogFilterBarProps> = ({
           <div className="flex gap-1.5 w-full">
             <select
               value={filters.sortBy || ''}
-              onChange={(e) => handleSortChange(e.target.value as BacklogFilters['sortBy'])}
+              onChange={(e) => handleSortChange(e.target.value as OrderFilters['sortBy'])}
               disabled={isLoading}
               className={`
                 flex-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg
@@ -520,4 +520,4 @@ export const BacklogFilterBar: React.FC<BacklogFilterBarProps> = ({
   );
 };
 
-export default BacklogFilterBar;
+export default OrderFilterBar;

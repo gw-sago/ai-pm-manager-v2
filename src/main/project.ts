@@ -51,8 +51,8 @@ import {
 import {
   DashboardService,
   type DashboardContext,
-  type BacklogFilters,
-  type BacklogItem,
+  type OrderFilters,
+  type OrderItemData,
 } from './services/DashboardService';
 import {
   getReleaseService,
@@ -350,11 +350,11 @@ export function registerProjectHandlers(): void {
     }
   );
 
-  // 全プロジェクトバックログ取得（フィルタ付き）
+  // 全プロジェクトORDER項目取得（フィルタ付き）
   ipcMain.handle(
     'project:get-all-backlogs',
-    async (_event, filters?: BacklogFilters): Promise<BacklogItem[]> => {
-      console.log('[Project IPC] 全バックログ取得リクエスト:', filters);
+    async (_event, filters?: OrderFilters): Promise<OrderItemData[]> => {
+      console.log('[Project IPC] 全ORDER項目取得リクエスト:', filters);
       try {
         const service = getDashboardService();
         if (!service) {
