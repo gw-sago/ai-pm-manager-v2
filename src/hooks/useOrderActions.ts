@@ -103,9 +103,9 @@ export const useOrderActions = ({
     const hasUncompletedTasks = totalTasks > 0 && completedTasks < totalTasks;
 
     // PM実行可能判定
-    // - PLANNING状態
+    // - DRAFT またはPLANNING状態（ORDER_065: DRAFTからもPM実行でPLANNINGに昇格可能）
     // - PM実行中でない
-    const canExecutePm = status === 'PLANNING' && !isPmRunning;
+    const canExecutePm = (status === 'PLANNING' || status === 'DRAFT') && !isPmRunning;
 
     // Worker実行可能判定
     // - IN_PROGRESS状態
@@ -121,10 +121,10 @@ export const useOrderActions = ({
     const canRelease =
       status === 'IN_PROGRESS' && totalTasks > 0 && completedTasks === totalTasks && !isReleaseRunning;
 
-    // 個別無効理由の判定
+    // 個別無効理由の判定（ORDER_065: DRAFTもPM実行可に）
     let pmDisabledReason = '';
-    if (status !== 'PLANNING') {
-      pmDisabledReason = `ORDERステータスが PLANNING ではありません (現在: ${status})`;
+    if (status !== 'PLANNING' && status !== 'DRAFT') {
+      pmDisabledReason = `ORDERステータスが DRAFT/PLANNING ではありません (現在: ${status})`;
     } else if (isPmRunning) {
       pmDisabledReason = 'PM処理実行中...';
     }
@@ -164,6 +164,9 @@ export const useOrderActions = ({
       disabledReason = 'このORDERは保留中です';
     } else if (status === 'PLANNING_FAILED') {
       disabledReason = 'PM処理に失敗しました - 再実行ボタンでリカバリできます';
+    } else if (status === 'DRAFT') {
+      // ORDER_065: DRAFT状態のORDER
+      disabledReason = isPmRunning ? 'PM処理実行中...' : 'DRAFT状態です - PM処理を実行してPLANNINGに昇格してください';
     } else if (status === 'PLANNING') {
       disabledReason = isPmRunning ? 'PM処理実行中...' : 'PM処理を実行してタスクを生成してください';
     } else if (status === 'IN_PROGRESS') {
@@ -240,14 +243,15 @@ export const useBacklogActions = ({
     // PM実行可能判定
     // ====================================================================
     // 条件:
-    // - ORDER化されていない（relatedOrderId=null）
+    // - ORDER化されていない（relatedOrderId=null）、またはDRAFT ORDER（ORDER_065）
     // - PM実行中ではない
     // - Low優先度かつTODO状態ではない（優先度の低いタスクは後回し方針）
+    const isDraftOrder = !!relatedOrderId && orderStatus === 'DRAFT';
     const isLowPriorityAndTodo = priority === 'Low' && status === 'TODO';
-    const canExecutePm = !relatedOrderId && !isPmRunning && !isLowPriorityAndTodo;
+    const canExecutePm = (!relatedOrderId || isDraftOrder) && !isPmRunning && !isLowPriorityAndTodo;
 
     let pmDisabledReason = '';
-    if (relatedOrderId) {
+    if (relatedOrderId && !isDraftOrder) {
       pmDisabledReason = 'すでにORDER化済みです';
     } else if (isPmRunning) {
       pmDisabledReason = 'PM処理実行中...';

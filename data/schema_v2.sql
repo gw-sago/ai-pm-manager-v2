@@ -1,8 +1,8 @@
 -- ============================================================================
 -- AI PM Framework Database Schema
--- Version: 2.3.0
+-- Version: 2.5.0
 -- Created: 2026-01-29
--- Updated: 2026-02-16
+-- Updated: 2026-02-25
 -- Description: SQLite schema with composite primary keys for multi-project support
 -- ============================================================================
 --
@@ -37,6 +37,13 @@
 --   * dev_workspace_path: Development workspace path for Worker subagents
 --   * Workers use this path for source code changes instead of Roaming
 --   * Migration: add_dev_workspace_path.py
+--
+-- CHANGELOG v2.5.0 (2026-02-25):
+-- - Extended orders table for backlog integration (ORDER_065)
+--   * Added description, sort_order, metadata, backlog_id columns to orders
+--   * Added DRAFT and PENDING_RELEASE to orders status CHECK constraint
+--   * Migration: migrate_backlog_to_orders.py
+--   * Backlog items are migrated as DRAFT orders for unified management
 --
 -- ============================================================================
 
@@ -82,6 +89,10 @@ CREATE TABLE IF NOT EXISTS orders (
     title TEXT NOT NULL,                          -- ORDER title
     priority TEXT DEFAULT 'P1',                   -- Priority (P0/P1/P2/P3)
     status TEXT NOT NULL DEFAULT 'PLANNING',      -- ORDER status
+    description TEXT,                             -- ORDER description
+    sort_order INTEGER DEFAULT 999,               -- Custom sort order (lower = higher priority)
+    metadata TEXT,                                -- Additional metadata (JSON)
+    backlog_id TEXT,                              -- Source backlog item ID (e.g., BACKLOG_029)
     started_at DATETIME,                          -- Start timestamp
     completed_at DATETIME,                        -- Completion timestamp
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -95,8 +106,8 @@ CREATE TABLE IF NOT EXISTS orders (
 
     -- Constraints
     CHECK (priority IN ('P0', 'P1', 'P2', 'P3')),
-    CHECK (status IN ('PLANNING', 'IN_PROGRESS', 'REVIEW', 'COMPLETED',
-                      'ON_HOLD', 'CANCELLED'))
+    CHECK (status IN ('DRAFT', 'PLANNING', 'IN_PROGRESS', 'REVIEW',
+                      'PENDING_RELEASE', 'COMPLETED', 'ON_HOLD', 'CANCELLED'))
 );
 
 -- ============================================================================
@@ -321,6 +332,7 @@ CREATE TABLE IF NOT EXISTS error_patterns (
 -- Orders indexes
 CREATE INDEX IF NOT EXISTS idx_orders_project_id ON orders(project_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_backlog_id ON orders(backlog_id);
 
 -- Tasks indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_order_id ON tasks(order_id);
@@ -489,7 +501,10 @@ INSERT OR IGNORE INTO status_transitions (entity_type, from_status, to_status, a
 
 -- Order status transitions
 INSERT OR IGNORE INTO status_transitions (entity_type, from_status, to_status, allowed_role, description) VALUES
+    ('order', NULL, 'DRAFT', 'PM', 'Create ORDER from backlog as draft'),
     ('order', NULL, 'PLANNING', 'PM', 'Create new ORDER'),
+    ('order', 'DRAFT', 'PLANNING', 'PM', 'Promote draft ORDER to planning'),
+    ('order', 'DRAFT', 'CANCELLED', 'PM', 'Cancel draft ORDER'),
     ('order', 'PLANNING', 'IN_PROGRESS', 'PM', 'Start ORDER execution'),
     ('order', 'IN_PROGRESS', 'REVIEW', 'PM', 'All tasks done - start review'),
     ('order', 'REVIEW', 'COMPLETED', 'PM', 'Approve ORDER'),

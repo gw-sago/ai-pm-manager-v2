@@ -14,6 +14,11 @@ Options:
     --auto-model    モデル自動選択（タスク情報から複雑度を計算）
     --depends       依存タスクID（カンマ区切り）
     --task-id       タスクID指定（省略時は自動採番）
+    --parent-task-id 親タスクID（サブタスク作成時）
+    --is-leader     リーダータスクフラグ
+    --decomposition-strategy 分解戦略（parallel/sequential/hybrid）
+    --aggregation-task-id 集約タスクID
+    --task-phase    タスクフェーズ
     --render        Markdown生成を実行（デフォルト: True）
     --json          JSON形式で出力
 
@@ -21,6 +26,7 @@ Example:
     python backend/task/create.py AI_PM_PJ ORDER_036 --title "DBスキーマ設計"
     python backend/task/create.py AI_PM_PJ ORDER_036 --title "実装タスク" --depends "TASK_188,TASK_189" --model Opus
     python backend/task/create.py AI_PM_PJ ORDER_036 --title "認証リファクタ" --description "OAuth再構築" --auto-model
+    python backend/task/create.py AI_PM_PJ ORDER_036 --title "サブタスク" --parent-task-id TASK_188
 """
 
 import argparse
@@ -112,6 +118,12 @@ def create_task(
     depends_on: Optional[List[str]] = None,
     target_files: Optional[str] = None,
     is_destructive_db_change: bool = False,
+    parent_task_id: Optional[str] = None,
+    depth: int = 0,
+    is_leader: bool = False,
+    decomposition_strategy: Optional[str] = None,
+    aggregation_task_id: Optional[str] = None,
+    task_phase: Optional[str] = None,
     render: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -130,6 +142,12 @@ def create_task(
         depends_on: 依存タスクIDのリスト
         target_files: 対象ファイルリスト（JSON文字列）
         is_destructive_db_change: 破壊的DB変更フラグ（DROP TABLE等を含む場合True）
+        parent_task_id: 親タスクID（サブタスク作成時）
+        depth: 階層の深さ（parent_task_id指定時は自動計算で上書きされる）
+        is_leader: リーダータスクフラグ
+        decomposition_strategy: 分解戦略（parallel/sequential/hybrid）
+        aggregation_task_id: 集約タスクID
+        task_phase: タスクフェーズ
         render: Markdown生成を実行するか
 
     Returns:
@@ -144,6 +162,17 @@ def create_task(
     validate_project_name(project_id)
     validate_order_id(order_id)
     validate_priority(priority)
+
+    # decomposition_strategy バリデーション
+    if decomposition_strategy is not None:
+        valid_strategies = ("parallel", "sequential", "hybrid")
+        if decomposition_strategy not in valid_strategies:
+            raise ValidationError(
+                f"無効な分解戦略: {decomposition_strategy}\n"
+                f"有効な値: {', '.join(valid_strategies)}",
+                "decomposition_strategy",
+                decomposition_strategy
+            )
 
     # モデル選択ロジック
     complexity_score = None
@@ -217,6 +246,45 @@ def create_task(
                 if not order_exists(conn, order_id, project_id):
                     raise ValidationError(f"ORDERが見つかりません: {order_id} (project: {project_id})", "order_id", order_id)
 
+                # parent_task_id バリデーション
+                if parent_task_id is not None:
+                    validate_task_id(parent_task_id)
+                    # 親タスクの存在確認
+                    if not task_exists(conn, parent_task_id, project_id):
+                        raise ValidationError(
+                            f"親タスクが見つかりません: {parent_task_id} (project: {project_id})",
+                            "parent_task_id",
+                            parent_task_id
+                        )
+
+                    # 親タスクのdepthを取得してdepthを自動計算
+                    parent_row = fetch_one(
+                        conn,
+                        "SELECT depth FROM tasks WHERE id = ? AND project_id = ?",
+                        (parent_task_id, project_id)
+                    )
+                    parent_depth = parent_row["depth"] if parent_row and parent_row["depth"] is not None else 0
+                    depth = parent_depth + 1
+
+                    # 最大深度制限チェック（4階層まで）
+                    if depth > 4:
+                        raise ValidationError(
+                            f"最大深度制限超過: depth={depth}（最大4）。"
+                            f"親タスク {parent_task_id} のdepth={parent_depth}",
+                            "depth",
+                            depth
+                        )
+
+                # aggregation_task_id バリデーション
+                if aggregation_task_id is not None:
+                    validate_task_id(aggregation_task_id)
+                    if not task_exists(conn, aggregation_task_id, project_id):
+                        raise ValidationError(
+                            f"集約タスクが見つかりません: {aggregation_task_id} (project: {project_id})",
+                            "aggregation_task_id",
+                            aggregation_task_id
+                        )
+
                 # タスクID決定（指定がなければ自動採番）
                 if task_id:
                     validate_task_id(task_id)
@@ -226,6 +294,33 @@ def create_task(
                     final_task_id = task_id
                 else:
                     final_task_id = get_next_task_number(conn, order_id, project_id)
+
+                # parent_task_id 循環参照防止チェック（final_task_id確定後）
+                if parent_task_id is not None:
+                    # 自分自身を親にできない
+                    if parent_task_id == final_task_id:
+                        raise ValidationError(
+                            f"循環参照: タスク {final_task_id} は自分自身を親にできません",
+                            "parent_task_id",
+                            parent_task_id
+                        )
+
+                    # 祖先チェック: parent→parent→...を辿って循環がないか確認
+                    # （新規タスクなので、既存の祖先チェーンに自分がいないかを確認）
+                    ancestor_id = parent_task_id
+                    visited = set()
+                    while ancestor_id is not None:
+                        if ancestor_id in visited:
+                            break  # 既存データに循環がある場合はループを抜ける
+                        visited.add(ancestor_id)
+                        ancestor_row = fetch_one(
+                            conn,
+                            "SELECT parent_task_id FROM tasks WHERE id = ? AND project_id = ?",
+                            (ancestor_id, project_id)
+                        )
+                        if ancestor_row is None:
+                            break
+                        ancestor_id = ancestor_row["parent_task_id"]
 
                 # 依存タスクの存在確認
                 if depends_on:
@@ -262,13 +357,17 @@ def create_task(
                         id, project_id, order_id, title, description, status,
                         assignee, priority, recommended_model, complexity_score, target_files,
                         is_destructive_db_change,
+                        parent_task_id, depth, is_leader, decomposition_strategy,
+                        aggregation_task_id, task_phase,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         final_task_id, project_id, order_id, title, description, initial_status,
                         assignee, priority, recommended_model, complexity_score, target_files,
                         1 if is_destructive_db_change else 0,
+                        parent_task_id, depth, 1 if is_leader else 0, decomposition_strategy,
+                        aggregation_task_id, task_phase,
                         now, now
                     )
                 )
@@ -361,6 +460,12 @@ def main():
     parser.add_argument("--model", help="推奨モデル（Haiku/Sonnet/Opus）、手動指定")
     parser.add_argument("--auto-model", action="store_true", help="モデル自動選択（タスク情報から複雑度を計算）")
     parser.add_argument("--depends", help="依存タスクID（カンマ区切り）")
+    parser.add_argument("--parent-task-id", help="親タスクID（サブタスク作成時）")
+    parser.add_argument("--is-leader", action="store_true", help="リーダータスクフラグ")
+    parser.add_argument("--decomposition-strategy", choices=["parallel", "sequential", "hybrid"],
+                        help="分解戦略（parallel/sequential/hybrid）")
+    parser.add_argument("--aggregation-task-id", help="集約タスクID")
+    parser.add_argument("--task-phase", help="タスクフェーズ")
     parser.add_argument("--no-render", action="store_true", help="Markdown生成をスキップ")
     parser.add_argument("--json", action="store_true", help="JSON形式で出力")
 
@@ -383,6 +488,11 @@ def main():
             recommended_model=args.model,
             auto_model=args.auto_model,
             depends_on=depends_on,
+            parent_task_id=args.parent_task_id,
+            is_leader=args.is_leader,
+            decomposition_strategy=args.decomposition_strategy,
+            aggregation_task_id=args.aggregation_task_id,
+            task_phase=args.task_phase,
             render=not args.no_render,
         )
 
@@ -398,6 +508,9 @@ def main():
                 print(f"  複雑度スコア: {result['complexity_score']}")
             if result.get('depends_on'):
                 print(f"  依存: {', '.join(result['depends_on'])}")
+            if result.get('parent_task_id'):
+                print(f"  親タスク: {result['parent_task_id']}")
+                print(f"  深度: {result.get('depth', 0)}")
 
     except (ValidationError, TransitionError, DatabaseError) as e:
         print(f"エラー: {e}", file=sys.stderr)

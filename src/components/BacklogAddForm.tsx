@@ -1,17 +1,20 @@
 /**
- * BacklogAddForm - バックログ新規追加フォームコンポーネント
+ * BacklogAddForm - DRAFT ORDER作成フォームコンポーネント
  *
- * バックログ項目の新規追加フォームを提供します。
+ * ORDER_065: バックログ追加からDRAFT ORDER作成に移行。
+ * 内部的には addBacklog IPC を呼び出し、バックエンド側で DRAFT ORDER として作成される。
+ *
  * - タイトル（必須）
  * - 説明（Markdownテキストエリア）
  * - 優先度（High/Medium/Low）
  * - カテゴリ選択（オプション）
  * - バリデーションとIPC呼び出しロジック
  *
+ * @deprecated バックログ専用APIは非推奨。DRAFT ORDER統合APIへ移行中（ORDER_065）
  * @module BacklogAddForm
  * @created 2026-02-10
  * @order ORDER_139
- * @task TASK_1160
+ * @task TASK_1160, TASK_314
  */
 
 import React, { useState } from 'react';
@@ -95,11 +98,11 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
         }
         onClose();
       } else {
-        setError(result?.error || 'バックログの追加に失敗しました');
+        setError(result?.error || 'DRAFT ORDERの作成に失敗しました');
       }
     } catch (err) {
-      console.error('[BacklogAddForm] Failed to add backlog:', err);
-      setError('バックログの追加に失敗しました');
+      console.error('[BacklogAddForm] Failed to create DRAFT ORDER:', err);
+      setError('DRAFT ORDERの作成に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -136,7 +139,7 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
       >
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">バックログ新規追加</h2>
+          <h2 className="text-lg font-semibold text-gray-900">DRAFT ORDER 新規作成</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-md transition-colors"
@@ -151,6 +154,16 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
 
         {/* フォーム */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+          {/* ORDER_065: DRAFT ORDER説明 */}
+          <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-700 text-sm">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>DRAFT ORDERとして作成されます。PM処理を実行するとPLANNINGステータスに昇格し、タスク分割が行われます。</span>
+            </div>
+          </div>
+
           {/* エラーメッセージ */}
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
@@ -265,7 +278,7 @@ export const BacklogAddForm: React.FC<BacklogAddFormProps> = ({
             disabled={submitting || !title.trim()}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {submitting ? '追加中...' : '追加'}
+            {submitting ? '作成中...' : 'DRAFT作成'}
           </button>
         </div>
       </div>

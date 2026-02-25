@@ -188,7 +188,7 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
   };
 
   /**
-   * ステータスに応じたバッジの色を取得
+   * ステータスに応じたバッジの色を取得（ORDER_065: DRAFT追加）
    */
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -202,16 +202,20 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
         return 'bg-green-100 text-green-600';
       case 'CANCELLED':
         return 'bg-gray-200 text-gray-500';
+      case 'DRAFT':
+        return 'bg-slate-100 text-slate-500';
       default:
         return 'bg-gray-100 text-gray-600';
     }
   };
 
   /**
-   * ORDERステータスに応じたバッジの色を取得
+   * ORDERステータスに応じたバッジの色を取得（ORDER_065: DRAFT追加）
    */
   const getOrderStatusColor = (status: string): string => {
     switch (status) {
+      case 'DRAFT':
+        return 'bg-slate-100 text-slate-600 border-slate-200';
       case 'PLANNING':
         return 'bg-yellow-100 text-yellow-700 border-yellow-200';
       case 'IN_PROGRESS':
@@ -403,7 +407,7 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
           {hasOrder ? (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">関連ORDER</h3>
-              <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+              <div className={`rounded-lg p-4 space-y-3 ${item.orderStatus === 'DRAFT' ? 'bg-slate-50' : 'bg-blue-50'}`}>
                 {/* ORDER ID（クリック可能） */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">ORDER ID:</span>
@@ -430,6 +434,32 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
                   </div>
                 )}
 
+                {/* ORDER_065: DRAFTステータスの場合はPM処理開始ボタンを表示 */}
+                {item.orderStatus === 'DRAFT' && (
+                  <div className="bg-slate-100 border border-slate-200 rounded-lg p-3 mt-2">
+                    <p className="text-xs text-slate-600 mb-2">
+                      このORDERはDRAFT（下書き）状態です。PM処理を実行するとPLANNINGに昇格し、タスク分割が行われます。
+                    </p>
+                    <button
+                      onClick={() => {
+                        if (item.relatedOrderId) {
+                          // PM処理を開始するには BacklogList の handleExecutePm を経由する必要がある
+                          // ここではORDER表示へ遷移してそこからPM実行を促す
+                          handleOrderIdClick();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                      title="ORDERを表示してPM処理を開始"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>PM処理開始</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* タスク進捗 */}
                 {(item.totalTasks ?? 0) > 0 && (
                   <div className="space-y-2">
@@ -450,6 +480,19 @@ export const BacklogDetailPanel: React.FC<BacklogDetailPanelProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          ) : item.orderStatus === 'DRAFT' ? (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">ORDERステータス</h3>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded border ${getOrderStatusColor('DRAFT')}`}>
+                    DRAFT
+                  </span>
+                  <span className="text-sm text-slate-600">下書き状態</span>
+                </div>
+                <p className="text-xs text-slate-500">PM処理を実行するとPLANNINGに昇格し、タスクが生成されます。</p>
               </div>
             </div>
           ) : (

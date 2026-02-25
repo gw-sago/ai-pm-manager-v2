@@ -1,6 +1,6 @@
 ---
 description: PM役としてORDERを処理
-argument-hint: PROJECT_NAME ORDER_NUMBER [--script] [--new-order] [--priority P1] [--pause] [--resume] [--set-priority P0] [--interrupt TASK_NUMBER "追加要件"]
+argument-hint: PROJECT_NAME ORDER_NUMBER [--script] [--new-order] [--priority P1] [--pause] [--resume] [--set-priority P0] [--interrupt TASK_NUMBER "追加要件"] [--draft "タイトル"]
 ---
 
 PMとして指定されたプロジェクトの ORDER を処理します。
@@ -16,6 +16,7 @@ PMとして指定されたプロジェクトの ORDER を処理します。
   - `--resume` - ORDER再開
   - `--set-priority P0` - 優先度変更
   - `--interrupt TASK_NUMBER "追加要件"` - 割り込みタスクを発行
+  - `--draft "タイトル"` - DRAFT ORDERとして作成（旧バックログ追加に相当）
 
 ---
 
@@ -87,6 +88,80 @@ END IF
 - 引数が0の場合: 同上
 
 **実行モード**:
+
+---
+
+## モード0: DRAFT ORDER作成（--draft あり）
+
+`--draft "タイトル"` オプションが指定された場合、DRAFT ORDERを作成します。これは旧 `/aipm-backlog-add` に相当する機能です。
+
+### 0.1 DRAFT ORDER作成
+
+```bash
+python backend/order/create.py $PROJECT_NAME --title "タイトル" --status DRAFT --json
+```
+
+**成功時の出力例**:
+```json
+{
+  "id": "ORDER_068",
+  "title": "ダッシュボードの性能改善",
+  "status": "DRAFT",
+  "priority": "P2"
+}
+```
+
+### 0.2 完了メッセージ
+
+```
+【DRAFT ORDER作成完了】
+
+プロジェクト: {PROJECT_NAME}
+ORDER_ID: {id}
+タイトル: {title}
+ステータス: DRAFT
+
+【次のアクション】
+- DRAFT ORDERをPLANNINGに昇格してPM処理を開始:
+  /aipm-pm {PROJECT_NAME} {ORDER_NUMBER}
+- 完全自動実行:
+  /aipm-full-auto {PROJECT_NAME} {ORDER_NUMBER}
+```
+
+### 0.3 処理フロー
+
+```
+IF --draft オプションあり THEN
+    python backend/order/create.py $PROJECT_NAME --title "タイトル" --status DRAFT --json を実行
+    作成結果を表示
+    処理終了（通常のPM処理は行わない）
+END IF
+```
+
+**注意**: `--draft` 指定時は、GOAL/REQUIREMENTS/STAFFING作成やタスク発行は行いません。DRAFT ORDERの登録のみ実行します。
+
+---
+
+## DRAFT ORDERのPLANNING昇格
+
+ORDER_IDが指定され、そのORDERのステータスがDRAFTの場合、自動的にPLANNINGに昇格してから通常のPM処理を開始します。
+
+### 昇格判定ロジック
+
+```
+IF ORDER_ID が指定されている THEN
+    ORDER情報を取得: python backend/order/list.py $PROJECT_NAME --order-id ORDER_$ORDER_NUMBER --json
+    IF ORDER.status == "DRAFT" THEN
+        DRAFT→PLANNINGに昇格:
+        python backend/order/update.py $PROJECT_NAME ORDER_$ORDER_NUMBER --status PLANNING --reason "DRAFT→PLANNING昇格"
+        昇格メッセージ表示:
+        「【昇格】ORDER_{ORDER_NUMBER} を DRAFT → PLANNING に昇格しました。PM処理を開始します。」
+        通常のPM処理を開始（モード1 Step 2へ）
+    ELSE
+        通常のPM処理を実行
+    END IF
+END IF
+```
 
 ---
 

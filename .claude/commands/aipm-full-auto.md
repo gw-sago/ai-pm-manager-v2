@@ -96,10 +96,28 @@ python backend/order/list.py $PROJECT_NAME --order-id ORDER_$ORDER_ID --json
 | ORDER状態 | 動作 |
 |-----------|------|
 | 存在しない | ORDER_ID = `new` または `BACKLOG_XXX` なら新規作成、それ以外はエラー |
+| DRAFT | DRAFT→PLANNINGに昇格し、PM処理から開始（Step 3へ） |
 | PLANNING | PM処理から開始（Step 3へ） |
 | IN_PROGRESS | タスク実行から継続（Step 4へ） |
 | COMPLETED | 「ORDER_${ORDER_ID}は既に完了しています」と表示して終了 |
 | ON_HOLD | 警告表示、実行中止（再開するには `/aipm-pm --resume`） |
+
+### 1.3.1 DRAFT ORDER昇格処理
+
+ORDER状態がDRAFTの場合、PLANNINGに自動昇格してからPM処理を開始:
+
+```bash
+# DRAFT→PLANNINGに昇格
+python backend/order/update.py $PROJECT_NAME ORDER_$ORDER_ID --status PLANNING --reason "DRAFT→PLANNING昇格（full-auto）"
+```
+
+```
+【昇格】ORDER_{ORDER_ID} を DRAFT → PLANNING に昇格しました。PM処理を開始します。
+```
+
+→ Step 3（PM処理）へ進む
+
+---
 
 ### 1.4 重複ORDER検出（新規作成時のみ）
 
@@ -1169,8 +1187,8 @@ python backend/backlog/update.py $PROJECT_NAME {BACKLOG_ID} --status DONE
 
 ---
 
-**Version**: 1.4.0
+**Version**: 1.5.0
 **作成日**: 2026-02-03
-**最終更新**: 2026-02-10（リリースフロー自動化: git_release.py + build_manager.py統合）
-**対応要件**: ORDER_056, ORDER_060, ORDER_068, ORDER_083
+**最終更新**: 2026-02-25（DRAFT ORDER対応: DRAFT→PLANNING自動昇格）
+**対応要件**: ORDER_056, ORDER_060, ORDER_065, ORDER_068, ORDER_083
 

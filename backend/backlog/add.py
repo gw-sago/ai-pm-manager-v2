@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG追加スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+代わりに backend/order/create.py --status DRAFT を使用してください。
+このモジュールは将来のバージョンで削除されます。
+
 Usage:
     python backend/backlog/add.py PROJECT_NAME --title "タイトル" [options]
 
@@ -22,10 +26,20 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/add.py は非推奨です。"
+    "代わりに backend/order/create.py --status DRAFT を使用してください。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # パス設定
 _current_dir = Path(__file__).resolve().parent
@@ -56,6 +70,14 @@ from utils.transition import (
     TransitionError,
 )
 
+# order/create.py のcreate_orderをインポート（ラッパー用）
+try:
+    from order.create import create_order, DuplicateOrderError
+except ImportError:
+    # フォールバック: import失敗時は従来ロジックにフォールバック
+    create_order = None
+    DuplicateOrderError = None
+
 
 # カテゴリ定義
 VALID_CATEGORIES = [
@@ -70,6 +92,13 @@ VALID_CATEGORIES = [
 
 # 優先度定義
 VALID_PRIORITIES = ["High", "Medium", "Low"]
+
+# 優先度変換マッピング（BACKLOG → ORDER）
+_PRIORITY_MAPPING = {
+    "High": "P0",
+    "Medium": "P1",
+    "Low": "P2",
+}
 
 
 @dataclass
@@ -138,6 +167,71 @@ def get_next_sort_order(conn, project_id: str, priority: str) -> int:
     return max_order + 1
 
 
+def _add_backlog_via_order_create(
+    project_name: str,
+    title: str,
+    *,
+    description: Optional[str] = None,
+    category: Optional[str] = None,
+    priority: str = "Medium",
+) -> AddBacklogResult:
+    """
+    order/create.py の create_order() を内部呼び出しするラッパー
+
+    backlog/add.py の引数を order/create.py 形式に変換して DRAFT ORDER を作成する。
+
+    Args:
+        project_name: プロジェクト名
+        title: タイトル
+        description: 説明
+        category: カテゴリ
+        priority: 優先度（High/Medium/Low）
+
+    Returns:
+        AddBacklogResult: 追加結果（backlog形式に変換して返す）
+    """
+    # 優先度変換: High→P0, Medium→P1, Low→P2
+    order_priority = _PRIORITY_MAPPING.get(priority, "P1")
+
+    # 説明文にカテゴリを含める（backlog互換）
+    full_description = description or ""
+    if category:
+        full_description = f"カテゴリ: {category}\n\n{full_description}" if full_description else f"カテゴリ: {category}"
+
+    try:
+        result = create_order(
+            project_name,
+            title,
+            priority=order_priority,
+            status="DRAFT",
+            description=full_description or None,
+            category=category,
+        )
+
+        # ORDER結果をbacklog形式に変換して返す
+        order_id = result.get("id", "")
+        warnings_list = [
+            f"内部的にDRAFT ORDER {order_id} として作成されました。"
+            "今後は order/create.py --status DRAFT を直接使用してください。"
+        ]
+
+        return AddBacklogResult(
+            success=True,
+            backlog_id=order_id,  # ORDER IDをbacklog_idとして返す（後方互換）
+            title=title,
+            priority=priority,
+            category=category or "",
+            message=f"DRAFT ORDERとして作成しました: {order_id}（backlog/add.py経由）",
+            warnings=warnings_list,
+        )
+
+    except Exception as e:
+        return AddBacklogResult(
+            success=False,
+            error=f"order/create.py 呼び出しエラー: {e}",
+        )
+
+
 def add_backlog(
     project_name: str,
     title: str,
@@ -151,6 +245,13 @@ def add_backlog(
 ) -> AddBacklogResult:
     """
     BACKLOGを追加
+
+    [DEPRECATED] このメソッドは非推奨です。
+    代わりに order.create.create_order(status="DRAFT") を使用してください。
+
+    内部的に order/create.py の create_order() を呼び出してDRAFT ORDERを作成します。
+    backlog_id指定時、db_path指定時は従来のbacklog_itemsテーブルへの直接INSERT
+    にフォールバックします。
 
     Args:
         project_name: プロジェクト名
@@ -166,13 +267,27 @@ def add_backlog(
         AddBacklogResult: 追加結果
 
     Workflow:
-        1. 入力検証（プロジェクト存在確認、優先度チェック）
-        2. BACKLOG ID自動採番
-        3. 優先度に応じたsort_order自動設定（同一優先度内での最大値+1）
-        4. DB INSERT処理
-        5. 変更履歴を記録
-        6. （廃止: BACKLOG.md生成は実行されなくなりました）
+        1. order/create.py が利用可能かつ backlog_id未指定の場合:
+           → create_order(status="DRAFT") でDRAFT ORDERを作成
+        2. それ以外の場合:
+           → 従来のbacklog_itemsテーブルへの直接INSERT（フォールバック）
     """
+    # order/create.py ラッパーを試行
+    # backlog_id指定時やdb_path指定時は従来ロジックにフォールバック
+    if create_order is not None and backlog_id is None and db_path is None:
+        try:
+            return _add_backlog_via_order_create(
+                project_name,
+                title,
+                description=description,
+                category=category,
+                priority=priority,
+            )
+        except Exception:
+            # ラッパー失敗時は従来ロジックにフォールバック
+            pass
+
+    # 従来ロジック（フォールバック）
     try:
         # 入力検証
         validate_project_name(project_name)
@@ -244,7 +359,10 @@ def add_backlog(
                 f"BACKLOG作成: {title}"
             )
 
-            warnings_list: List[str] = []
+            warnings_list: List[str] = [
+                "従来のbacklog_itemsテーブルに直接INSERTしました（フォールバック）。"
+                "今後は order/create.py --status DRAFT を使用してください。"
+            ]
             result = AddBacklogResult(
                 success=True,
                 backlog_id=backlog_id,

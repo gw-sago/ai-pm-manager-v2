@@ -1,6 +1,25 @@
 ---
-description: BACKLOG項目をORDER化
+description: 【非推奨】BACKLOG項目をORDER化
 argument-hint: PROJECT_NAME BACKLOG_ID
+---
+
+> **非推奨**: このコマンドは廃止予定です。代わりに以下を使用してください:
+> ```
+> /aipm-pm PROJECT_NAME ORDER_XXX  (DRAFTのORDERをPLANNINGに昇格)
+> ```
+> DRAFT ORDERの作成は `/aipm-pm PROJECT_NAME --draft "タイトル"` で行い、
+> PLANNINGへの昇格は `/aipm-pm PROJECT_NAME ORDER_XXX` でDRAFT状態のORDERを指定してください。
+> 既存の処理フローは引き続き動作しますが、今後のバージョンで削除される予定です。
+
+---
+
+**実行時の非推奨通知**: このコマンドが呼び出された場合、処理実行前に以下のメッセージを表示してください:
+```
+【非推奨警告】/aipm-backlog-to-order は廃止予定です。
+代替コマンド: /aipm-pm PROJECT_NAME ORDER_XXX（DRAFT ORDER指定でPLANNINGに昇格）
+今回は従来の処理を続行します。
+```
+
 ---
 
 BACKLOG項目をORDERに変換し、新規プロジェクトとして開始します。
@@ -167,5 +186,5 @@ PMとして要件定義とタスク発行を実施してください：
 
 ---
 
-**バージョン**: 2.0.0（DB駆動版）
-**更新日**: 2026-02-04
+**バージョン**: 2.1.0（非推奨化: /aipm-pm に統合）
+**更新日**: 2026-02-25

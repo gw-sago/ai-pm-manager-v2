@@ -94,6 +94,8 @@ export interface PendingReviewSummary {
  */
 export interface BacklogSummary {
   totalItems: number;
+  /** ORDER_065: DRAFTステータスのORDER数（バックエンドが未対応の場合はundefined） */
+  draftCount?: number;
   todoCount: number;
   inProgressCount: number;
   highPriorityCount: number;
@@ -152,7 +154,8 @@ export interface BacklogFilters {
 }
 
 /**
- * バックログ頁E���E�ERDER_032で拡張: ORDER紐付け惁E��追加�E�E
+ * バックログ項目（ORDER_032で拡張: ORDER紐付け情報追加）
+ * ORDER_065: orderStatus に DRAFT を追加。DRAFT ORDERも一覧に含まれる。
  */
 export interface BacklogItem {
   id: string;
@@ -165,14 +168,15 @@ export interface BacklogItem {
   relatedOrderId?: string;
   createdAt: string;
   updatedAt?: string;
-  // ORDER_032追加: ORDER紐付け惁E��
+  // ORDER_032追加: ORDER紐付け情報
+  // ORDER_065: orderStatus は DRAFT | PLANNING | IN_PROGRESS | REVIEW | COMPLETED | ON_HOLD | CANCELLED
   orderTitle?: string;
   orderStatus?: string;
   orderProjectId?: string;
   totalTasks?: number;
   completedTasks?: number;
   progressPercent?: number;
-  // ORDER_106追加: sort_order�E�数値優先度�E�E
+  // ORDER_106追加: sort_order（数値優先度）
   sortOrder?: number;
 }
 
@@ -370,7 +374,8 @@ export class DashboardService {
                 related_order_id?: string;
                 created_at: string;
                 updated_at?: string;
-                // ORDER_032追加: ORDER紐付け惁E��
+                // ORDER_032追加: ORDER紐付け情報
+                // ORDER_065: order_status は DRAFT | PLANNING | IN_PROGRESS | REVIEW | COMPLETED | ON_HOLD | CANCELLED
                 order_title?: string;
                 order_status?: string;
                 order_project_id?: string;
@@ -389,7 +394,8 @@ export class DashboardService {
                 relatedOrderId: item.related_order_id,
                 createdAt: item.created_at,
                 updatedAt: item.updated_at,
-                // ORDER_032追加: ORDER紐付け惁E��
+                // ORDER_032追加: ORDER紐付け情報
+                // ORDER_065: orderStatus は DRAFT を含む
                 orderTitle: item.order_title,
                 orderStatus: item.order_status,
                 orderProjectId: item.order_project_id,

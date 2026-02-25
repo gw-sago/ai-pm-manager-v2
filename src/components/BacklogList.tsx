@@ -77,6 +77,7 @@ const STATUS_ORDER: Record<string, number> = {
   BLOCKED: 2,
   DONE: 3,
   CANCELLED: 4,
+  DRAFT: 5,
 };
 
 /** 優先度に対応する色クラス */
@@ -93,10 +94,12 @@ const STATUS_COLORS: Record<string, string> = {
   BLOCKED: 'bg-orange-100 text-orange-600',
   DONE: 'bg-green-100 text-green-600',
   CANCELLED: 'bg-gray-200 text-gray-500',
+  DRAFT: 'bg-slate-100 text-slate-500',
 };
 
-/** ORDERステータスに対応する色クラス（ORDER_032追加） */
+/** ORDERステータスに対応する色クラス（ORDER_032追加, ORDER_065: DRAFT追加） */
 const ORDER_STATUS_COLORS: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-600 border-slate-200',
   PLANNING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   IN_PROGRESS: 'bg-blue-100 text-blue-700 border-blue-200',
   REVIEW: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -105,8 +108,9 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   CANCELLED: 'bg-red-100 text-red-700 border-red-200',
 };
 
-/** ORDERステータスの日本語表示（ORDER_032追加） */
+/** ORDERステータスの日本語表示（ORDER_032追加, ORDER_065: DRAFT追加） */
 const ORDER_STATUS_LABELS: Record<string, string> = {
+  DRAFT: '下書き',
   PLANNING: '計画中',
   IN_PROGRESS: '実行中',
   REVIEW: 'レビュー',
@@ -655,7 +659,7 @@ export const BacklogList: React.FC<BacklogListProps> = ({
    */
   const handleAddComplete = useCallback(() => {
     setIsAddModalOpen(false);
-    handleShowToast('バックログを追加しました', 'success');
+    handleShowToast('DRAFT ORDERを作成しました', 'success');
     fetchBacklogs(true); // silentモードで再取得
   }, [handleShowToast, fetchBacklogs]);
 
@@ -757,11 +761,11 @@ export const BacklogList: React.FC<BacklogListProps> = ({
               <span>自動提案</span>
             </button>
           )}
-          {/* ORDER_139: 追加ボタン */}
+          {/* ORDER_139: 追加ボタン（ORDER_065: DRAFT ORDER作成に変更） */}
           <button
             onClick={handleOpenAddModal}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-            title="新規バックログを追加"
+            title="DRAFT ORDERを新規作成"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1174,6 +1178,13 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
                 </span>
               )}
             </div>
+          ) : item.orderStatus === 'DRAFT' ? (
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded border ${ORDER_STATUS_COLORS['DRAFT']}`}>
+                {ORDER_STATUS_LABELS['DRAFT']}
+              </span>
+              <span className="text-[10px] text-gray-400">PM処理で計画に昇格</span>
+            </div>
           ) : (
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
@@ -1183,8 +1194,8 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
           )}
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          {/* PM実行ボタン（ORDER_039追加、ORDER_123でツールチップ拡張） */}
-          {!item.relatedOrderId && (
+          {/* PM実行ボタン（ORDER_039追加、ORDER_123でツールチップ拡張, ORDER_065: DRAFT ORDERにも表示） */}
+          {(!item.relatedOrderId || item.orderStatus === 'DRAFT') && (
             <button
               onClick={handleExecutePm}
               disabled={!canExecutePm}
@@ -1223,7 +1234,7 @@ const BacklogItemCard: React.FC<BacklogItemCardProps> = React.memo(({
               )}
             </button>
           )}
-          {/* Worker実行ボタン（ORDER_039追加、TASK_1137でツールチップ拡張） */}
+          {/* Worker実行ボタン（ORDER_039追加、TASK_1137でツールチップ拡張, ORDER_065: DRAFTでは非表示） */}
           {item.relatedOrderId && item.orderStatus === 'IN_PROGRESS' && (
             <button
               onClick={handleExecuteWorker}
@@ -1496,7 +1507,7 @@ const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, 
     >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full m-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">プロジェクトを選択</h2>
+          <h2 className="text-lg font-semibold text-gray-900">DRAFT ORDER作成 - プロジェクトを選択</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-md transition-colors"
@@ -1513,7 +1524,7 @@ const BacklogAddModal: React.FC<BacklogAddModalProps> = ({ onClose, onComplete, 
             <p className="text-sm text-gray-500 text-center py-4">プロジェクトが見つかりません</p>
           ) : (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600 mb-3">バックログを追加するプロジェクトを選択してください</p>
+              <p className="text-sm text-gray-600 mb-3">DRAFT ORDERを作成するプロジェクトを選択してください</p>
               {projects.map((p) => (
                 <button
                   key={p.name}

@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG一覧取得スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+代わりに backend/order/list.py --draft でDRAFT ORDERを一覧できます。
+このモジュールは将来のバージョンで削除されます。
+
 Usage:
     python backend/backlog/list.py PROJECT_NAME [options]
 
@@ -26,10 +30,20 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/list.py は非推奨です。"
+    "代わりに backend/order/list.py --draft でDRAFT ORDERを一覧できます。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # パス設定
 _current_dir = Path(__file__).resolve().parent

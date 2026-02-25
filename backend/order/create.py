@@ -8,9 +8,13 @@ Usage:
 Options:
     --title         ORDER名（必須）
     --priority      優先度（P0/P1/P2、デフォルト: P1）
+    --status        初期ステータス（PLANNING/DRAFT、デフォルト: PLANNING）
     --order-id      ORDER ID指定（省略時は自動採番）
+    --description   ORDER説明文（DRAFT用）
+    --sort-order    表示順序（整数、デフォルト: 999）
+    --category      カテゴリ（metadata JSONに格納）
     --check-dup     重複チェックを実行（デフォルト: False）
-    --backlog-id    関連BACKLOG ID（重複チェック用）
+    --backlog-id    関連BACKLOG ID（重複チェック用/紐付け用）
     --force         重複警告を無視して強制作成
     --json          JSON形式で出力
 
@@ -18,6 +22,7 @@ Example:
     python backend/order/create.py AI_PM_PJ --title "新機能実装"
     python backend/order/create.py AI_PM_PJ --title "緊急バグ修正" --priority P0
     python backend/order/create.py AI_PM_PJ --title "機能X" --check-dup --backlog-id BACKLOG_058
+    python backend/order/create.py AI_PM_PJ --title "バックログ項目" --status DRAFT --description "詳細説明" --category "feature"
 """
 
 import argparse
@@ -173,6 +178,10 @@ def create_order(
     *,
     order_id: Optional[str] = None,
     priority: str = "P1",
+    status: str = "PLANNING",
+    description: Optional[str] = None,
+    sort_order: Optional[int] = None,
+    category: Optional[str] = None,
     check_duplicate: bool = False,
     backlog_id: Optional[str] = None,
     force: bool = False,
@@ -185,8 +194,12 @@ def create_order(
         title: ORDER名
         order_id: ORDER ID（省略時は自動採番）
         priority: 優先度（P0/P1/P2）
+        status: 初期ステータス（PLANNING/DRAFT、デフォルト: PLANNING）
+        description: ORDER説明文（DRAFT用）
+        sort_order: 表示順序（整数）
+        category: カテゴリ（metadata JSONに格納）
         check_duplicate: 重複チェックを実行するか
-        backlog_id: 関連BACKLOG ID（重複チェック用）
+        backlog_id: 関連BACKLOG ID（重複チェック用/紐付け用）
         force: 重複警告を無視して強制作成
 
     Returns:
@@ -202,6 +215,13 @@ def create_order(
     validate_project_name(project_id)
     validate_priority(priority)
 
+    # 初期ステータス検証（PLANNINGまたはDRAFTのみ許可）
+    if status not in ("PLANNING", "DRAFT"):
+        raise ValidationError(
+            f"ORDER作成時のステータスはPLANNINGまたはDRAFTのみ指定可能です: {status}",
+            "status", status
+        )
+
     # 重複チェック（オプション）
     if check_duplicate and not force:
         dup_result = check_duplicate_orders(project_id, title, backlog_id)
@@ -211,6 +231,11 @@ def create_order(
                 f"重複ORDERが検出されました（{len(duplicates)}件）。--force で強制作成可能です。",
                 duplicates
             )
+
+    # metadata構築（categoryがあればJSON格納）
+    metadata_json = None
+    if category:
+        metadata_json = json.dumps({"category": category}, ensure_ascii=False)
 
     # リトライ設定（Race Condition対策）
     max_retries = 3
@@ -234,28 +259,35 @@ def create_order(
                     final_order_id = get_next_order_number(conn, project_id)
 
                 # 初期ステータス
-                initial_status = "PLANNING"
+                initial_status = status
 
                 # 状態遷移検証
                 validate_transition(conn, "order", None, initial_status, "PM")
 
                 # ORDER作成
                 now = datetime.now().isoformat()
+
+                # DRAFT作成時はstarted_atをNULLのままにする
+                started_at = None if initial_status == "DRAFT" else None  # PLANNINGもstarted_atはNULL
+
                 execute_query(
                     conn,
                     """
                     INSERT INTO orders (
                         id, project_id, title, priority, status,
+                        description, sort_order, metadata, backlog_id,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         final_order_id, project_id, title, priority, initial_status,
+                        description, sort_order, metadata_json, backlog_id,
                         now, now
                     )
                 )
 
                 # 状態遷移履歴を記録
+                transition_note = f"ORDER作成（DRAFT）: {title}" if initial_status == "DRAFT" else f"ORDER作成: {title}"
                 record_transition(
                     conn,
                     "order",
@@ -263,7 +295,7 @@ def create_order(
                     None,
                     initial_status,
                     "PM",
-                    f"ORDER作成: {title}"
+                    transition_note
                 )
 
                 # 作成されたORDERを取得（複合キー対応）
@@ -318,8 +350,12 @@ def main():
     parser.add_argument("--title", required=True, help="ORDER名")
     parser.add_argument("--order-id", help="ORDER ID（省略時は自動採番）")
     parser.add_argument("--priority", default="P1", help="優先度（P0/P1/P2）")
+    parser.add_argument("--status", default="PLANNING", help="初期ステータス（PLANNING/DRAFT、デフォルト: PLANNING）")
+    parser.add_argument("--description", help="ORDER説明文（DRAFT用）")
+    parser.add_argument("--sort-order", type=int, help="表示順序（整数）")
+    parser.add_argument("--category", help="カテゴリ（metadata JSONに格納）")
     parser.add_argument("--check-dup", action="store_true", help="重複チェックを実行")
-    parser.add_argument("--backlog-id", help="関連BACKLOG ID（重複チェック用）")
+    parser.add_argument("--backlog-id", help="関連BACKLOG ID（重複チェック用/紐付け用）")
     parser.add_argument("--force", action="store_true", help="重複警告を無視して強制作成")
     parser.add_argument("--json", action="store_true", help="JSON形式で出力")
 
@@ -331,6 +367,10 @@ def main():
             args.title,
             order_id=args.order_id,
             priority=args.priority,
+            status=args.status,
+            description=args.description,
+            sort_order=args.sort_order,
+            category=args.category,
             check_duplicate=args.check_dup,
             backlog_id=args.backlog_id,
             force=args.force,

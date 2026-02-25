@@ -11,6 +11,8 @@ Options:
     --title             タイトル変更
     --description       説明変更
     --priority          優先度変更（P0/P1/P2）
+    --parent-task-id    親タスクID変更
+    --task-phase        タスクフェーズ変更
     --markdown-created  Markdownファイル作成状態変更（true/false）
     --role              操作者の役割（PM/Worker、デフォルト: Worker）
     --reason            変更理由
@@ -72,6 +74,8 @@ def update_task(
     title: Optional[str] = None,
     description: Optional[str] = None,
     priority: Optional[str] = None,
+    parent_task_id: Optional[str] = None,
+    task_phase: Optional[str] = None,
     markdown_created: Optional[bool] = None,
     role: str = "Worker",
     reason: Optional[str] = None,
@@ -88,6 +92,8 @@ def update_task(
         title: 新しいタイトル
         description: 新しい説明
         priority: 新しい優先度
+        parent_task_id: 新しい親タスクID（"__CLEAR__"で解除）
+        task_phase: 新しいタスクフェーズ（"__CLEAR__"で解除）
         markdown_created: Markdownファイル作成状態（True/False）
         role: 操作者の役割（PM/Worker）
         reason: 変更理由
@@ -199,6 +205,90 @@ def update_task(
                 updates.append("markdown_created = ?")
                 params.append(1 if markdown_created else 0)
                 changes.append(("markdown_created", current_md_created, markdown_created))
+
+        # parent_task_id更新
+        if parent_task_id is not None:
+            if parent_task_id == "__CLEAR__":
+                # 親タスクを解除
+                if current_dict.get("parent_task_id") is not None:
+                    updates.append("parent_task_id = NULL")
+                    updates.append("depth = 0")
+                    changes.append(("parent_task_id", current_dict.get("parent_task_id"), None))
+            elif parent_task_id != current_dict.get("parent_task_id"):
+                # 親タスクのバリデーション
+                validate_task_id(parent_task_id)
+
+                # 自分自身を親にできない
+                if parent_task_id == task_id:
+                    raise ValidationError(
+                        f"循環参照: タスク {task_id} は自分自身を親にできません",
+                        "parent_task_id",
+                        parent_task_id
+                    )
+
+                # 親タスクの存在確認
+                if not task_exists(conn, parent_task_id, project_id):
+                    raise ValidationError(
+                        f"親タスクが見つかりません: {parent_task_id} (project: {project_id})",
+                        "parent_task_id",
+                        parent_task_id
+                    )
+
+                # 祖先チェック: 循環参照防止
+                ancestor_id = parent_task_id
+                visited = set()
+                while ancestor_id is not None:
+                    if ancestor_id == task_id:
+                        raise ValidationError(
+                            f"循環参照: {task_id} は {parent_task_id} の祖先です",
+                            "parent_task_id",
+                            parent_task_id
+                        )
+                    if ancestor_id in visited:
+                        break
+                    visited.add(ancestor_id)
+                    ancestor_row = fetch_one(
+                        conn,
+                        "SELECT parent_task_id FROM tasks WHERE id = ? AND project_id = ?",
+                        (ancestor_id, project_id)
+                    )
+                    if ancestor_row is None:
+                        break
+                    ancestor_id = ancestor_row["parent_task_id"]
+
+                # 親タスクのdepthを取得してdepthを自動計算
+                parent_row = fetch_one(
+                    conn,
+                    "SELECT depth FROM tasks WHERE id = ? AND project_id = ?",
+                    (parent_task_id, project_id)
+                )
+                parent_depth = parent_row["depth"] if parent_row and parent_row["depth"] is not None else 0
+                new_depth = parent_depth + 1
+
+                # 最大深度制限チェック
+                if new_depth > 4:
+                    raise ValidationError(
+                        f"最大深度制限超過: depth={new_depth}（最大4）",
+                        "depth",
+                        new_depth
+                    )
+
+                updates.append("parent_task_id = ?")
+                params.append(parent_task_id)
+                updates.append("depth = ?")
+                params.append(new_depth)
+                changes.append(("parent_task_id", current_dict.get("parent_task_id"), parent_task_id))
+
+        # task_phase更新
+        if task_phase is not None:
+            if task_phase == "__CLEAR__":
+                if current_dict.get("task_phase") is not None:
+                    updates.append("task_phase = NULL")
+                    changes.append(("task_phase", current_dict.get("task_phase"), None))
+            elif task_phase != current_dict.get("task_phase"):
+                updates.append("task_phase = ?")
+                params.append(task_phase)
+                changes.append(("task_phase", current_dict.get("task_phase"), task_phase))
 
         # 更新がなければ早期リターン
         if not updates:
@@ -729,6 +819,8 @@ def main():
     parser.add_argument("--title", help="タイトル変更")
     parser.add_argument("--description", help="説明変更")
     parser.add_argument("--priority", help="優先度変更（P0/P1/P2）")
+    parser.add_argument("--parent-task-id", help="親タスクID変更（'__CLEAR__'で解除）")
+    parser.add_argument("--task-phase", help="タスクフェーズ変更（'__CLEAR__'で解除）")
     parser.add_argument("--markdown-created", choices=["true", "false"], help="Markdownファイル作成状態（true/false）")
     parser.add_argument("--role", default="Worker", help="操作者の役割（PM/Worker）")
     parser.add_argument("--reason", help="変更理由")
@@ -743,7 +835,8 @@ def main():
         markdown_created = args.markdown_created.lower() == "true"
 
     # 更新内容がなければエラー
-    if not any([args.status, args.assignee, args.title, args.description, args.priority, args.markdown_created]):
+    if not any([args.status, args.assignee, args.title, args.description, args.priority,
+                args.parent_task_id, args.task_phase, args.markdown_created]):
         print("エラー: 更新内容を指定してください", file=sys.stderr)
         sys.exit(1)
 
@@ -756,6 +849,8 @@ def main():
             title=args.title,
             description=args.description,
             priority=args.priority,
+            parent_task_id=args.parent_task_id,
+            task_phase=args.task_phase,
             markdown_created=markdown_created,
             role=args.role,
             reason=args.reason,

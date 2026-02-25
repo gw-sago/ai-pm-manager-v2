@@ -2,6 +2,10 @@
 """
 AI PM Framework - バックログ詳細取得スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+代わりに backend/order/get.py を使用してください。
+このモジュールは将来のバージョンで削除されます。
+
 Usage:
     python backend/backlog/get.py PROJECT_NAME BACKLOG_ID [options]
 
@@ -17,8 +21,18 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/get.py は非推奨です。"
+    "代わりに backend/order/get.py を使用してください。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # aipm-db は Python パッケージ名として使えないためモジュール直接参照
 try:

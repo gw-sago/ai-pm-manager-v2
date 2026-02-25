@@ -1,6 +1,23 @@
 ---
-description: バックログ項目を追加
+description: 【非推奨】バックログ項目を追加
 argument-hint: PROJECT_NAME "タイトル" [--priority High|Medium|Low] [--category カテゴリ]
+---
+
+> **非推奨**: このコマンドは廃止予定です。代わりに以下を使用してください:
+> ```
+> /aipm-pm PROJECT_NAME --draft "タイトル"
+> ```
+> 既存の処理フローは引き続き動作しますが、今後のバージョンで削除される予定です。
+
+---
+
+**実行時の非推奨通知**: このコマンドが呼び出された場合、処理実行前に以下のメッセージを表示してください:
+```
+【非推奨警告】/aipm-backlog-add は廃止予定です。
+代替コマンド: /aipm-pm PROJECT_NAME --draft "タイトル"
+今回は従来の処理を続行します。
+```
+
 ---
 
 バックログに新しいアイデア・要望を追加します。
@@ -183,5 +200,5 @@ python backend/backlog/add.py AI_PM_PJ --title "UIの配色変更" --priority Lo
 
 ---
 
-**バージョン**: 2.1.0（BACKLOG.md廃止対応）
-**更新日**: 2026-02-04
+**バージョン**: 2.2.0（非推奨化: /aipm-pm --draft に統合）
+**更新日**: 2026-02-25

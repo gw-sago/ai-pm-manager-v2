@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG→ORDER変換スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+DRAFT→PLANNINGへの遷移は order/update.py --status PLANNING で行ってください。
+このモジュールは将来のバージョンで削除されます。
+
 BACKLOG項目をORDERに変換し、新規プロジェクトとして開始します。
 一連の処理をトランザクションで実行し、エラー時は自動ロールバックします。
 
@@ -32,10 +36,20 @@ import json
 import logging
 import os
 import sys
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/to_order.py は非推奨です。"
+    "DRAFT→PLANNINGへの遷移は backend/order/update.py --status PLANNING で行ってください。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # ロギング設定
 logger = logging.getLogger(__name__)

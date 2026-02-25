@@ -9,6 +9,7 @@ Options:
     --status        ステータスでフィルタ（カンマ区切りで複数指定可）
     --priority      優先度でフィルタ
     --active        アクティブなORDERのみ（PLANNING/IN_PROGRESS/REVIEW）
+    --draft         DRAFTステータスのORDERのみ
     --completed     完了済みORDERのみ（COMPLETED）
     --on-hold       一時停止中のORDERのみ（ON_HOLD）
     --limit         取得件数制限
@@ -19,6 +20,7 @@ Options:
 Example:
     python backend/order/list.py AI_PM_PJ
     python backend/order/list.py AI_PM_PJ --active
+    python backend/order/list.py AI_PM_PJ --draft
     python backend/order/list.py AI_PM_PJ --status IN_PROGRESS,REVIEW --table
     python backend/order/list.py AI_PM_PJ --summary
 """
@@ -51,6 +53,7 @@ class OrderSummary:
     """ORDER集計サマリ"""
     total_count: int = 0
     active_count: int = 0
+    draft_count: int = 0
     completed_count: int = 0
     on_hold_count: int = 0
     cancelled_count: int = 0
@@ -69,6 +72,7 @@ def list_orders(
     status: Optional[List[str]] = None,
     priority: Optional[str] = None,
     active_only: bool = False,
+    draft_only: bool = False,
     completed_only: bool = False,
     on_hold_only: bool = False,
     limit: Optional[int] = None,
@@ -82,6 +86,7 @@ def list_orders(
         status: ステータスでフィルタ（リスト）
         priority: 優先度でフィルタ
         active_only: アクティブなORDERのみ
+        draft_only: DRAFTステータスのORDERのみ
         completed_only: 完了済みORDERのみ
         on_hold_only: 一時停止中ORDERのみ
         limit: 取得件数制限
@@ -109,6 +114,10 @@ def list_orders(
         o.title,
         o.priority,
         o.status,
+        o.description,
+        o.sort_order,
+        o.metadata,
+        o.backlog_id,
         o.started_at,
         o.completed_at,
         o.created_at,
@@ -127,6 +136,8 @@ def list_orders(
         params.extend(status)
     elif active_only:
         query += " AND o.status IN ('PLANNING', 'IN_PROGRESS', 'REVIEW')"
+    elif draft_only:
+        query += " AND o.status = 'DRAFT'"
     elif completed_only:
         query += " AND o.status = 'COMPLETED'"
     elif on_hold_only:
@@ -138,6 +149,7 @@ def list_orders(
         params.append(priority)
 
     # ソート（優先度順、ステータス順、作成日順）
+    # DRAFTはsort_orderで並べ、その他はステータス・優先度・作成日で並べる
     query += """
     ORDER BY
         CASE o.status
@@ -145,9 +157,11 @@ def list_orders(
             WHEN 'REVIEW' THEN 1
             WHEN 'PLANNING' THEN 2
             WHEN 'ON_HOLD' THEN 3
-            WHEN 'COMPLETED' THEN 4
-            WHEN 'CANCELLED' THEN 5
+            WHEN 'DRAFT' THEN 4
+            WHEN 'COMPLETED' THEN 5
+            WHEN 'CANCELLED' THEN 6
         END,
+        CASE WHEN o.status = 'DRAFT' THEN o.sort_order ELSE 999 END,
         CASE o.priority
             WHEN 'P0' THEN 0
             WHEN 'P1' THEN 1
@@ -253,6 +267,8 @@ def get_order_summary(
 
             if status in ("PLANNING", "IN_PROGRESS", "REVIEW"):
                 summary.active_count += count
+            elif status == "DRAFT":
+                summary.draft_count += count
             elif status == "COMPLETED":
                 summary.completed_count += count
             elif status == "ON_HOLD":
@@ -311,6 +327,7 @@ def format_summary(summary: OrderSummary) -> str:
         "-" * 40,
         f"  合計: {summary.total_count}件",
         f"  アクティブ: {summary.active_count}件 / {summary.recommended_max_active}件（推奨上限）",
+        f"  DRAFT（バックログ）: {summary.draft_count}件",
         f"  完了済み: {summary.completed_count}件",
         f"  一時停止: {summary.on_hold_count}件",
         f"  キャンセル: {summary.cancelled_count}件",
@@ -347,6 +364,7 @@ def main():
     parser.add_argument("--status", help="ステータスでフィルタ（カンマ区切り）")
     parser.add_argument("--priority", help="優先度でフィルタ")
     parser.add_argument("--active", action="store_true", help="アクティブなORDERのみ")
+    parser.add_argument("--draft", action="store_true", help="DRAFTステータスのORDERのみ")
     parser.add_argument("--completed", action="store_true", help="完了済みORDERのみ")
     parser.add_argument("--on-hold", action="store_true", help="一時停止中ORDERのみ")
     parser.add_argument("--limit", type=int, help="取得件数制限")
@@ -375,6 +393,7 @@ def main():
                 status=status_list,
                 priority=args.priority,
                 active_only=args.active,
+                draft_only=args.draft,
                 completed_only=args.completed,
                 on_hold_only=args.on_hold,
                 limit=args.limit,

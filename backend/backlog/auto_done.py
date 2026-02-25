@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG自動DONE更新モジュール
 
+[DEPRECATED] このモジュールは非推奨です。
+ORDER完了時のBACKLOG更新は order/update.py の内部処理で実行されます。
+このモジュールは将来のバージョンで削除されます。
+
 ORDER完了時に、紐付いているBACKLOGを自動的にDONEステータスに更新する。
 order/update.py の complete_order() から呼び出される。
 
@@ -23,9 +27,19 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/auto_done.py は非推奨です。"
+    "ORDER完了時のBACKLOG更新は backend/order/update.py の内部処理で実行されます。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # パス設定
 _current_dir = Path(__file__).resolve().parent

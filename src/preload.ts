@@ -258,6 +258,7 @@ export interface BacklogItem {
   completedAt: string | null;
   updatedAt: string;
   // ORDER_032追加: ORDER紐付け情報
+  // ORDER_065: orderStatus は DRAFT | PLANNING | IN_PROGRESS | REVIEW | COMPLETED | ON_HOLD | CANCELLED のいずれか
   orderTitle?: string | null;
   orderStatus?: string | null;
   orderProjectId?: string | null;
@@ -433,6 +434,8 @@ export interface PendingReviewSummary {
 export interface BacklogSummaryData {
   /** 全項目数 */
   totalItems: number;
+  /** ORDER_065: DRAFT ORDER数（バックエンドが未対応の場合はundefined） */
+  draftCount?: number;
   /** TODO数 */
   todoCount: number;
   /** 進行中数 */

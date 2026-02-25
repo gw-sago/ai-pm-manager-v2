@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG優先度自動整理スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+優先度管理はORDERシステムに統合予定です。
+このモジュールは将来のバージョンで削除されます。
+
 全アクティブBACKLOGと直近のインシデント・エスカレーション履歴を取得し、
 Claude Code CLI経由で優先度判断を実行。優先度とsort_orderをDB更新する。
 
@@ -29,11 +33,21 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/prioritize.py は非推奨です。"
+    "優先度管理はORDERシステムに統合予定です。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # パス設定
 _current_dir = Path(__file__).resolve().parent

@@ -7,10 +7,13 @@ Usage:
     python backend/order/update.py PROJECT_NAME ORDER_ID --complete [options]
 
 Options:
-    --status        ステータス変更（PLANNING/IN_PROGRESS/REVIEW/COMPLETED/ON_HOLD/CANCELLED）
+    --status        ステータス変更（DRAFT/PLANNING/IN_PROGRESS/REVIEW/COMPLETED/ON_HOLD/CANCELLED）
     --complete      COMPLETEDまで自動段階遷移（PLANNING→IN_PROGRESS→REVIEW→COMPLETED）
     --title         タイトル変更
     --priority      優先度変更（P0/P1/P2）
+    --description   ORDER説明文（DRAFT用）
+    --sort-order    表示順序（整数）
+    --category      カテゴリ（metadata JSONに格納）
     --role          操作者の役割（PM、デフォルト: PM）
     --reason        変更理由
     --render        Markdown生成を実行（デフォルト: True）
@@ -21,6 +24,7 @@ Example:
     python backend/order/update.py AI_PM_PJ ORDER_036 --status ON_HOLD --reason "リソース調整"
     python backend/order/update.py AI_PM_PJ ORDER_036 --priority P0
     python backend/order/update.py AI_PM_PJ ORDER_036 --complete --reason "全タスク完了"
+    python backend/order/update.py AI_PM_PJ ORDER_070 --description "詳細説明" --sort-order 10 --category "feature"
 """
 
 import argparse
@@ -28,7 +32,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 
 
 # パス設定
@@ -58,6 +62,9 @@ def update_order(
     status: Optional[str] = None,
     title: Optional[str] = None,
     priority: Optional[str] = None,
+    description: Optional[str] = None,
+    sort_order: Optional[int] = None,
+    category: Optional[str] = None,
     role: str = "PM",
     reason: Optional[str] = None,
     render: bool = True,
@@ -71,6 +78,9 @@ def update_order(
         status: 新しいステータス
         title: 新しいタイトル
         priority: 新しい優先度
+        description: ORDER説明文（DRAFT用）
+        sort_order: 表示順序（整数）
+        category: カテゴリ（metadata JSONに格納）
         role: 操作者の役割（PM）
         reason: 変更理由
         render: Markdown生成を実行するか
@@ -153,6 +163,41 @@ def update_order(
             updates.append("priority = ?")
             params.append(priority)
             changes.append(("priority", current_dict["priority"], priority))
+
+        # description更新
+        if description is not None:
+            old_description = current_dict.get("description")
+            if description != old_description:
+                updates.append("description = ?")
+                params.append(description)
+                changes.append(("description", old_description, description))
+
+        # sort_order更新
+        if sort_order is not None:
+            old_sort_order = current_dict.get("sort_order")
+            if sort_order != old_sort_order:
+                updates.append("sort_order = ?")
+                params.append(sort_order)
+                changes.append(("sort_order", old_sort_order, sort_order))
+
+        # category更新（metadata JSONのcategoryキー）
+        if category is not None:
+            old_metadata = current_dict.get("metadata")
+            # 既存metadataをパースしてcategoryを更新
+            if old_metadata:
+                try:
+                    metadata_dict = json.loads(old_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    metadata_dict = {}
+            else:
+                metadata_dict = {}
+            old_category = metadata_dict.get("category")
+            if category != old_category:
+                metadata_dict["category"] = category
+                new_metadata = json.dumps(metadata_dict, ensure_ascii=False)
+                updates.append("metadata = ?")
+                params.append(new_metadata)
+                changes.append(("metadata.category", old_category, category))
 
         # 更新がなければ早期リターン
         if not updates:
@@ -461,6 +506,9 @@ def main():
     parser.add_argument("--complete", action="store_true", help="COMPLETEDまで自動段階遷移")
     parser.add_argument("--title", help="タイトル変更")
     parser.add_argument("--priority", help="優先度変更（P0/P1/P2）")
+    parser.add_argument("--description", help="ORDER説明文（DRAFT用）")
+    parser.add_argument("--sort-order", type=int, help="表示順序（整数）")
+    parser.add_argument("--category", help="カテゴリ（metadata JSONに格納）")
     parser.add_argument("--role", default="PM", help="操作者の役割（PM）")
     parser.add_argument("--reason", help="変更理由")
     parser.add_argument("--no-render", action="store_true", help="Markdown生成をスキップ")
@@ -474,7 +522,8 @@ def main():
         sys.exit(1)
 
     # 更新内容がなければエラー
-    if not any([args.status, args.complete, args.title, args.priority]):
+    if not any([args.status, args.complete, args.title, args.priority,
+                args.description is not None, args.sort_order is not None, args.category is not None]):
         print("エラー: 更新内容を指定してください", file=sys.stderr)
         sys.exit(1)
 
@@ -494,6 +543,9 @@ def main():
                 status=args.status,
                 title=args.title,
                 priority=args.priority,
+                description=args.description,
+                sort_order=args.sort_order,
+                category=args.category,
                 role=args.role,
                 reason=args.reason,
                 render=not args.no_render,

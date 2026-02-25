@@ -2,6 +2,10 @@
 """
 AI PM Framework - BACKLOG状態更新スクリプト
 
+[DEPRECATED] このモジュールは非推奨です。
+代わりに backend/order/update.py を使用してください。
+このモジュールは将来のバージョンで削除されます。
+
 Usage:
     python backend/backlog/update.py PROJECT_NAME BACKLOG_ID [options]
 
@@ -29,10 +33,20 @@ Example:
 import argparse
 import json
 import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+
+# 非推奨警告
+_DEPRECATION_MSG = (
+    "[DEPRECATED] backend/backlog/update.py は非推奨です。"
+    "代わりに backend/order/update.py を使用してください。"
+    "このモジュールは将来のバージョンで削除されます。"
+)
+warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+print(f"WARNING: {_DEPRECATION_MSG}", file=sys.stderr)
 
 # パス設定
 _current_dir = Path(__file__).resolve().parent
