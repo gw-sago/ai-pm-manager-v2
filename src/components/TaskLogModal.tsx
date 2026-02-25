@@ -62,8 +62,8 @@ export const TaskLogModal: React.FC<TaskLogModalProps> = ({
         logData = await window.electronAPI.readWorkerLog(logFile);
       } else {
         // タスクIDから最新ログを検索
-        const logs = await window.electronAPI.getWorkerLogs(projectId);
-        const taskLog = logs.find(l => l.taskId === taskId);
+        const response = await window.electronAPI.getWorkerLogs(projectId);
+        const taskLog = response.items.find(l => l.taskId === taskId);
         if (taskLog) {
           logData = await window.electronAPI.readWorkerLog(taskLog.filePath);
         }

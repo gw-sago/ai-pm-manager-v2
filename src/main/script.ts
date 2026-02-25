@@ -10,7 +10,7 @@ import {
   getScriptExecutionService,
   type ExecutionResult,
   type ExecutionProgress,
-  type WorkerLogFileInfo,
+  type WorkerLogFileListResponse,
   type WorkerLogContent,
   type WorkerLogUpdateEvent,
 } from './services/ScriptExecutionService';
@@ -145,12 +145,12 @@ export function registerScriptHandlers(): void {
     }
   );
 
-  // ORDER_111: Worker ログファイル一覧取得
+  // ORDER_111: Worker ログファイル一覧取得（ORDER_090: ページネーション対応）
   ipcMain.handle(
     'script:get-worker-logs',
-    async (_event, projectId: string, orderId?: string): Promise<WorkerLogFileInfo[]> => {
-      console.log('[Script] get-worker-logs called:', { projectId, orderId });
-      return scriptService.getWorkerLogFiles(projectId, orderId);
+    async (_event, projectId: string, orderId?: string, options?: { limit?: number; offset?: number }): Promise<WorkerLogFileListResponse> => {
+      console.log('[Script] get-worker-logs called:', { projectId, orderId, options });
+      return scriptService.getWorkerLogFiles(projectId, orderId, options);
     }
   );
 

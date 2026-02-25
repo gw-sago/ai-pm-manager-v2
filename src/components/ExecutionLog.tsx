@@ -329,15 +329,23 @@ const BackgroundLogTab: React.FC<BackgroundLogTabProps> = ({ projectId }) => {
   const [filterOrderId, setFilterOrderId] = useState<string>('');
   const [filterTaskId, setFilterTaskId] = useState<string>('');
 
-  // ログ一覧取得
-  const fetchLogFiles = useCallback(async () => {
+  // ORDER_090: 総件数とページネーション状態
+  const [totalCount, setTotalCount] = useState(0);
+
+  // ログ一覧取得（ORDER_090: ページネーション対応）
+  const fetchLogFiles = useCallback(async (append = false, offset = 0) => {
     if (!projectId) {
       setIsLoading(false);
       return;
     }
     try {
-      const logs = await window.electronAPI.getWorkerLogs(projectId);
-      setLogFiles(logs);
+      const response = await window.electronAPI.getWorkerLogs(projectId, undefined, { limit: 100, offset });
+      if (append) {
+        setLogFiles(prev => [...prev, ...response.items]);
+      } else {
+        setLogFiles(response.items);
+      }
+      setTotalCount(response.totalCount);
     } catch (err) {
       console.error('[BackgroundLogTab] Failed to fetch worker logs:', err);
     } finally {
@@ -350,10 +358,10 @@ const BackgroundLogTab: React.FC<BackgroundLogTabProps> = ({ projectId }) => {
     fetchLogFiles();
   }, [fetchLogFiles]);
 
-  // 10秒ごとの自動リフレッシュ（一覧表示中のみ）
+  // ORDER_090: 30秒ごとの自動リフレッシュ（一覧表示中のみ）
   useEffect(() => {
     if (selectedLog) return; // ログ内容表示中はリフレッシュ不要
-    const interval = setInterval(fetchLogFiles, 10000);
+    const interval = setInterval(() => fetchLogFiles(), 30000);
     return () => clearInterval(interval);
   }, [fetchLogFiles, selectedLog]);
 
@@ -455,9 +463,15 @@ const BackgroundLogTab: React.FC<BackgroundLogTabProps> = ({ projectId }) => {
             <option key={id} value={id}>{id}</option>
           ))}
         </select>
+        {/* ORDER_090: 件数表示 */}
+        {totalCount > 0 && (
+          <span className="text-xs text-gray-400 ml-auto mr-2">
+            {logFiles.length}/{totalCount}件
+          </span>
+        )}
         <button
-          onClick={fetchLogFiles}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors ml-auto"
+          onClick={() => fetchLogFiles()}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           title="更新"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,6 +517,17 @@ const BackgroundLogTab: React.FC<BackgroundLogTabProps> = ({ projectId }) => {
               onClick={() => setSelectedLog(log)}
             />
           ))}
+          {/* ORDER_090: もっと読み込むボタン */}
+          {logFiles.length < totalCount && (
+            <div className="flex justify-center py-3">
+              <button
+                onClick={() => fetchLogFiles(true, logFiles.length)}
+                className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 px-4 py-1.5 rounded-md transition-colors"
+              >
+                もっと読み込む（残り {totalCount - logFiles.length} 件）
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

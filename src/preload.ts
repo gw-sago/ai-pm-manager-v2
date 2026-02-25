@@ -625,6 +625,20 @@ export interface WorkerLogFileInfo {
 }
 
 /**
+ * Worker ログファイル一覧のページネーション付きレスポンス（ORDER_090）
+ */
+export interface WorkerLogFileListResponse {
+  /** ログファイル情報の配列 */
+  items: WorkerLogFileInfo[];
+  /** 総件数 */
+  totalCount: number;
+  /** 取得開始位置 */
+  offset: number;
+  /** 取得件数上限 */
+  limit: number;
+}
+
+/**
  * Worker ログ内容
  */
 export interface WorkerLogContent {
@@ -1987,7 +2001,7 @@ export interface ElectronAPI {
    * @param orderId ORDER ID（省略時は全ORDER）
    * @returns ログファイル情報一覧
    */
-  getWorkerLogs: (projectId: string, orderId?: string) => Promise<WorkerLogFileInfo[]>;
+  getWorkerLogs: (projectId: string, orderId?: string, options?: { limit?: number; offset?: number }) => Promise<WorkerLogFileListResponse>;
 
   /**
    * Worker ログファイル内容を読み込む
@@ -2658,8 +2672,8 @@ const electronAPI: ElectronAPI = {
     createEventListener('script:task-crash', callback),
 
   // Worker ログ一覧・読み込み・監視（ORDER_111 / TASK_1001）
-  getWorkerLogs: (projectId: string, orderId?: string) =>
-    ipcRenderer.invoke('script:get-worker-logs', projectId, orderId),
+  getWorkerLogs: (projectId: string, orderId?: string, options?: { limit?: number; offset?: number }) =>
+    ipcRenderer.invoke('script:get-worker-logs', projectId, orderId, options),
   readWorkerLog: (
     filePath: string,
     options?: { tailLines?: number; fromPosition?: number }
