@@ -19,7 +19,6 @@ export { OrderDetailPanel } from './OrderDetailPanel';
 export { ArtifactsBrowser } from './ArtifactsBrowser';
 export { ExecutionLog } from './ExecutionLog';
 export { ReleaseInfoCard } from './ReleaseInfoCard';
-export { ReleaseDetailSection } from './ReleaseDetailSection';
 export { RelatedInfoSection } from './RelatedInfoSection';
 export { AipmAutoLogViewer } from './AipmAutoLogViewer';
 export { PortfolioView } from './PortfolioView';

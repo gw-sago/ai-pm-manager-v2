@@ -223,7 +223,7 @@ export class SupervisorService {
   }
 
   // ポートフォリオORDERタスク一覧取得 (ORDER_068 / BACKLOG_116)
-  getPortfolioOrderTasks(projectId: string, orderId: string): PortfolioTask[] {
+  getPortfolioOrderTasks(_projectId: string, orderId: string): PortfolioTask[] {
     try {
       const db = this.getConnection();
       const rows = db.prepare(`

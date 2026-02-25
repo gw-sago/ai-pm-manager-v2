@@ -19,7 +19,6 @@ import { ipcMain, BrowserWindow, dialog } from 'electron';
 const execFileAsync = promisify(execFile);
 import {
   getProjectService,
-  type Project,
   type ProjectListResult,
   type ProjectStateChangedEvent,
   type ArtifactFile,

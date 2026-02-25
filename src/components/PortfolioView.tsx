@@ -97,7 +97,7 @@ const PortfolioIcon: React.FC = () => (
   </svg>
 );
 
-export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId, projects }) => {
+export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId }) => {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PortfolioOrder | null>(null);
   const [selectedBacklog, setSelectedBacklog] = useState<PortfolioBacklog | null>(null);
@@ -107,7 +107,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ supervisorId, proj
 
   // フィルタ状態
   const [statusFilter, setStatusFilter] = useState<string[]>(['IN_PROGRESS', 'QUEUED', 'TODO']);
-  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [priorityFilter] = useState<string[]>([]);
 
   // ポートフォリオデータを取得
   useEffect(() => {

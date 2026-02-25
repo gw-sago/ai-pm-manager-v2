@@ -10,7 +10,7 @@
  * - 通知クリック時のアクション
  */
 
-import { Notification, app } from 'electron';
+import { Notification } from 'electron';
 import type { ExecutionResult } from './ScriptExecutionService';
 
 // =============================================================================
@@ -98,7 +98,7 @@ export class NotificationService {
   /**
    * PM処理開始通知
    */
-  showPmStarted(projectId: string, backlogId: string): void {
+  showPmStarted(_projectId: string, backlogId: string): void {
     this.show({
       title: 'PM処理開始',
       body: `${backlogId} のPM処理を開始しました`,
@@ -109,7 +109,7 @@ export class NotificationService {
   /**
    * Worker処理開始通知
    */
-  showWorkerStarted(projectId: string, orderId: string): void {
+  showWorkerStarted(_projectId: string, orderId: string): void {
     this.show({
       title: 'Worker処理開始',
       body: `${orderId} のWorker処理を開始しました`,
@@ -120,7 +120,7 @@ export class NotificationService {
   /**
    * 通知タイプに応じたアイコンパスを取得
    */
-  private getIcon(type?: 'success' | 'error' | 'info'): string | undefined {
+  private getIcon(_type?: 'success' | 'error' | 'info'): string | undefined {
     // Electronでは、アプリアイコンがデフォルトで使用される
     // カスタムアイコンを使用する場合は、ここでパスを返す
     // 現時点ではデフォルトアイコンを使用

@@ -11,10 +11,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
   ExecutionResult,
-  ExecutionProgress,
   RunningJob,
   WorkerLogFileInfo,
-  WorkerLogContent,
   WorkerLogUpdateEvent,
 } from '../preload';
 
@@ -79,17 +77,6 @@ const WORKER_LOG_STATUS_LABELS: Record<string, string> = {
   unknown: '不明',
 };
 
-/** ログ行のレベル色マッピング */
-const WORKER_LOG_LEVEL_COLORS: Record<string, string> = {
-  '[ERROR]': 'text-red-400',
-  'ERROR': 'text-red-400',
-  '[WARN]': 'text-yellow-400',
-  'WARNING': 'text-yellow-400',
-  '[INFO]': 'text-blue-400',
-  'INFO': 'text-blue-400',
-  '[DEBUG]': 'text-gray-500',
-  'DEBUG': 'text-gray-500',
-};
 
 // =============================================================================
 // メインコンポーネント

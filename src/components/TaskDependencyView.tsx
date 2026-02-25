@@ -460,7 +460,7 @@ export const TaskDependencyView: React.FC<TaskDependencyViewProps> = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // ORDER_140 TASK_1167: 依存関係リアルタイム更新フック
-  const { dependencyMap, lastUpdate, isLoading: isDependencyLoading, refresh: refreshDependencies } = useTaskDependencyUpdates(
+  const { dependencyMap, lastUpdate, isLoading: isDependencyLoading } = useTaskDependencyUpdates(
     projectId || null,
     order?.id || null
   );

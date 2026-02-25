@@ -32,6 +32,12 @@
 --   * metadata: Project metadata in JSON format (tech_stack, repo_url, etc.)
 --   * Migration: 004_add_project_info_fields.sql
 --
+-- CHANGELOG v2.4.0 (2026-02-24):
+-- - Added dev_workspace_path to projects table (ORDER_071)
+--   * dev_workspace_path: Development workspace path for Worker subagents
+--   * Workers use this path for source code changes instead of Roaming
+--   * Migration: add_dev_workspace_path.py
+--
 -- ============================================================================
 
 -- Enable foreign key constraints
@@ -53,6 +59,7 @@ CREATE TABLE IF NOT EXISTS projects (
     status TEXT NOT NULL DEFAULT 'INITIAL',       -- Project status
     current_order_id TEXT,                        -- Currently active ORDER
     is_active INTEGER NOT NULL DEFAULT 1,         -- Active flag (1=active, 0=inactive)
+    dev_workspace_path TEXT,                      -- Development workspace path (e.g., d:/your_workspace/...)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 

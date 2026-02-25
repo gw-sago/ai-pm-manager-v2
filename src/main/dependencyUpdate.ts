@@ -330,7 +330,7 @@ export function startEventMonitoring(projectId: string, orderId: string): void {
   console.log(`[DependencyUpdate] Starting event monitoring for ${watchKey}: ${eventsDir}`);
 
   try {
-    const watcher = fs.watch(eventsDir, async (eventType, filename) => {
+    const watcher = fs.watch(eventsDir, async (_eventType, filename) => {
       if (!filename || !filename.startsWith('event_') || !filename.endsWith('.json')) {
         return;
       }

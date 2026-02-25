@@ -73,6 +73,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   const [error, setError] = useState<string | null>(null);
   const [isInfoEmpty, setIsInfoEmpty] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshingDirect, setIsRefreshingDirect] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // トースト自動消去
@@ -144,6 +145,26 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
       setIsRefreshing(false);
     }
   }, [projectId]);
+
+  // プロジェクト情報をAIで直接最新化するハンドラ
+  const handleRefreshDirect = useCallback(async () => {
+    setIsRefreshingDirect(true);
+    setToast(null);
+    try {
+      const result = await window.electronAPI.refreshProjectInfo(projectId);
+      if (result.success) {
+        setToast({ type: 'success', message: result.message || 'プロジェクト情報を最新化しました' });
+        await loadProjectInfo();
+      } else {
+        setToast({ type: 'error', message: result.error || 'プロジェクト情報の最新化に失敗しました' });
+      }
+    } catch (err) {
+      console.error('[ProjectInfo] Failed to refresh project info directly:', err);
+      setToast({ type: 'error', message: 'プロジェクト情報の最新化中にエラーが発生しました' });
+    } finally {
+      setIsRefreshingDirect(false);
+    }
+  }, [projectId, loadProjectInfo]);
 
   // ページコンテンツ読み込み
   const loadPageContent = useCallback(async (pageId: string) => {
@@ -227,6 +248,37 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
     </button>
   );
 
+  // AI直接実行ボタンUI（共通）
+  const refreshDirectButton = (
+    <button
+      onClick={handleRefreshDirect}
+      disabled={isRefreshingDirect}
+      className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+        isRefreshingDirect
+          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          : 'bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200'
+      }`}
+      title="AIがプロジェクト情報を今すぐ最新化します"
+    >
+      {isRefreshingDirect ? (
+        <>
+          <svg className="animate-spin -ml-0.5 mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          最新化中...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          プロジェクト情報を最新化
+        </>
+      )}
+    </button>
+  );
+
   // トーストUI（共通）
   const toastUI = toast && (
     <div className={`fixed bottom-4 right-4 z-50 flex items-center px-4 py-3 rounded-lg shadow-lg ${
@@ -252,7 +304,8 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   if (!infoPages && fallbackContent) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-end px-2">
+        <div className="flex items-center justify-end gap-2 px-2">
+          {refreshDirectButton}
           {refreshButton}
         </div>
         <div className="bg-white rounded-lg shadow p-6">
@@ -297,7 +350,8 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ projectId }) => {
   if (infoPages) {
     return (
       <div className="space-y-4 p-2">
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
+          {refreshDirectButton}
           {refreshButton}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

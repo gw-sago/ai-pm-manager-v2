@@ -322,7 +322,7 @@ export class DashboardService {
     console.log('[DashboardService] Script path:', scriptPath);
     console.log('[DashboardService] Args:', args);
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const spawnOptions: SpawnOptions = {
         cwd: this.aiPmRoot,
         env: {

@@ -5,18 +5,36 @@ All notable changes to AI PM Manager V2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-snapshot] - 2026-02-24
+## [0.1.0-snapshot] - 2026-02-25
 
 ### Added
 - projectsテーブルにdev_workspace_pathカラム追加（ORDER_071）
 - execute_task.pyがDBからdev_workspace_pathを取得しWorkerプロンプトに開発環境パスを注入
-- Workerプロンプトに開発環境/Roamingの使い分けルールを明示的に指示
 - project CRUD (create.py, list.py) がdev_workspace_pathカラムに対応
 - db_config.pyのget_project_paths()にdev_workspace返却を追加
+- backend/order/retry_order.py 新規作成 - ORDER再実行機能（ORDER_074）
+- backend/pm/update_project_info.py 新規作成 - PROJECT_INFO自動深化（ORDER_073）
+- backend/base/base_script.py, backend/utils/base_script.py - 共通基盤クラス（ORDER_083）
+- backend/render/md_to_html.py - Worker実行フローへのHTML変換自動組込み（ORDER_076）
+- git_release.pyに成果物0件時のREPORTフォールバック収集ロジック追加（ORDER_075）
+- process_order.py/execute_task.pyにPROJECT_INFO自動読込・反映機能追加（ORDER_073）
+- OrderCompleteReport.tsxに成果物ディレクトリアクセスボタン追加（ORDER_085）
+- ProjectInfo.tsxにAI直接実行による最新化ボタン追加（ORDER_084）
+- aipm-pm.mdに--scriptモード推奨警告追加（ORDER_081）
 - CLAUDE.mdにビルドルール・環境分離ルール追記
+
+### Changed
+- spec_generator.py/process_order.pyのデフォルトモデルをSonnet→Opusに統一（ORDER_078）
+- process_review.pyの直接SQL 3箇所をupdate_task_status()経由に統一（ORDER_080）
+- process_review.pyにBaseScript共通基盤クラス導入（ORDER_083）
+- aipm-worker.md/aipm-full-auto.mdから旧aipm-dbパス・直接DB操作指示を除去（ORDER_081）
+- リリースボタンをバックログ一覧に統一、ORDER詳細パネルのOrderReleaseSectionを削除（ORDER_079）
+- ReleaseDetailSection.tsx削除（不要コンポーネント除去、ORDER_082）
 
 ### Fixed
 - Workerサブエージェントがソースコード変更をRoaming側で行いデグレする根本原因を解消
+- 過去ORDER成果物の実装消失6件を再実装（ORDER_018/027/039/052/054/061）
+- 過去ORDER部分実装7件を修正（ORDER_019/032/034/035/041/045/051）
 
 ## [0.1.0] - 2026-02-24
 
