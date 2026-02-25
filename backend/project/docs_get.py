@@ -117,6 +117,10 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
     # ファイル名の正規化（バックスラッシュをスラッシュに統一）
     normalized_filename = filename.replace("\\", "/")
 
+    # 拡張子がない場合は .md を自動付与（file.idから呼ばれるケース対応）
+    if not Path(normalized_filename).suffix:
+        normalized_filename += ".md"
+
     # パス構築
     target_path = docs_path / normalized_filename
 
@@ -151,9 +155,13 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
         relative_path = target_path.relative_to(docs_path).as_posix()
         title = _extract_title(target_path)
 
+        # ファイルID（拡張子なしの相対パス）
+        file_id = Path(relative_path).with_suffix("").as_posix()
+
         return {
             "success": True,
             "project_id": project_id,
+            "file_id": file_id,
             "filename": target_path.name,
             "relative_path": relative_path,
             "title": title or target_path.stem,

@@ -123,13 +123,33 @@ def list_docs(project_id: str) -> Dict[str, Any]:
 
         title = _extract_title(md_file)
 
+        # カテゴリ判定（トップレベルは "root"、サブディレクトリはdir名）
+        parts = relative_path.split("/")
+        category = parts[0] if len(parts) > 1 else "root"
+
+        # ファイルID（拡張子なしの相対パス）
+        file_id = Path(relative_path).with_suffix("").as_posix()
+
         files.append({
+            "id": file_id,
             "filename": md_file.name,
+            "file": md_file.name,
             "relative_path": relative_path,
+            "path": str(md_file),
             "title": title or md_file.stem,
+            "size": stat.st_size,
             "size_bytes": stat.st_size,
             "updated_at": updated_at,
+            "category": category,
         })
+
+    # カテゴリ一覧を生成（出現順、rootを先頭に）
+    unique_categories = list(dict.fromkeys(f["category"] for f in files))
+    if "root" in unique_categories:
+        unique_categories.remove("root")
+        unique_categories = ["root"] + unique_categories
+
+    index_path = docs_path / "INDEX.md"
 
     return {
         "success": True,
@@ -137,6 +157,8 @@ def list_docs(project_id: str) -> Dict[str, Any]:
         "docs_path": str(docs_path),
         "files": files,
         "total_count": len(files),
+        "categories": unique_categories,
+        "index_exists": index_path.exists(),
     }
 
 
