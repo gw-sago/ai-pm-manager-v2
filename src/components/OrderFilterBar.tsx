@@ -289,7 +289,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
 
         {/* ステータスフィルタ */}
         <FilterSection label="ステータス:" compact>
-          {availableStatuses.slice(0, 3).map((status) => (
+          {availableStatuses.map((status) => (
             <FilterChip
               key={status}
               label={status}
