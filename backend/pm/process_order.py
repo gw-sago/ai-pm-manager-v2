@@ -252,16 +252,54 @@ class PMProcessor:
         return self.results
 
     def _step_read_order(self) -> str:
-        """Step 1: ORDER.md を読み込む"""
+        """Step 1: ORDER.md または DB から ORDER内容を読み込む"""
         self._log_step("read_order", "start", str(self.order_file))
 
-        if not self.order_file.exists():
-            raise PMProcessError(f"ORDER.md が見つかりません: {self.order_file}")
+        if self.order_file.exists():
+            # MDファイルが存在する場合は従来通りファイルから読み込み
+            content = self.order_file.read_text(encoding="utf-8")
+        else:
+            # ORDER_091: MDファイル不在時はDBからORDER情報を取得
+            self._log_step("read_order", "info", "MDファイル不在、DBから取得")
+            conn = get_connection()
+            try:
+                row = fetch_one(
+                    conn,
+                    "SELECT id, title, priority, description FROM orders WHERE id = ? AND project_id = ?",
+                    (self.order_id, self.project_id)
+                )
+                if not row:
+                    raise PMProcessError(f"ORDER が見つかりません（DB・ファイル両方不在）: {self.order_id}")
+                order = row_to_dict(row)
+                content = self._generate_order_content_from_db(order)
+            finally:
+                conn.close()
 
-        content = self.order_file.read_text(encoding="utf-8")
         self.results["order_content"] = content
         self._log_step("read_order", "success", f"{len(content)} bytes")
         return content
+
+    def _generate_order_content_from_db(self, order: Dict[str, Any]) -> str:
+        """DBのORDER情報からMarkdown形式の内容を生成する"""
+        title = order.get("title", "（タイトル未設定）")
+        description = order.get("description", "") or "（説明なし）"
+        priority = order.get("priority", "P1")
+
+        return f"""# {self.order_id}
+
+## 発注情報
+- **発注ID**: {self.order_id}
+- **発注日**: {datetime.now().strftime('%Y-%m-%d')}
+- **優先度**: {priority}
+
+## 発注内容
+
+### 概要
+{title}
+
+### 詳細
+{description}
+"""
 
     def _step_validate_project(self) -> None:
         """Step 2: プロジェクト存在確認"""

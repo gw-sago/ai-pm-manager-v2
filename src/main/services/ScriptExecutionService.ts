@@ -18,6 +18,7 @@
 import { spawn, exec, ChildProcess } from 'child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import { EventEmitter } from 'events';
 import { watch, type FSWatcher } from 'chokidar';
 import { getConfigService } from './ConfigService';
@@ -150,6 +151,20 @@ export interface WorkerLogFileInfo {
 }
 
 /**
+ * Worker ログファイル一覧のページネーション付きレスポンス（ORDER_090）
+ */
+export interface WorkerLogFileListResponse {
+  /** ログファイル情報の配列 */
+  items: WorkerLogFileInfo[];
+  /** 総件数 */
+  totalCount: number;
+  /** 取得開始位置 */
+  offset: number;
+  /** 取得件数上限 */
+  limit: number;
+}
+
+/**
  * Worker ログ内容
  */
 export interface WorkerLogContent {
@@ -236,6 +251,9 @@ export class ScriptExecutionService extends EventEmitter {
 
   /** ORDER_111: Worker ログファイルの前回読み込み位置 */
   private workerLogPositions: Map<string, number> = new Map();
+
+  /** ORDER_090: ログファイルステータスキャッシュ（filePath → {status, mtimeMs}） */
+  private logStatusCache: Map<string, { status: 'running' | 'success' | 'failed' | 'unknown'; mtimeMs: number }> = new Map();
 
   constructor() {
     super();
@@ -530,59 +548,94 @@ export class ScriptExecutionService extends EventEmitter {
     } as ExecutionProgress);
 
     try {
-      // Step 1: backlog/to_order.py でORDER作成
-      console.log(`[ScriptExecution] ========================================`);
-      console.log(`[ScriptExecution] Step 1: Creating ORDER from ${backlogId} via to_order.py`);
-      console.log(`[ScriptExecution] ========================================`);
-
-      this.emit('progress', {
-        executionId,
-        type: 'pm',
-        projectId,
-        targetId: backlogId,
-        status: 'running',
-        lastOutput: `Step 1: ORDER作成中 (${backlogId})...`,
-      } as ExecutionProgress);
-
+      let orderId: string;
       const backendPath = this.getBackendPath()!;
-      const toOrderScript = path.join(backendPath, 'backlog', 'to_order.py');
-      const step1Args = [toOrderScript, projectId, backlogId, '--json'];
 
-      const step1Result = await this.runPythonScript(pythonCommand, step1Args, frameworkPath);
-      job.stdout += `[Step 1: to_order.py]\n${step1Result.stdout}\n`;
-      job.stderr += step1Result.stderr;
+      // ORDER_091: DB駆動ORDER対応 - ORDER_IDが直接渡された場合はStep1をスキップ
+      if (backlogId.startsWith('ORDER_')) {
+        // DB駆動ORDER: backlogIdは実際にはORDER ID
+        orderId = backlogId;
+        console.log(`[ScriptExecution] ========================================`);
+        console.log(`[ScriptExecution] Step 1: Skipped (DB-driven ORDER: ${orderId})`);
+        console.log(`[ScriptExecution] ========================================`);
 
-      if (!step1Result.success) {
-        console.error(`[ScriptExecution] Step 1 failed`);
-        this.runningJobs.delete(executionId);
-        const result = this.createExecutionResult(
-          'pm', projectId, backlogId, executionId, startedAt,
-          false, job.stdout, job.stderr, step1Result.exitCode,
-          `Step 1 failed: ${step1Result.error || 'Unknown error'}`
-        );
-        this.addToHistory(result);
-        this.emitComplete(result);
-        return result;
+        this.emit('progress', {
+          executionId,
+          type: 'pm',
+          projectId,
+          targetId: backlogId,
+          status: 'running',
+          lastOutput: `Step 1: DB駆動ORDER検出、ステータス更新中 (${orderId})...`,
+        } as ExecutionProgress);
+
+        // DRAFT/PLANNINGの場合はIN_PROGRESSに遷移
+        const updateScript = path.join(backendPath, 'order', 'update.py');
+        const updateArgs = [updateScript, projectId, orderId, '--status', 'IN_PROGRESS', '--reason', 'PM処理開始（UI経由）', '--json'];
+        const updateResult = await this.runPythonScript(pythonCommand, updateArgs, frameworkPath);
+        job.stdout += `[Step 1: order/update.py (DB-driven)]\n${updateResult.stdout}\n`;
+        job.stderr += updateResult.stderr;
+
+        // ステータス更新失敗は警告のみ（既にIN_PROGRESSの場合など）
+        if (!updateResult.success) {
+          console.warn(`[ScriptExecution] Step 1: ORDER status update warning: ${updateResult.stderr}`);
+        }
+
+        console.log(`[ScriptExecution] Step 1 complete: Using existing ${orderId}`);
+      } else {
+        // 従来フロー: BACKLOG_IDからORDER作成
+        console.log(`[ScriptExecution] ========================================`);
+        console.log(`[ScriptExecution] Step 1: Creating ORDER from ${backlogId} via to_order.py`);
+        console.log(`[ScriptExecution] ========================================`);
+
+        this.emit('progress', {
+          executionId,
+          type: 'pm',
+          projectId,
+          targetId: backlogId,
+          status: 'running',
+          lastOutput: `Step 1: ORDER作成中 (${backlogId})...`,
+        } as ExecutionProgress);
+
+        const toOrderScript = path.join(backendPath, 'backlog', 'to_order.py');
+        const step1Args = [toOrderScript, projectId, backlogId, '--json'];
+
+        const step1Result = await this.runPythonScript(pythonCommand, step1Args, frameworkPath);
+        job.stdout += `[Step 1: to_order.py]\n${step1Result.stdout}\n`;
+        job.stderr += step1Result.stderr;
+
+        if (!step1Result.success) {
+          console.error(`[ScriptExecution] Step 1 failed`);
+          this.runningJobs.delete(executionId);
+          const result = this.createExecutionResult(
+            'pm', projectId, backlogId, executionId, startedAt,
+            false, job.stdout, job.stderr, step1Result.exitCode,
+            `Step 1 failed: ${step1Result.error || 'Unknown error'}`
+          );
+          this.addToHistory(result);
+          this.emitComplete(result);
+          return result;
+        }
+
+        // ORDER IDを出力から抽出
+        const extractedOrderId = this.extractOrderIdFromJson(step1Result.stdout) ||
+                  this.extractOrderIdFromOutput(step1Result.stdout);
+
+        if (!extractedOrderId) {
+          console.error(`[ScriptExecution] Failed to extract ORDER ID from output`);
+          this.runningJobs.delete(executionId);
+          const result = this.createExecutionResult(
+            'pm', projectId, backlogId, executionId, startedAt,
+            false, job.stdout, job.stderr, 0,
+            'Failed to extract ORDER ID from to_order.py output'
+          );
+          this.addToHistory(result);
+          this.emitComplete(result);
+          return result;
+        }
+
+        orderId = extractedOrderId;
+        console.log(`[ScriptExecution] Step 1 complete: Created ${orderId}`);
       }
-
-      // ORDER IDを出力から抽出
-      const orderId = this.extractOrderIdFromJson(step1Result.stdout) ||
-                      this.extractOrderIdFromOutput(step1Result.stdout);
-
-      if (!orderId) {
-        console.error(`[ScriptExecution] Failed to extract ORDER ID from output`);
-        this.runningJobs.delete(executionId);
-        const result = this.createExecutionResult(
-          'pm', projectId, backlogId, executionId, startedAt,
-          false, job.stdout, job.stderr, 0,
-          'Failed to extract ORDER ID from to_order.py output'
-        );
-        this.addToHistory(result);
-        this.emitComplete(result);
-        return result;
-      }
-
-      console.log(`[ScriptExecution] Step 1 complete: Created ${orderId}`);
 
       // Step 2: pm/process_order.py でPM処理
       console.log(`[ScriptExecution] ========================================`);
@@ -2520,76 +2573,117 @@ export class ScriptExecutionService extends EventEmitter {
   // =============================================================================
 
   /**
-   * Worker ログファイル一覧を取得
+   * Worker ログファイル一覧を取得（ORDER_090: ページネーション・非同期化・キャッシュ対応）
    *
    * ORDER_111: PROJECTS/{projectId}/RESULT/ORDER_xxx/LOGS/ ディレクトリを走査し、
    * worker_xxx.log および execution_xxx.log ファイルを一覧化する
    *
    * @param projectId プロジェクトID
    * @param orderId ORDER ID（指定時はそのORDERのみ、省略時は全ORDER）
-   * @returns ログファイル情報の配列（更新日時降順）
+   * @param options ページネーションオプション（limit: 取得件数, offset: 開始位置）
+   * @returns ページネーション付きログファイル情報
    */
-  async getWorkerLogFiles(projectId: string, orderId?: string): Promise<WorkerLogFileInfo[]> {
+  async getWorkerLogFiles(
+    projectId: string,
+    orderId?: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<WorkerLogFileListResponse> {
     const frameworkPath = this.getFrameworkPath();
-    if (!frameworkPath) return [];
+    if (!frameworkPath) return { items: [], totalCount: 0, offset: 0, limit: 0 };
 
+    const limit = options?.limit ?? 100;
+    const offset = options?.offset ?? 0;
     const results: WorkerLogFileInfo[] = [];
     const configService = getConfigService();
     const resultDir = path.join(configService.getProjectsBasePath(), projectId, 'RESULT');
 
-    if (!fs.existsSync(resultDir)) return [];
+    try {
+      await fsPromises.access(resultDir);
+    } catch {
+      return { items: [], totalCount: 0, offset, limit };
+    }
 
     try {
-      // ORDER ディレクトリを特定
+      // ORDER ディレクトリを特定（非同期）
       let orderDirs: string[];
       if (orderId) {
-        const specificDir = path.join(resultDir, orderId);
-        orderDirs = fs.existsSync(specificDir) ? [orderId] : [];
+        try {
+          await fsPromises.access(path.join(resultDir, orderId));
+          orderDirs = [orderId];
+        } catch {
+          orderDirs = [];
+        }
       } else {
-        const entries = fs.readdirSync(resultDir, { withFileTypes: true });
+        const entries = await fsPromises.readdir(resultDir, { withFileTypes: true });
         orderDirs = entries
           .filter(e => e.isDirectory() && e.name.startsWith('ORDER_'))
           .map(e => e.name);
       }
 
-      for (const orderDirName of orderDirs) {
+      // 全LOGSディレクトリからファイル名とmtimeのみ収集（並列実行）
+      const scanPromises = orderDirs.map(async (orderDirName) => {
         const logsDir = path.join(resultDir, orderDirName, 'LOGS');
-        if (!fs.existsSync(logsDir)) continue;
-
-        const logEntries = fs.readdirSync(logsDir, { withFileTypes: true });
-        for (const entry of logEntries) {
-          if (!entry.isFile() || !entry.name.endsWith('.log')) continue;
-
-          const filePath = path.join(logsDir, entry.name);
-          try {
-            const stats = fs.statSync(filePath);
-            const taskId = this.extractTaskIdFromLogFileName(entry.name);
-            const status = this.detectLogFileStatus(filePath, stats);
-
-            results.push({
-              filePath,
-              fileName: entry.name,
-              taskId,
-              orderId: orderDirName,
-              status,
-              fileSize: stats.size,
-              modifiedAt: stats.mtime.toISOString(),
-            });
-          } catch (err) {
-            console.warn(`[WorkerLog] Failed to stat ${filePath}:`, err);
-          }
+        try {
+          await fsPromises.access(logsDir);
+        } catch {
+          return [];
         }
+
+        const logEntries = await fsPromises.readdir(logsDir, { withFileTypes: true });
+        const fileInfoPromises = logEntries
+          .filter(entry => entry.isFile() && entry.name.endsWith('.log'))
+          .map(async (entry) => {
+            const filePath = path.join(logsDir, entry.name);
+            try {
+              const stats = await fsPromises.stat(filePath);
+              return {
+                filePath,
+                fileName: entry.name,
+                taskId: this.extractTaskIdFromLogFileName(entry.name),
+                orderId: orderDirName,
+                fileSize: stats.size,
+                mtimeMs: stats.mtime.getTime(),
+                modifiedAt: stats.mtime.toISOString(),
+              };
+            } catch {
+              return null;
+            }
+          });
+
+        return (await Promise.all(fileInfoPromises)).filter(
+          (info): info is NonNullable<typeof info> => info !== null
+        );
+      });
+
+      const allFileInfos = (await Promise.all(scanPromises)).flat();
+
+      // 更新日時降順でソート
+      allFileInfos.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+      const totalCount = allFileInfos.length;
+
+      // ページネーション: offset/limit適用後のみステータス判定
+      const paginatedInfos = allFileInfos.slice(offset, offset + limit);
+
+      // ステータス判定（キャッシュ活用、表示分のみ）
+      for (const info of paginatedInfos) {
+        const status = await this.detectLogFileStatusCached(info.filePath, info.fileSize, info.mtimeMs);
+        results.push({
+          filePath: info.filePath,
+          fileName: info.fileName,
+          taskId: info.taskId,
+          orderId: info.orderId,
+          status,
+          fileSize: info.fileSize,
+          modifiedAt: info.modifiedAt,
+        });
       }
 
-      // 更新日時降順でソート（最新が先頭）
-      results.sort((a, b) =>
-        new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
-      );
+      return { items: results, totalCount, offset, limit };
     } catch (error) {
       console.error(`[WorkerLog] Error scanning log files for ${projectId}:`, error);
+      return { items: [], totalCount: 0, offset, limit };
     }
-
-    return results;
   }
 
   /**
@@ -2616,7 +2710,84 @@ export class ScriptExecutionService extends EventEmitter {
   }
 
   /**
-   * ログファイルのステータスを判定
+   * ログファイルのステータスをキャッシュ付きで判定（ORDER_090: 非同期版）
+   *
+   * キャッシュヒット条件: filePath + mtimeMs が一致
+   * キャッシュミス時のみファイル末尾を読み込んでパターンマッチ
+   */
+  private async detectLogFileStatusCached(
+    filePath: string,
+    fileSize: number,
+    mtimeMs: number
+  ): Promise<'running' | 'success' | 'failed' | 'unknown'> {
+    if (fileSize === 0) return 'unknown';
+
+    // 実行中プロセスのログファイルか確認（キャッシュより優先）
+    for (const [, info] of this.monitoredProcesses) {
+      if (info.logFile === filePath) {
+        return 'running';
+      }
+    }
+
+    // キャッシュチェック
+    const cached = this.logStatusCache.get(filePath);
+    if (cached && cached.mtimeMs === mtimeMs) {
+      return cached.status;
+    }
+
+    // キャッシュミス: ファイル末尾を非同期で読み込んでパターンマッチ
+    let status: 'running' | 'success' | 'failed' | 'unknown' = 'unknown';
+    try {
+      const readSize = Math.min(fileSize, 4096);
+      const fh = await fsPromises.open(filePath, 'r');
+      try {
+        const buffer = Buffer.alloc(readSize);
+        await fh.read(buffer, 0, readSize, Math.max(0, fileSize - readSize));
+        const tailContent = buffer.toString('utf-8');
+
+        if (
+          tailContent.includes('SUCCESS') ||
+          tailContent.includes('DONE') ||
+          tailContent.includes('COMPLETED') ||
+          tailContent.includes('タスク完了') ||
+          tailContent.includes('exit code: 0')
+        ) {
+          status = 'success';
+        } else if (
+          tailContent.includes('FAILED') ||
+          tailContent.includes('ERROR') ||
+          tailContent.includes('CRASHED') ||
+          tailContent.includes('Traceback') ||
+          tailContent.includes('異常終了') ||
+          tailContent.match(/exit code: [^0]/)
+        ) {
+          status = 'failed';
+        }
+      } finally {
+        await fh.close();
+      }
+    } catch {
+      // ファイル読み取りエラーは無視
+    }
+
+    // running判定（ファイルI/Oで判定できなかった場合）
+    if (status === 'unknown') {
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      if (mtimeMs > fiveMinutesAgo) {
+        status = 'running';
+      }
+    }
+
+    // キャッシュに保存（running以外。runningは動的に変わるためキャッシュしない）
+    if (status !== 'running') {
+      this.logStatusCache.set(filePath, { status, mtimeMs });
+    }
+
+    return status;
+  }
+
+  /**
+   * ログファイルのステータスを判定（同期版、watchWorkerLog等で使用）
    *
    * 判定ロジック:
    * 1. ファイルサイズ0: unknown
