@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-snapshot] - 2026-02-25
 
+### Fixed
+- ORDER一覧画面がbacklog/list.py（非推奨）を使用しており全ORDERが表示されない不具合を修正（ORDER_088）
+  - DashboardService.getAllBacklogs()のスクリプトをorder/list.pyに切り替え
+  - レスポンスパースをorder/list.pyの直接配列形式に対応
+  - BacklogFilterBarのステータス定数をORDER用に更新（PLANNING,REVIEW,COMPLETED等）
+- ドキュメントタブのファイルツリーにファイル名が表示されないバグ修正（ORDER_087）
+
+### Changed
+- 「バックログ」タブを「ORDER一覧」に統一
+
 ### Added
 - ordersテーブルにDRAFTステータス追加、DRAFT ORDER CRUD API実装（ORDER_065）
 - tasksテーブルにparent_task_id/depth/is_leader/decomposition_strategy/aggregation_task_id/task_phaseカラム追加（ORDER_065）
