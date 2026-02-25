@@ -14,7 +14,7 @@ Options:
     --verbose       詳細ログ出力
     --json          JSON形式で出力
     --timeout SEC   claude -p タイムアウト秒数（デフォルト: 600）
-    --model MODEL   AI呼び出しモデル（haiku/sonnet/opus、デフォルト: sonnet）
+    --model MODEL   AI呼び出しモデル（haiku/sonnet/opus、デフォルト: opus）
 
 Example:
     python backend/pm/process_order.py AI_PM_PJ 095
@@ -108,7 +108,7 @@ class PMProcessor:
         skip_ai: bool = False,
         verbose: bool = False,
         timeout: int = 600,
-        model: str = "sonnet",
+        model: str = "opus",
         stream_output: bool = True,  # デフォルトでリアルタイム出力有効
     ):
         self.project_id = project_id
@@ -410,6 +410,82 @@ class PMProcessor:
 
         return "\n".join(result_lines).strip()
 
+    def _read_project_info(self, project_id: str) -> str:
+        """
+        PROJECT_INFO.mdを読み込む
+
+        get_project_paths()を使用してRoamingパスのPROJECT_INFO.mdを読み込む。
+        最大6000文字に制限（PMプロンプトの肥大化防止）。
+
+        Args:
+            project_id: プロジェクトID
+
+        Returns:
+            PROJECT_INFO.mdの内容（最大6000文字）。読み込み失敗時は空文字列。
+        """
+        MAX_LENGTH = 6000
+        try:
+            _paths = get_project_paths(project_id)
+            project_info_path = _paths["base"] / "PROJECT_INFO.md"
+            if not project_info_path.exists():
+                logger.debug(f"PROJECT_INFO.md が見つかりません: {project_info_path}")
+                return ""
+            content = project_info_path.read_text(encoding="utf-8")
+            if len(content) > MAX_LENGTH:
+                content = content[:MAX_LENGTH] + "\n\n[...以降省略...]"
+            return content
+        except Exception as e:
+            logger.warning(f"PROJECT_INFO.md 読み込み失敗: {e}")
+            return ""
+
+    def _extract_project_info_summary(self, project_info: str) -> str:
+        """
+        PROJECT_INFO.mdからサマリー情報を抽出する
+
+        プロジェクト概要、既知バグ、技術的制約、実装パターンのセクションを
+        選択的に抽出して簡潔なサマリーを返す。
+
+        Args:
+            project_info: PROJECT_INFO.mdの全文
+
+        Returns:
+            抽出されたサマリー文字列。空の場合は空文字列。
+        """
+        if not project_info:
+            return ""
+
+        summary_sections = []
+
+        # プロジェクト概要セクション（基本情報）
+        overview = self._extract_section(project_info, "プロジェクト概要")
+        if overview:
+            summary_sections.append(f"### プロジェクト概要\n{overview[:500]}")
+
+        # 既知バグパターンセクション
+        bugs = self._extract_section(project_info, "バグ修正履歴")
+        if bugs:
+            summary_sections.append(f"### バグ修正履歴（抜粋）\n{bugs[:800]}")
+
+        # 技術的制約セクション
+        constraints = self._extract_section(project_info, "技術的制約")
+        if constraints:
+            summary_sections.append(f"### 技術的制約\n{constraints[:600]}")
+
+        # 実装パターンセクション
+        patterns = self._extract_section(project_info, "実装パターン")
+        if patterns:
+            summary_sections.append(f"### 実装パターン\n{patterns[:600]}")
+
+        # 既知バグ一覧セクション
+        known_bugs = self._extract_section(project_info, "既知バグ一覧")
+        if known_bugs:
+            summary_sections.append(f"### 既知バグ一覧\n{known_bugs[:400]}")
+
+        if not summary_sections:
+            return ""
+
+        return "## PROJECT_INFO.md サマリー\n\n" + "\n\n".join(summary_sections)
+
     def _build_requirements_prompt(self, order_content: str) -> str:
         """要件定義生成用プロンプトを構築"""
         # SpecGeneratorが利用可能ならAC生成指示付きの改善プロンプトを使用
@@ -456,7 +532,7 @@ class PMProcessor:
       "title": "タスク名",
       "description": "タスク説明",
       "priority": "P0",
-      "model": "Sonnet",
+      "model": "Opus",
       "depends_on": [],
       "target_files": ["path/to/file1.py", "path/to/file2.py"]
     }}
@@ -625,7 +701,7 @@ class PMProcessor:
             lines.append(
                 f"| {i} | {task.get('title', '?')} | "
                 f"{task.get('priority', 'P1')} | "
-                f"{task.get('model', 'Sonnet')} | {deps} |"
+                f"{task.get('model', 'Opus')} | {deps} |"
             )
 
         lines.append("")
@@ -932,7 +1008,7 @@ class PMProcessor:
         title = task.get("title", "Untitled Task")
         description = task.get("description", "（説明なし）")
         priority = task.get("priority", "P1")
-        model = task.get("recommended_model", "Sonnet")
+        model = task.get("recommended_model", "Opus")
         depends_on = task.get("depends_on", [])
         target_files_json = task.get("target_files")
 
@@ -1070,6 +1146,42 @@ class PMProcessor:
             # ステータス更新失敗は警告のみ
             self._log_step("update_order", "warning", str(e))
 
+    def update_project_info_from_learnings(
+        self,
+        order_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        ORDER完了時の学習内容をPROJECT_INFO.mdに追記する
+
+        REPORTファイルとDBのORDER/タスク情報から学習内容を収集し、
+        PROJECT_INFO.mdのバグ修正履歴・技術的制約・実装パターン等を更新する。
+
+        リリース処理のStep 3.5（ORDER完了後・BACKLOG更新前）で呼び出される。
+
+        Args:
+            order_id: 対象ORDER ID（省略時はself.order_idを使用）
+
+        Returns:
+            更新結果辞書
+        """
+        target_order_id = order_id or self.order_id
+
+        try:
+            from pm.update_project_info import collect_and_update_from_db
+            result = collect_and_update_from_db(
+                project_id=self.project_id,
+                order_id=target_order_id,
+            )
+            if result.get("updated"):
+                logger.info(
+                    f"PROJECT_INFO.md更新完了: {result.get('added_count', 0)}件追記 "
+                    f"({', '.join(result.get('sections_updated', []))})"
+                )
+            return result
+        except Exception as e:
+            logger.warning(f"PROJECT_INFO.md更新失敗（非致命的）: {e}")
+            return {"success": False, "error": str(e), "updated": False}
+
 
 def main():
     """CLI エントリーポイント"""
@@ -1093,7 +1205,7 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="詳細ログ出力")
     parser.add_argument("--json", action="store_true", help="JSON形式で出力")
     parser.add_argument("--timeout", type=int, default=600, help="タイムアウト秒数")
-    parser.add_argument("--model", default="sonnet", help="AIモデル（haiku/sonnet/opus）")
+    parser.add_argument("--model", default="opus", help="AIモデル（haiku/sonnet/opus）")
     parser.add_argument("--no-stream", action="store_true", help="リアルタイム出力を無効化")
 
     args = parser.parse_args()

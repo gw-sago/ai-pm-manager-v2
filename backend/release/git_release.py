@@ -407,6 +407,102 @@ def _execute_build(project_id: str, order_ids: List[str]) -> Dict[str, Any]:
 
 
 # ============================================================================
+# REPORTからの成果物収集
+# ============================================================================
+
+def _collect_artifacts_from_reports(
+    project_id: str,
+    order_id: str,
+) -> List[Dict[str, Any]]:
+    """
+    ORDER配下のREPORTディレクトリを走査して成果物ファイルを収集する。
+
+    REPORTファイル（05_REPORT/REPORT_*.md）の「## 成果物」セクションに
+    記載されたファイルパスを抽出し、リリースファイル形式で返す。
+
+    Args:
+        project_id: プロジェクトID
+        order_id: ORDER ID
+
+    Returns:
+        成果物ファイルのリスト（{"target": path, "change_type": "MODIFIED"} 形式）
+    """
+    from config import get_project_paths
+    paths = get_project_paths(project_id)
+    result_path = paths["result"]
+    report_dir = result_path / order_id / "05_REPORT"
+
+    if not report_dir.exists():
+        return []
+
+    collected: List[Dict[str, Any]] = []
+    seen: set = set()
+
+    # REPORT_*.md ファイルを走査
+    for report_file in sorted(report_dir.glob("REPORT_*.md")):
+        try:
+            content = report_file.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        lines = content.splitlines()
+        in_artifacts_section = False
+
+        for line in lines:
+            # 「## 成果物」セクションの開始を検出
+            if re.match(r"^##\s*成果物", line):
+                in_artifacts_section = True
+                continue
+
+            # 次の ## セクションで終了
+            if in_artifacts_section and re.match(r"^##\s+", line):
+                in_artifacts_section = False
+                break
+
+            if not in_artifacts_section:
+                continue
+
+            # 箇条書き行からファイルパスを抽出
+            stripped = line.strip()
+            if not stripped.startswith("-"):
+                continue
+
+            # "- " プレフィックスを除去
+            item = stripped.lstrip("- ").strip()
+
+            # 括弧内の注釈を除去（例: （修正済み）、（新規）等）
+            item = re.sub(r"[（(][^）)]*[）)]", "", item).strip()
+
+            # バッククォートを除去（注釈除去後に行う）
+            item = item.strip("`")
+
+            # 空行・「なし」・スキップすべきエントリを除外
+            if not item or item in ("なし", "-"):
+                continue
+
+            # バックスラッシュをスラッシュに統一
+            item_normalized = item.replace("\\", "/")
+
+            # ファイルパスっぽいものだけ収集（拡張子か / を含む）
+            if "/" not in item_normalized and "." not in item_normalized:
+                continue
+
+            # 重複除去
+            if item_normalized in seen:
+                continue
+            seen.add(item_normalized)
+
+            # ファイル名部分（最後のコンポーネント）をターゲットとする
+            # 絶対パスの場合はそのまま、相対パスの場合もそのまま使用
+            collected.append({
+                "target": item_normalized,
+                "change_type": "MODIFIED",
+            })
+
+    return collected
+
+
+# ============================================================================
 # ORDER/BACKLOG操作
 # ============================================================================
 
@@ -546,6 +642,10 @@ def _record_release_logs(
                 )
                 files = targets.get("targets", []) if targets.get("success") else []
 
+                # フォールバック: DEV差分が0件の場合はREPORTから成果物を収集
+                if not files:
+                    files = _collect_artifacts_from_reports(project_id, order_id)
+
                 title = order_titles.get(order_id, "")
                 notes = title
                 bl_for_order = backlog_ids if backlog_ids else None
@@ -644,6 +744,27 @@ def execute_git_release(
     if not skip_complete:
         completed = _complete_orders(project_id, order_ids)
         result["steps"]["complete_orders"] = completed
+
+    # Step 3.5: PROJECT_INFO.md自動更新（ORDER完了後・BACKLOG更新前）
+    project_info_updates = []
+    for order_id_item in order_ids:
+        try:
+            from pm.process_order import PMProcessor
+            processor = PMProcessor(project_id, order_id_item, skip_ai=True)
+            update_result = processor.update_project_info_from_learnings(order_id_item)
+            project_info_updates.append({
+                "order_id": order_id_item,
+                "updated": update_result.get("updated", False),
+                "added_count": update_result.get("added_count", 0),
+            })
+        except Exception as e:
+            # PROJECT_INFO更新失敗は警告のみ（リリースは継続）
+            project_info_updates.append({
+                "order_id": order_id_item,
+                "updated": False,
+                "error": str(e),
+            })
+    result["steps"]["project_info_updates"] = project_info_updates
 
     # Step 4: BACKLOG更新
     backlog_ids = []

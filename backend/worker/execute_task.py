@@ -1323,6 +1323,103 @@ class WorkerExecutor:
             self._log_step("docs_selector", "warning", f"ドキュメント選択失敗: {e}")
             return ""
 
+    def _read_project_info(self, project_id: str) -> str:
+        """
+        PROJECT_INFO.mdを読み込む
+
+        get_project_paths()を使用してRoamingパスのPROJECT_INFO.mdを読み込む。
+        最大8000文字に制限（Workerプロンプトの肥大化防止）。
+
+        Args:
+            project_id: プロジェクトID
+
+        Returns:
+            PROJECT_INFO.mdの内容（最大8000文字）。読み込み失敗時は空文字列。
+        """
+        MAX_LENGTH = 8000
+        try:
+            _paths = get_project_paths(project_id)
+            project_info_path = _paths["base"] / "PROJECT_INFO.md"
+            if not project_info_path.exists():
+                logger.debug(f"PROJECT_INFO.md が見つかりません: {project_info_path}")
+                return ""
+            content = project_info_path.read_text(encoding="utf-8")
+            if len(content) > MAX_LENGTH:
+                content = content[:MAX_LENGTH] + "\n\n[...以降省略...]"
+            return content
+        except Exception as e:
+            logger.warning(f"PROJECT_INFO.md 読み込み失敗: {e}")
+            return ""
+
+    def _extract_section(self, content: str, section_name: str) -> str:
+        """Markdownコンテンツから指定セクションを抽出"""
+        lines = content.split("\n")
+        in_section = False
+        section_level = 0
+        result_lines = []
+
+        for line in lines:
+            if line.startswith("#") and section_name in line:
+                in_section = True
+                section_level = len(line) - len(line.lstrip("#"))
+                continue
+            elif in_section:
+                if line.startswith("#"):
+                    current_level = len(line) - len(line.lstrip("#"))
+                    if current_level <= section_level:
+                        break
+                result_lines.append(line)
+
+        return "\n".join(result_lines).strip()
+
+    def _extract_project_info_summary(self, project_info: str) -> str:
+        """
+        PROJECT_INFO.mdからサマリー情報を抽出する
+
+        プロジェクト概要、既知バグ、技術的制約、実装パターンのセクションを
+        選択的に抽出して簡潔なサマリーを返す。
+
+        Args:
+            project_info: PROJECT_INFO.mdの全文
+
+        Returns:
+            抽出されたサマリー文字列。空の場合は空文字列。
+        """
+        if not project_info:
+            return ""
+
+        summary_sections = []
+
+        # プロジェクト概要セクション（基本情報）
+        overview = self._extract_section(project_info, "プロジェクト概要")
+        if overview:
+            summary_sections.append(f"### プロジェクト概要\n{overview[:500]}")
+
+        # 既知バグパターンセクション
+        bugs = self._extract_section(project_info, "バグ修正履歴")
+        if bugs:
+            summary_sections.append(f"### バグ修正履歴（抜粋）\n{bugs[:1000]}")
+
+        # 技術的制約セクション
+        constraints = self._extract_section(project_info, "技術的制約")
+        if constraints:
+            summary_sections.append(f"### 技術的制約\n{constraints[:800]}")
+
+        # 実装パターンセクション
+        patterns = self._extract_section(project_info, "実装パターン")
+        if patterns:
+            summary_sections.append(f"### 実装パターン\n{patterns[:800]}")
+
+        # 既知バグ一覧セクション
+        known_bugs = self._extract_section(project_info, "既知バグ一覧")
+        if known_bugs:
+            summary_sections.append(f"### 既知バグ一覧\n{known_bugs[:500]}")
+
+        if not summary_sections:
+            return ""
+
+        return "## PROJECT_INFO.md サマリー\n\n" + "\n\n".join(summary_sections)
+
     def _build_execution_prompt(self, task_content: str) -> str:
         """タスク実行用プロンプトを構築"""
         # リワークモードの場合、差し戻しコメントを追加

@@ -129,7 +129,7 @@ class SpecGenerator:
       "title": "タスク名",
       "description": "タスク説明",
       "priority": "P0",
-      "model": "Sonnet",
+      "model": "Opus",
       "depends_on": [],
       "target_files": ["path/to/file1.py", "path/to/file2.py"],
       "acceptance_criteria": [
