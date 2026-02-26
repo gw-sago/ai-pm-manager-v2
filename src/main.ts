@@ -358,19 +358,22 @@ app.on('ready', async () => {
 
   // ============================================================
   // ORDER_057: ドキュメントツリービュー IPC ハンドラ（TASK_196）
-  // docs:list - docs/配下のファイル一覧取得
-  // docs:get  - docs/配下の指定ファイルの内容取得
+  // ORDER_103: ドキュメント参照パス解決拡張（TASK_360）
+  // docs:list - プロジェクト設定に基づくドキュメント一覧取得
+  // docs:get  - プロジェクト設定に基づくドキュメント内容取得
+  // バックエンドがprojectIdからdev_workspace_pathを取得し、
+  // 設定されていればdev_workspace/docs/を、なければPROJECTS/{id}/docs/を参照
   // ============================================================
   ipcMain.handle('docs:list', async (_event, projectId: string) => {
     console.log('[Main] docs:list called:', projectId);
     try {
       const backendPath = configService.getBackendPath();
       if (!backendPath) {
-        return { success: false, error: 'Backend path not configured', files: [], categories: [] };
+        return { success: false, error: 'Backend path not configured', project_id: projectId, docs_path: '', index_exists: false, files: [], total_count: 0, categories: [] };
       }
       const scriptPath = path.join(backendPath, 'project', 'docs_list.py');
       if (!fs.existsSync(scriptPath)) {
-        return { success: false, error: `docs_list.py not found: ${scriptPath}`, files: [], categories: [] };
+        return { success: false, error: `docs_list.py not found: ${scriptPath}`, project_id: projectId, docs_path: '', index_exists: false, files: [], total_count: 0, categories: [] };
       }
       const pythonCommand = configService.getPythonPath();
       const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -395,7 +398,7 @@ app.on('ready', async () => {
       return result;
     } catch (error) {
       console.error('[Main] docs:list error:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error), files: [], categories: [] };
+      return { success: false, error: error instanceof Error ? error.message : String(error), project_id: projectId, docs_path: '', index_exists: false, files: [], total_count: 0, categories: [] };
     }
   });
 
@@ -438,7 +441,94 @@ app.on('ready', async () => {
   });
 
   createWindow();
+
+  // ORDER_102 / TASK_357: アプリ起動時にログクリーンアップをバックグラウンド実行
+  if (dbInitialized) {
+    runLogCleanup(configService).catch((error) => {
+      console.error('[Main] Log cleanup failed:', error);
+    });
+  }
 });
+
+/**
+ * ORDER_102 / TASK_357: ログクリーンアップをバックグラウンドで実行
+ *
+ * backend/log/cleanup.py を child_process.spawn で非同期実行し、
+ * UI起動をブロックしない。結果JSONをアプリログに記録する。
+ * エラー時もアプリ起動を妨げない（ログ出力のみ）。
+ */
+async function runLogCleanup(configService: ReturnType<typeof getConfigService>): Promise<void> {
+  try {
+    const pythonCommand = configService.getPythonPath();
+    const backendPath = configService.getBackendPath();
+    if (!backendPath) {
+      console.warn('[Main] Log cleanup skipped: backend path not configured');
+      return;
+    }
+
+    const scriptPath = path.join(backendPath, 'log', 'cleanup.py');
+    if (!fs.existsSync(scriptPath)) {
+      console.warn('[Main] Log cleanup skipped: cleanup.py not found at', scriptPath);
+      return;
+    }
+
+    console.log('[Main] Starting background log cleanup...');
+
+    const result = await new Promise<string>((resolve, reject) => {
+      const proc = spawn(pythonCommand, [scriptPath, '--json'], {
+        cwd: backendPath,
+        timeout: 60000, // 60秒タイムアウト
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      proc.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code: number | null) => {
+        if (stderr) {
+          console.warn('[Main] Log cleanup stderr:', stderr.trim());
+        }
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          reject(new Error(`cleanup.py exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      proc.on('error', (err: Error) => {
+        reject(new Error(`Failed to spawn cleanup.py: ${err.message}`));
+      });
+    });
+
+    // JSON結果をパースしてログに記録
+    try {
+      const parsed = JSON.parse(result);
+      if (parsed.skipped) {
+        console.log('[Main] Log cleanup skipped:', parsed.skip_reason);
+      } else {
+        console.log(
+          `[Main] Log cleanup completed: ${parsed.total_deleted} entries deleted ` +
+          `(${parsed.rows_before} -> ${parsed.rows_after} rows), ` +
+          `elapsed: ${parsed.elapsed_sec}s`
+        );
+      }
+    } catch {
+      // JSONパース失敗時はraw出力をログ
+      console.log('[Main] Log cleanup result (raw):', result.trim());
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[Main] Log cleanup error:', msg);
+    // エラー時もアプリ起動は妨げない
+  }
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
