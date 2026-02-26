@@ -91,18 +91,15 @@ def list_docs(project_id: str) -> Dict[str, Any]:
     paths = get_project_paths(project_id)
     docs_path = paths["docs"]
 
-    if not docs_path.exists():
+    if not docs_path.exists() or not docs_path.is_dir():
         return {
-            "success": False,
-            "error": f"docs/ ディレクトリが見つかりません: {docs_path}",
+            "success": True,
             "project_id": project_id,
-        }
-
-    if not docs_path.is_dir():
-        return {
-            "success": False,
-            "error": f"docs/ がディレクトリではありません: {docs_path}",
-            "project_id": project_id,
+            "docs_path": str(docs_path),
+            "files": [],
+            "total_count": 0,
+            "categories": [],
+            "index_exists": False,
         }
 
     files: List[Dict[str, Any]] = []
