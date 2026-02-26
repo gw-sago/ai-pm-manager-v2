@@ -15,7 +15,7 @@ Options:
     --category      カテゴリ（metadata JSONに格納）
     --check-dup     重複チェックを実行（デフォルト: False）
     --backlog-id    関連BACKLOG ID（重複チェック用/紐付け用）
-    --force         重複警告を無視して強制作成
+    --force         重複警告を無視して強制作成（テスト用タイトルも許可）
     --json          JSON形式で出力
 
 Example:
@@ -23,6 +23,7 @@ Example:
     python backend/order/create.py AI_PM_PJ --title "緊急バグ修正" --priority P0
     python backend/order/create.py AI_PM_PJ --title "機能X" --check-dup --backlog-id BACKLOG_058
     python backend/order/create.py AI_PM_PJ --title "バックログ項目" --status DRAFT --description "詳細説明" --category "feature"
+    python backend/order/create.py AI_PM_PJ --title "test_機能確認" --force
 """
 
 import argparse
@@ -62,6 +63,44 @@ class DuplicateOrderError(Exception):
     def __init__(self, message: str, duplicates: List[Dict[str, Any]]):
         super().__init__(message)
         self.duplicates = duplicates
+
+
+class TestTitleError(Exception):
+    """テスト用タイトル検出エラー"""
+    pass
+
+
+# テスト用プレフィックスの定義
+TEST_TITLE_PREFIXES = [
+    "test_",
+    "debug_",
+    "tmp_",
+    "temp_",
+    "wip_",
+    "draft_",
+    "sample_",
+    "dummy_",
+]
+
+
+def validate_title_not_test(title: str) -> None:
+    """
+    ORDERタイトルにテスト用プレフィックスが含まれていないか検証する。
+
+    Args:
+        title: チェック対象のORDERタイトル
+
+    Raises:
+        TestTitleError: テスト用プレフィックスが検出された場合
+    """
+    title_lower = title.lower()
+    for prefix in TEST_TITLE_PREFIXES:
+        if title_lower.startswith(prefix):
+            raise TestTitleError(
+                f"テスト用タイトルと判断されました（プレフィックス: '{prefix}'）: {title}\n"
+                f"本番ORDERにはテスト用プレフィックスを使用しないでください。\n"
+                f"テスト目的の場合は --force オプションを使用してください。"
+            )
 
 
 def check_duplicate_orders(
@@ -215,6 +254,10 @@ def create_order(
     validate_project_name(project_id)
     validate_priority(priority)
 
+    # テスト用タイトルバリデーション（--force 未指定時のみ）
+    if not force:
+        validate_title_not_test(title)
+
     # 初期ステータス検証（PLANNINGまたはDRAFTのみ許可）
     if status not in ("PLANNING", "DRAFT"):
         raise ValidationError(
@@ -266,9 +309,6 @@ def create_order(
 
                 # ORDER作成
                 now = datetime.now().isoformat()
-
-                # DRAFT作成時はstarted_atをNULLのままにする
-                started_at = None if initial_status == "DRAFT" else None  # PLANNINGもstarted_atはNULL
 
                 execute_query(
                     conn,
@@ -384,21 +424,47 @@ def main():
             print(f"  優先度: {result['priority']}")
             print(f"  ステータス: {result['status']}")
 
+    except TestTitleError as e:
+        if args.json:
+            print(json.dumps({
+                "error": "TEST_TITLE_DETECTED",
+                "message": str(e),
+                "hint": f"python backend/order/create.py {args.project_id} --title \"{args.title}\" --force"
+            }, ensure_ascii=False, indent=2))
+        else:
+            print(f"【テスト用タイトル検出】{e}", file=sys.stderr)
+            print("\n強制作成するには:", file=sys.stderr)
+            print(f"  python backend/order/create.py {args.project_id} --title \"{args.title}\" --force", file=sys.stderr)
+        sys.exit(3)  # テスト用タイトル検出は exit code 3
     except DuplicateOrderError as e:
-        print(f"【重複検出】{e}", file=sys.stderr)
-        print("\n重複ORDER一覧:", file=sys.stderr)
-        for dup in e.duplicates:
-            print(f"  - {dup['id']}: {dup['title']} ({dup['status']})", file=sys.stderr)
-        print("\n継続実行するには:", file=sys.stderr)
-        print(f"  /aipm-full-auto {args.project_id} {{ORDER_ID}}", file=sys.stderr)
-        print("\n強制作成するには:", file=sys.stderr)
-        print(f"  python backend/order/create.py {args.project_id} --title \"{args.title}\" --force", file=sys.stderr)
+        if args.json:
+            print(json.dumps({
+                "error": "DUPLICATE_ORDER",
+                "message": str(e),
+                "duplicates": e.duplicates,
+                "hint": f"python backend/order/create.py {args.project_id} --title \"{args.title}\" --force"
+            }, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(f"【重複検出】{e}", file=sys.stderr)
+            print("\n重複ORDER一覧:", file=sys.stderr)
+            for dup in e.duplicates:
+                print(f"  - {dup['id']}: {dup['title']} ({dup['status']})", file=sys.stderr)
+            print("\n継続実行するには:", file=sys.stderr)
+            print(f"  /aipm-full-auto {args.project_id} {{ORDER_ID}}", file=sys.stderr)
+            print("\n強制作成するには:", file=sys.stderr)
+            print(f"  python backend/order/create.py {args.project_id} --title \"{args.title}\" --force", file=sys.stderr)
         sys.exit(2)  # 重複検出は exit code 2
     except (ValidationError, TransitionError, DatabaseError) as e:
-        print(f"エラー: {e}", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"error": "VALIDATION_ERROR", "message": str(e)}, ensure_ascii=False, indent=2))
+        else:
+            print(f"エラー: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"予期しないエラー: {e}", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"error": "UNEXPECTED_ERROR", "message": str(e)}, ensure_ascii=False, indent=2))
+        else:
+            print(f"予期しないエラー: {e}", file=sys.stderr)
         sys.exit(1)
 
 

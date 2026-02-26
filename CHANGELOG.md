@@ -5,9 +5,15 @@ All notable changes to AI PM Manager V2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-snapshot] - 2026-02-25
+## [0.1.0-snapshot] - 2026-02-26
 
 ### Fixed
+- docs/ディレクトリ未作成時にdocs_list.pyがexit code 1で異常終了する不具合を修正（ORDER_094）
+  - docs/が存在しない場合は空リスト（success: true, files: [], categories: []）を正常に返すように変更
+- PMボタン押下後にWorkerボタンが表示されないバグを修正（ORDER_093）
+- UIのPMボタンでDRAFT ORDERを処理する際、DRAFT→IN_PROGRESSの不正な遷移エラーを修正（ORDER_092）
+  - ScriptExecutionService.tsのStep 1でDRAFT→PLANNINGに遷移するよう修正
+  - IN_PROGRESSへの遷移はprocess_order.pyのStep 6に委譲
 - ORDER一覧画面がbacklog/list.py（非推奨）を使用しており全ORDERが表示されない不具合を修正（ORDER_088）
   - DashboardService.getAllBacklogs()のスクリプトをorder/list.pyに切り替え
   - レスポンスパースをorder/list.pyの直接配列形式に対応
@@ -23,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 「バックログ」タブを「ORDER一覧」に統一
 
 ### Added
+- ドキュメントタブで.html/.txtファイルも表示可能に（ORDER_095）
+  - docs_list.pyを複数拡張子（.md/.html/.txt）対応に拡張
+  - docs_get.pyの拡張子なし時の.md自動付与ロジックを修正
+  - DocsPanel.tsxでHTML/テキストファイルの表示に対応
 - ordersテーブルにDRAFTステータス追加、DRAFT ORDER CRUD API実装（ORDER_065）
 - tasksテーブルにparent_task_id/depth/is_leader/decomposition_strategy/aggregation_task_id/task_phaseカラム追加（ORDER_065）
 - task/create.pyに循環参照防止バリデーション・depth自動計算（最大4階層）実装（ORDER_065）

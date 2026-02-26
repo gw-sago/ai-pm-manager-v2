@@ -556,45 +556,6 @@ export const OrderManageList: React.FC<OrderManageListProps> = ({
   }, [runningJobs, handleShowToast, fetchOrders]);
 
   /**
-   * Worker実行ハンドラ（ORDER_039追加、ORDER_042でバックグラウンド実行化）
-   * 実行を開始したら即座に返し、結果はFloatingProgressPanelで表示
-   */
-  const handleExecuteWorker = useCallback((projectId: string, orderId: string) => {
-    const jobKey = `worker:${projectId}:${orderId}`;
-    if (runningJobs.has(jobKey)) {
-      return;
-    }
-
-    // ローカル状態で実行中フラグを立てる（UI即時反映用）
-    setRunningJobs((prev) => new Set(prev).add(jobKey));
-    handleShowToast(`Worker処理を開始: ${orderId}`, 'info');
-
-    // バックグラウンドで実行（awaitしない）
-    window.electronAPI.executeWorkerProcess(projectId, orderId)
-      .then((result) => {
-        if (result.success) {
-          handleShowToast(`Worker処理が完了しました: ${orderId}`, 'success');
-        } else {
-          handleShowToast(`Worker処理失敗: ${result.error || 'Unknown error'}`, 'error');
-        }
-        // 完了後にリフレッシュ（ORDER_053: silentモード）
-        fetchOrders(true);
-      })
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        handleShowToast(`Worker処理エラー: ${message}`, 'error');
-        console.error('[OrderManageList] Worker execution error:', err);
-      })
-      .finally(() => {
-        setRunningJobs((prev) => {
-          const next = new Set(prev);
-          next.delete(jobKey);
-          return next;
-        });
-      });
-  }, [runningJobs, handleShowToast, fetchOrders]);
-
-  /**
    * リリース実行ハンドラ（ORDER_019追加）
    * 全タスクCOMPLETEDのORDERに対してリリース処理を実行する
    */
@@ -634,9 +595,81 @@ export const OrderManageList: React.FC<OrderManageListProps> = ({
   }, [runningJobs, handleShowToast, fetchOrders]);
 
   /**
+   * Worker実行ハンドラ（ORDER_099追加）
+   * ORDER一覧行のWorker実行ボタンから呼び出される
+   */
+  const handleExecuteWorker = useCallback((projectId: string, orderId: string) => {
+    const jobKey = `worker:${projectId}:${orderId}`;
+    if (runningJobs.has(jobKey)) {
+      return;
+    }
+
+    setRunningJobs((prev) => new Set(prev).add(jobKey));
+    handleShowToast(`Worker処理を開始: ${orderId}`, 'info');
+
+    window.electronAPI.executeWorkerProcess(projectId, orderId)
+      .then((result) => {
+        if (result.success) {
+          handleShowToast(`Worker処理が完了しました: ${orderId}`, 'success');
+        } else {
+          handleShowToast(`Worker処理失敗: ${(result as { error?: string }).error || 'Unknown error'}`, 'error');
+        }
+        fetchOrders(true);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        handleShowToast(`Worker処理エラー: ${message}`, 'error');
+        console.error('[OrderManageList] Worker execution error:', err);
+      })
+      .finally(() => {
+        setRunningJobs((prev) => {
+          const next = new Set(prev);
+          next.delete(jobKey);
+          return next;
+        });
+      });
+  }, [runningJobs, handleShowToast, fetchOrders]);
+
+  /**
+   * フルオート実行ハンドラ（ORDER_099追加）
+   * ORDER一覧行のフルオートボタンから呼び出される
+   */
+  const handleExecuteFullAuto = useCallback((projectId: string, orderId: string) => {
+    const jobKey = `fullauto:${projectId}:${orderId}`;
+    if (runningJobs.has(jobKey)) {
+      return;
+    }
+
+    setRunningJobs((prev) => new Set(prev).add(jobKey));
+    handleShowToast(`フルオート実行を開始: ${orderId}`, 'info');
+
+    window.electronAPI.orderFullAuto(projectId, orderId)
+      .then((result) => {
+        if (result.success) {
+          handleShowToast(`フルオート実行が完了しました: ${orderId}`, 'success');
+        } else {
+          handleShowToast(`フルオート失敗: ${(result as { error?: string }).error || 'Unknown error'}`, 'error');
+        }
+        fetchOrders(true);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        handleShowToast(`フルオートエラー: ${message}`, 'error');
+        console.error('[OrderManageList] Full-auto execution error:', err);
+      })
+      .finally(() => {
+        setRunningJobs((prev) => {
+          const next = new Set(prev);
+          next.delete(jobKey);
+          return next;
+        });
+      });
+  }, [runningJobs, handleShowToast, fetchOrders]);
+
+  /**
    * 特定のジョブが実行中かどうかを確認（ORDER_039追加）
    */
-  const isJobRunning = useCallback((type: 'pm' | 'worker' | 'release', projectId: string, targetId: string): boolean => {
+  const isJobRunning = useCallback((type: 'pm' | 'worker' | 'release' | 'fullauto', projectId: string, targetId: string): boolean => {
     return runningJobs.has(`${type}:${projectId}:${targetId}`);
   }, [runningJobs]);
 
@@ -898,9 +931,11 @@ export const OrderManageList: React.FC<OrderManageListProps> = ({
                 onOrderIdClick={onOrderClick}
                 isPmRunning={isJobRunning('pm', item.projectId, item.id)}
                 isWorkerRunning={item.relatedOrderId ? isJobRunning('worker', item.projectId, item.relatedOrderId) : false}
+                isFullAutoRunning={item.relatedOrderId ? isJobRunning('fullauto', item.projectId, item.relatedOrderId) : false}
                 isReleaseRunning={item.relatedOrderId ? isJobRunning('release', item.projectId, item.relatedOrderId) : false}
                 onExecutePm={handleExecutePm}
                 onExecuteWorker={handleExecuteWorker}
+                onExecuteFullAuto={handleExecuteFullAuto}
                 onExecuteRelease={handleExecuteRelease}
                 onDelete={handleOpenDeleteConfirm}
               />
@@ -951,14 +986,18 @@ interface OrderItemCardProps {
   onOrderIdClick?: (orderId: string) => void;
   /** PM実行中フラグ */
   isPmRunning?: boolean;
-  /** Worker実行中フラグ */
+  /** Worker実行中フラグ（ORDER_099追加） */
   isWorkerRunning?: boolean;
+  /** フルオート実行中フラグ（ORDER_099追加） */
+  isFullAutoRunning?: boolean;
   /** リリース実行中フラグ */
   isReleaseRunning?: boolean;
   /** PM実行コールバック */
   onExecutePm?: (projectId: string, orderItemId: string) => void;
-  /** Worker実行コールバック */
+  /** Worker実行コールバック（ORDER_099追加） */
   onExecuteWorker?: (projectId: string, orderId: string) => void;
+  /** フルオート実行コールバック（ORDER_099追加） */
+  onExecuteFullAuto?: (projectId: string, orderId: string) => void;
   /** リリース実行コールバック */
   onExecuteRelease?: (projectId: string, orderId: string) => void;
   /** 削除ボタンクリックコールバック（ORDER_139追加） */
@@ -979,44 +1018,28 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
   onOrderIdClick,
   isPmRunning = false,
   isWorkerRunning = false,
+  isFullAutoRunning = false,
   isReleaseRunning = false,
   onExecutePm,
   onExecuteWorker,
+  onExecuteFullAuto,
   onExecuteRelease,
   onDelete,
 }) => {
-  const [isCopied, setIsCopied] = useState(false);
   const priorityColor = PRIORITY_COLORS[item.priority] || 'bg-gray-100 text-gray-600';
   const statusColor = STATUS_COLORS[item.status] || 'bg-gray-100 text-gray-600';
 
   // TASK_1137: useOrderItemActionsを使用してボタン活性制御を精緻化
   const {
     canExecutePm,
-    canExecuteWorker,
     pmDisabledReason,
+    canExecuteWorker,
     workerDisabledReason,
   } = useOrderItemActions({
     orderItem: item,
     isPmRunning,
     isWorkerRunning,
   });
-
-  /**
-   * コピーボタンクリックハンドラ
-   */
-  const handleCopyClick = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation(); // 親のonClickを発火させない
-    const command = `/aipm-full-auto ${item.projectId} ${item.id}`;
-    try {
-      await navigator.clipboard.writeText(command);
-      setIsCopied(true);
-      onCopyCommand?.('コマンドをコピーしました');
-      setTimeout(() => setIsCopied(false), 1500);
-    } catch (err) {
-      console.error('Failed to copy command:', err);
-      onCopyCommand?.('コピーに失敗しました');
-    }
-  }, [item.projectId, item.id, onCopyCommand]);
 
   /**
    * ORDER IDクリックハンドラ
@@ -1039,7 +1062,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
   }, [canExecutePm, onExecutePm, item.projectId, item.id]);
 
   /**
-   * Worker実行ボタンクリックハンドラ（ORDER_039追加）
+   * Worker実行ボタンクリックハンドラ（ORDER_099追加）
    */
   const handleExecuteWorker = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1047,6 +1070,16 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
       onExecuteWorker(item.projectId, item.relatedOrderId);
     }
   }, [canExecuteWorker, onExecuteWorker, item.projectId, item.relatedOrderId]);
+
+  /**
+   * フルオート実行ボタンクリックハンドラ（ORDER_099追加）
+   */
+  const handleExecuteFullAuto = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onExecuteFullAuto && item.relatedOrderId) {
+      onExecuteFullAuto(item.projectId, item.relatedOrderId);
+    }
+  }, [onExecuteFullAuto, item.projectId, item.relatedOrderId]);
 
   /**
    * リリースボタンクリックハンドラ（ORDER_019追加）
@@ -1114,8 +1147,22 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
     totalTasks > 0 &&
     completedTasks === totalTasks;
 
+  // Worker実行ボタン表示条件: ORDER紐付けあり、IN_PROGRESS、未完了タスクあり（ORDER_099追加）
+  const shouldShowWorkerButton =
+    !!item.relatedOrderId &&
+    item.orderStatus === 'IN_PROGRESS' &&
+    (item.totalTasks ?? 0) > 0 &&
+    (item.completedTasks ?? 0) < (item.totalTasks ?? 0);
+
+  // フルオートボタン表示条件: ORDER紐付けあり（IDが存在）、IN_PROGRESSまたはPLANNING（ORDER_099追加）
+  // PLANNINGはrelatedOrderIdが必須（IDなしではフルオートを呼び出せないため）
+  const shouldShowFullAutoButton =
+    !!item.relatedOrderId &&
+    (item.orderStatus === 'IN_PROGRESS' || item.orderStatus === 'PLANNING') &&
+    !(item.orderStatus === 'IN_PROGRESS' && completedTasks === totalTasks && totalTasks > 0);
+
   // 実行中かどうか（ORDER_051: パルスアニメーション用）
-  const isRunning = isPmRunning || isWorkerRunning || isReleaseRunning;
+  const isRunning = isPmRunning || isWorkerRunning || isFullAutoRunning || isReleaseRunning;
 
   return (
     <div
@@ -1234,19 +1281,27 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
               )}
             </button>
           )}
-          {/* Worker実行ボタン（ORDER_039追加、TASK_1137でツールチップ拡張, ORDER_065: DRAFTでは非表示, ORDER_093: PLANNING時もタスク存在時表示） */}
-          {item.relatedOrderId && (item.orderStatus === 'IN_PROGRESS' || item.orderStatus === 'PLANNING') && (
+          {/* Worker実行ボタン（ORDER_099追加）: IN_PROGRESS、未完了タスクあり時に表示 */}
+          {shouldShowWorkerButton && (
             <button
               onClick={handleExecuteWorker}
-              disabled={!canExecuteWorker}
-              title={canExecuteWorker ? "Worker処理を並列実行" : workerDisabledReason}
+              disabled={!canExecuteWorker || isWorkerRunning || isFullAutoRunning}
+              title={
+                isFullAutoRunning
+                  ? 'フルオート実行中...'
+                  : isWorkerRunning
+                    ? 'Worker実行中...'
+                    : canExecuteWorker
+                      ? 'Worker処理を実行'
+                      : workerDisabledReason
+              }
               aria-label="Worker処理を実行"
               className={`
                 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors
                 ${isWorkerRunning
                   ? 'bg-blue-100 text-blue-600 cursor-wait'
-                  : canExecuteWorker
-                    ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  : canExecuteWorker && !isFullAutoRunning
+                    ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }
               `}
@@ -1262,9 +1317,51 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
               ) : (
                 <>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <span>Worker</span>
+                </>
+              )}
+            </button>
+          )}
+          {/* フルオートボタン（ORDER_099追加）: ORDER紐付けあり、PLANNING/IN_PROGRESS時に表示 */}
+          {shouldShowFullAutoButton && (
+            <button
+              onClick={handleExecuteFullAuto}
+              disabled={isFullAutoRunning || isWorkerRunning || isPmRunning}
+              title={
+                isFullAutoRunning
+                  ? 'フルオート実行中...'
+                  : isWorkerRunning || isPmRunning
+                    ? '他の処理実行中...'
+                    : 'フルオートで自動実行（PM→Worker→レビューを自動ループ）'
+              }
+              aria-label="フルオートで自動実行"
+              className={`
+                flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors
+                ${isFullAutoRunning
+                  ? 'bg-blue-100 text-blue-600 cursor-wait'
+                  : isWorkerRunning || isPmRunning
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                }
+              `}
+            >
+              {isFullAutoRunning ? (
+                <>
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Auto...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>フルオート</span>
                 </>
               )}
             </button>
@@ -1302,31 +1399,6 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
               )}
             </button>
           )}
-          {/* コピーボタン */}
-          <button
-            onClick={handleCopyClick}
-            title="フルオート実行コマンドをコピー"
-            aria-label="フルオート実行コマンドをコピー"
-            className={`
-              p-1 rounded transition-colors
-              ${isCopied
-                ? 'bg-green-100 text-green-600'
-                : 'bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600'
-              }
-            `}
-          >
-            {isCopied ? (
-              // チェックマークアイコン
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              // クリップボードアイコン
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-              </svg>
-            )}
-          </button>
           {/* ORDER_139: 削除ボタン */}
           <button
             onClick={handleDelete}
@@ -1391,6 +1463,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = React.memo(({
     prevProps.showProject === nextProps.showProject &&
     prevProps.isPmRunning === nextProps.isPmRunning &&
     prevProps.isWorkerRunning === nextProps.isWorkerRunning &&
+    prevProps.isFullAutoRunning === nextProps.isFullAutoRunning &&
     prevProps.isReleaseRunning === nextProps.isReleaseRunning &&
     prevProps.onDelete === nextProps.onDelete
   );

@@ -61,23 +61,13 @@ export const OrderAddForm: React.FC<OrderAddFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ORDER_104: dev_workspace_path未設定時の確認ダイアログ状態
+  const [showDevWorkspaceWarning, setShowDevWorkspaceWarning] = useState(false);
+
   /**
-   * フォーム送信ハンドラ
+   * ORDER_104: dev_workspace_path未設定チェック付き送信処理
    */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // バリデーション
-    if (!title.trim()) {
-      setError('タイトルを入力してください');
-      return;
-    }
-
-    if (title.trim().length > 200) {
-      setError('タイトルは200文字以内で入力してください');
-      return;
-    }
-
+  const doSubmit = async () => {
     setSubmitting(true);
     setError(null);
 
@@ -109,6 +99,41 @@ export const OrderAddForm: React.FC<OrderAddFormProps> = ({
   };
 
   /**
+   * フォーム送信ハンドラ
+   */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // バリデーション
+    if (!title.trim()) {
+      setError('タイトルを入力してください');
+      return;
+    }
+
+    if (title.trim().length > 200) {
+      setError('タイトルは200文字以内で入力してください');
+      return;
+    }
+
+    // ORDER_104: dev_workspace_path未設定チェック
+    try {
+      const projectInfo = await window.electronAPI.getProjectInfo(projectId);
+      if (!projectInfo?.dev_workspace_path) {
+        // dev_workspace_pathが未設定の場合は確認ダイアログを表示
+        setShowDevWorkspaceWarning(true);
+        return;
+      }
+    } catch (err) {
+      console.warn('[OrderAddForm] Failed to check dev_workspace_path:', err);
+      // チェック失敗時は警告を表示して続行を促す
+      setShowDevWorkspaceWarning(true);
+      return;
+    }
+
+    await doSubmit();
+  };
+
+  /**
    * バックドロップクリックで閉じる
    */
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -132,6 +157,49 @@ export const OrderAddForm: React.FC<OrderAddFormProps> = ({
       onClick={handleBackdropClick}
       onKeyDown={handleKeyDown}
     >
+      {/* ORDER_104: dev_workspace_path未設定時の確認ダイアログ */}
+      {showDevWorkspaceWarning && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-60">
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-1">警告</h3>
+                <p className="text-sm text-gray-700">
+                  dev_workspace_pathが未設定のため本番DBに直接影響します。続行しますか？
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDevWorkspaceWarning(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowDevWorkspaceWarning(false);
+                  await doSubmit();
+                }}
+                disabled={submitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                続行
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* モーダルコンテナ */}
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"

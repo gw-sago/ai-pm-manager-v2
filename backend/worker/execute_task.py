@@ -78,7 +78,7 @@ try:
     from utils.path_validation import (
         safe_path_join, validate_path_components, PathValidationError
     )
-    from config.db_config import get_project_paths
+    from config.db_config import get_project_paths, warn_if_production_db
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -2699,6 +2699,9 @@ def main():
     # 詳細ログモード
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # 本番DB保護チェック: AIPM_DB_PATH未設定の場合に警告を出力
+    warn_if_production_db("execute_task.py")
 
     # 並列起動モード
     if args.parallel:

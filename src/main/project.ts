@@ -1075,6 +1075,7 @@ export function registerProjectHandlers(): void {
       purpose: string | null;
       tech_stack: string | null;
       status: string;
+      dev_workspace_path: string | null;
       created_at: string;
       updated_at: string;
     } | null> => {

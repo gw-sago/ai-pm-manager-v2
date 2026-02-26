@@ -310,6 +310,7 @@ export class AipmDbService {
     purpose: string | null;
     tech_stack: string | null;
     status: string;
+    dev_workspace_path: string | null;
     created_at: string;
     updated_at: string;
   } | null {
@@ -325,6 +326,7 @@ export class AipmDbService {
           purpose,
           tech_stack,
           status,
+          dev_workspace_path,
           created_at,
           updated_at
         FROM projects
@@ -339,6 +341,7 @@ export class AipmDbService {
         purpose: string | null;
         tech_stack: string | null;
         status: string;
+        dev_workspace_path: string | null;
         created_at: string;
         updated_at: string;
       } | undefined;

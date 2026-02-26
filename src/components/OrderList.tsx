@@ -43,6 +43,40 @@ const orderStatusColors: Record<string, { bg: string; text: string }> = {
     bg: 'bg-gray-100',
     text: 'text-gray-800',
   },
+  DRAFT: {
+    bg: 'bg-slate-100',
+    text: 'text-slate-600',
+  },
+  CANCELLED: {
+    bg: 'bg-gray-100',
+    text: 'text-gray-400',
+  },
+};
+
+/**
+ * ORDERステータスアイコンコンポーネント
+ */
+const OrderStatusIcon: React.FC<{ status: string }> = ({ status }) => {
+  switch (status) {
+    case 'DRAFT':
+      return (
+        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+        </svg>
+      );
+    case 'CANCELLED':
+      return (
+        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+            clipRule="evenodd"
+          />
+        </svg>
+      );
+    default:
+      return null;
+  }
 };
 
 /**
@@ -66,12 +100,22 @@ const OrderItem: React.FC<OrderItemProps> = ({
 }) => {
   const colors = orderStatusColors[order.status] || orderStatusColors.IN_PROGRESS;
   const progress = calculateProgress(order.tasks);
+  const isCancelled = order.status === 'CANCELLED';
+  const isDraft = order.status === 'DRAFT';
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div className={`border rounded-lg overflow-hidden ${
+      isCancelled ? 'border-gray-200 bg-gray-50 opacity-60' :
+      isDraft ? 'border-slate-200 bg-slate-50' :
+      'border-gray-200 bg-white'
+    }`}>
       {/* ORDERヘッダー（クリックで展開・折りたたみ） */}
       <div
-        className="flex items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        className={`flex items-center p-4 cursor-pointer transition-colors ${
+          isCancelled ? 'hover:bg-gray-100' :
+          isDraft ? 'hover:bg-slate-100' :
+          'hover:bg-gray-50'
+        }`}
         onClick={onToggle}
         role="button"
         tabIndex={0}
@@ -84,9 +128,11 @@ const OrderItem: React.FC<OrderItemProps> = ({
         {/* 展開・折りたたみアイコン */}
         <div className="flex-shrink-0 mr-3">
           <svg
-            className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
-              isExpanded ? 'transform rotate-90' : ''
-            }`}
+            className={`w-5 h-5 transition-transform duration-200 ${
+              isCancelled ? 'text-gray-400' :
+              isDraft ? 'text-slate-400' :
+              'text-gray-500'
+            } ${isExpanded ? 'transform rotate-90' : ''}`}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -101,9 +147,17 @@ const OrderItem: React.FC<OrderItemProps> = ({
         {/* ORDER情報 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-3">
-            <span className="font-semibold text-gray-900">{order.id}</span>
+            <span className={`font-semibold ${
+              isCancelled ? 'text-gray-400' :
+              isDraft ? 'text-slate-500' :
+              'text-gray-900'
+            }`}>{order.id}</span>
             {order.title && (
-              <span className="text-gray-600 truncate">- {order.title}</span>
+              <span className={`truncate ${
+                isCancelled ? 'text-gray-400 line-through' :
+                isDraft ? 'text-slate-500 italic' :
+                'text-gray-600'
+              }`}>- {order.title}</span>
             )}
           </div>
 
@@ -124,6 +178,7 @@ const OrderItem: React.FC<OrderItemProps> = ({
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}
           >
+            <OrderStatusIcon status={order.status} />
             {order.status}
           </span>
         </div>
@@ -170,6 +225,7 @@ export const OrderList: React.FC<OrderListProps> = ({
         PLANNING: 4,
         ON_HOLD: 5,
         COMPLETED: 6,
+        CANCELLED: 7,
       };
 
       const aPriority = statusPriority[a.status] ?? 3;

@@ -56,7 +56,7 @@ try:
     from utils.validation import (
         validate_project_name, project_exists, ValidationError
     )
-    from config.db_config import get_project_paths
+    from config.db_config import get_project_paths, warn_if_production_db
 except ImportError as e:
     logger.error(f"内部モジュールのインポートに失敗: {e}")
     sys.exit(1)
@@ -351,6 +351,9 @@ def main() -> None:
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # 本番DB保護チェック: AIPM_DB_PATH未設定の場合に警告を出力
+    warn_if_production_db("full_auto.py")
 
     try:
         validate_project_name(args.project_name)

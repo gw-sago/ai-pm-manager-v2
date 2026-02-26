@@ -55,10 +55,17 @@ _package_root = _current_dir.parent
 if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
 
-from config.db_config import setup_utf8_output, get_project_paths
+from config.db_config import setup_utf8_output, get_project_paths, resolve_docs_path
 
 
 SUPPORTED_EXTENSIONS = {".md", ".html", ".htm", ".txt"}
+
+# dev_workspace_pathをドキュメントルートとして扱う場合に除外するディレクトリ
+DEV_WORKSPACE_EXCLUDE_DIRS = {
+    "node_modules", ".git", ".webpack", ".pytest_cache", "__pycache__",
+    "out", "dist", "build", ".cache", "coverage", ".nyc_output",
+    "backend", "src", "data", "framework", "cli",
+}
 
 
 def _extract_title(file_path: Path) -> Optional[str]:
@@ -93,7 +100,10 @@ def _extract_title(file_path: Path) -> Optional[str]:
 
 def list_docs(project_id: str) -> Dict[str, Any]:
     """
-    docs/配下の全.mdファイル一覧を取得する
+    ドキュメントファイル一覧を取得する
+
+    dev_workspace_pathが設定されていればそのパス自体をドキュメントルートとして参照し、
+    未設定またはパスが存在しない場合はPROJECTS/{project_id}/docs/にフォールバックする。
 
     Args:
         project_id: プロジェクトID
@@ -101,14 +111,17 @@ def list_docs(project_id: str) -> Dict[str, Any]:
     Returns:
         ファイル一覧情報を含む辞書
     """
-    paths = get_project_paths(project_id)
-    docs_path = paths["docs"]
+    docs_info = resolve_docs_path(project_id)
+    docs_path = docs_info["docs_path"]
+    is_dev_workspace = docs_info["source"] == "dev_workspace"
 
     if not docs_path.exists() or not docs_path.is_dir():
         return {
             "success": True,
             "project_id": project_id,
             "docs_path": str(docs_path),
+            "docs_source": docs_info["source"],
+            "fallback_used": docs_info["fallback_used"],
             "files": [],
             "total_count": 0,
             "categories": [],
@@ -117,11 +130,27 @@ def list_docs(project_id: str) -> Dict[str, Any]:
 
     files: List[Dict[str, Any]] = []
 
-    # docs/配下の対応拡張子ファイルを再帰的に探索
-    all_files = [
-        f for f in docs_path.rglob("*")
-        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
-    ]
+    if is_dev_workspace:
+        # dev_workspace_pathの場合: 除外ディレクトリを除いたトップレベルファイルと
+        # 1階層下のサブディレクトリのみを探索（node_modules等の巨大ディレクトリを除外）
+        candidate_files: List[Path] = []
+        # トップレベルのファイル
+        for f in docs_path.iterdir():
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                candidate_files.append(f)
+        # 1階層下のサブディレクトリ（除外対象を除く）
+        for d in docs_path.iterdir():
+            if d.is_dir() and d.name not in DEV_WORKSPACE_EXCLUDE_DIRS and not d.name.startswith('.'):
+                for f in d.iterdir():
+                    if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                        candidate_files.append(f)
+        all_files = sorted(candidate_files)
+    else:
+        # docs/ディレクトリの場合: 再帰的に探索
+        all_files = sorted([
+            f for f in docs_path.rglob("*")
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
+        ])
     for md_file in sorted(all_files):
         # docs/からの相対パス（Windowsでもスラッシュ区切り）
         relative_path = md_file.relative_to(docs_path).as_posix()
@@ -164,16 +193,24 @@ def list_docs(project_id: str) -> Dict[str, Any]:
         unique_categories = ["root"] + unique_categories
 
     index_path = docs_path / "INDEX.md"
+    message = None
+    if is_dev_workspace and docs_info.get("dev_workspace_path"):
+        message = f"dev_workspace_path: {docs_info['dev_workspace_path']} を参照中"
 
-    return {
+    result = {
         "success": True,
         "project_id": project_id,
         "docs_path": str(docs_path),
+        "docs_source": docs_info["source"],
+        "fallback_used": docs_info["fallback_used"],
         "files": files,
         "total_count": len(files),
         "categories": unique_categories,
         "index_exists": index_path.exists(),
     }
+    if message:
+        result["message"] = message
+    return result
 
 
 def format_table(result: Dict[str, Any]) -> str:

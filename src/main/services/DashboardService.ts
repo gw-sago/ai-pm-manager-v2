@@ -387,7 +387,7 @@ export class DashboardService {
               description: item.description,
               priority: item.priority as 'High' | 'Medium' | 'Low',
               status: item.status,
-              relatedOrderId: item.backlog_id,
+              relatedOrderId: item.id,
               createdAt: item.created_at,
               updatedAt: item.updated_at,
               orderTitle: item.title,

@@ -568,14 +568,15 @@ export class ScriptExecutionService extends EventEmitter {
           lastOutput: `Step 1: DB駆動ORDER検出、ステータス更新中 (${orderId})...`,
         } as ExecutionProgress);
 
-        // DRAFT/PLANNINGの場合はIN_PROGRESSに遷移
+        // DRAFTの場合はPLANNINGに遷移（DRAFT→IN_PROGRESSは不正な遷移）
+        // IN_PROGRESSへの遷移はprocess_order.pyのStep 6で行う
         const updateScript = path.join(backendPath, 'order', 'update.py');
-        const updateArgs = [updateScript, projectId, orderId, '--status', 'IN_PROGRESS', '--reason', 'PM処理開始（UI経由）', '--json'];
+        const updateArgs = [updateScript, projectId, orderId, '--status', 'PLANNING', '--reason', 'PM処理開始（UI経由）', '--json'];
         const updateResult = await this.runPythonScript(pythonCommand, updateArgs, frameworkPath);
         job.stdout += `[Step 1: order/update.py (DB-driven)]\n${updateResult.stdout}\n`;
         job.stderr += updateResult.stderr;
 
-        // ステータス更新失敗は警告のみ（既にIN_PROGRESSの場合など）
+        // ステータス更新失敗は警告のみ（既にPLANNING/IN_PROGRESSの場合など）
         if (!updateResult.success) {
           console.warn(`[ScriptExecution] Step 1: ORDER status update warning: ${updateResult.stderr}`);
         }

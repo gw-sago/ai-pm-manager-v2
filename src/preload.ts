@@ -977,6 +977,8 @@ export interface DocFile {
   id: string;
   /** タイトル（H1見出しまたはファイル名） */
   title: string;
+  /** ファイル名（file と同義） */
+  filename: string;
   /** ファイル名 */
   file: string;
   /** 絶対パス */
@@ -985,9 +987,20 @@ export interface DocFile {
   relative_path: string;
   /** ファイルサイズ（バイト） */
   size: number;
+  /** ファイルサイズ（バイト）- size と同値 */
+  size_bytes: number;
+  /** 更新日時（ISO8601形式） */
+  updated_at: string;
   /** カテゴリ（"root", "decisions"等） */
   category: string;
 }
+
+/**
+ * ドキュメント参照元（ORDER_103 / TASK_360）
+ * - "project_docs": PROJECTS/{project_id}/docs/ 配下を参照
+ * - "dev_workspace": dev_workspace_path/docs/ 配下を参照
+ */
+export type DocsSource = 'project_docs' | 'dev_workspace';
 
 /**
  * ドキュメント一覧取得結果
@@ -996,8 +1009,14 @@ export interface DocsListResult {
   success: boolean;
   project_id: string;
   docs_path: string;
+  /** ドキュメント参照元（ORDER_103 / TASK_360） */
+  docs_source?: DocsSource;
+  /** dev_workspace設定済みだがdocs/未存在でフォールバックした場合true */
+  fallback_used?: boolean;
   index_exists: boolean;
   files: DocFile[];
+  /** ファイル総数 */
+  total_count: number;
   categories: string[];
   message?: string;
   error?: string;
@@ -1010,12 +1029,20 @@ export interface DocContentResult {
   success: boolean;
   project_id?: string;
   file_id?: string;
+  /** ファイル名 */
+  filename?: string;
   title?: string;
   relative_path?: string;
   path?: string;
+  /** ドキュメントパス（docs:get のエラー時にも返される） */
+  docs_path?: string;
   content?: string;
   content_type?: 'markdown' | 'html' | 'text';
+  /** ファイルサイズ（バイト） */
+  size_bytes?: number;
   generated?: boolean;
+  /** ドキュメント参照元（ORDER_103 / TASK_360） */
+  docs_source?: DocsSource;
   error?: string;
 }
 
@@ -2247,6 +2274,7 @@ export interface ElectronAPI {
     purpose: string | null;
     tech_stack: string | null;
     status: string;
+    dev_workspace_path: string | null;
     created_at: string;
     updated_at: string;
   } | null>;
@@ -2268,20 +2296,25 @@ export interface ElectronAPI {
 
   // ============================================================
   // ORDER_057: ドキュメントツリービュー（TASK_196）
+  // ORDER_103: ドキュメント参照パス解決拡張（TASK_360）
   // ============================================================
 
   /**
-   * docs/配下のファイル一覧を取得
+   * プロジェクト設定に基づくドキュメント一覧を取得
+   * バックエンドがprojectIdからdev_workspace_path設定を参照し、
+   * 設定されていればdev_workspace/docs/、なければPROJECTS/{id}/docs/を返す
    * @param projectId プロジェクトID
-   * @returns ドキュメントファイル一覧
+   * @returns ドキュメントファイル一覧（docs_sourceフィールドで参照元を示す）
    */
   getDocsList: (projectId: string) => Promise<DocsListResult>;
 
   /**
-   * docs/配下の指定ファイルの内容を取得
+   * プロジェクト設定に基づくドキュメント内容を取得
+   * バックエンドがprojectIdからdev_workspace_path設定を参照し、
+   * 設定されていればdev_workspace/docs/、なければPROJECTS/{id}/docs/を参照
    * @param projectId プロジェクトID
    * @param fileId ファイルID（例: "architecture", "decisions/adr_001"）
-   * @returns ドキュメント内容
+   * @returns ドキュメント内容（docs_sourceフィールドで参照元を示す）
    */
   getDocContent: (projectId: string, fileId: string) => Promise<DocContentResult>;
 

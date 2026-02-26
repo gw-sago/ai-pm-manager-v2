@@ -46,7 +46,7 @@ _package_root = _current_dir.parent
 if str(_package_root) not in sys.path:
     sys.path.insert(0, str(_package_root))
 
-from config.db_config import setup_utf8_output, get_project_paths
+from config.db_config import setup_utf8_output, get_project_paths, resolve_docs_path
 
 
 SUPPORTED_EXTENSIONS = [".md", ".html", ".htm", ".txt"]
@@ -113,23 +113,27 @@ def _is_safe_path(docs_dir: Path, target_path: Path) -> bool:
 
 def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
     """
-    docs/配下の指定ファイルの内容を取得する
+    ドキュメントファイルの内容を取得する
+
+    dev_workspace_pathが設定されていればそのパス自体をドキュメントルートとして参照し、
+    未設定またはパスが存在しない場合はPROJECTS/{project_id}/docs/にフォールバックする。
 
     Args:
         project_id: プロジェクトID
-        filename: docs/からの相対パス（例: architecture.md, decisions/001_xxx.md）
+        filename: ドキュメントルートからの相対パス（例: architecture.md, README.md）
 
     Returns:
         ファイル内容を含む辞書
     """
-    paths = get_project_paths(project_id)
-    docs_path = paths["docs"]
+    docs_info = resolve_docs_path(project_id)
+    docs_path = docs_info["docs_path"]
 
     if not docs_path.exists():
         return {
             "success": False,
-            "error": f"docs/ ディレクトリが見つかりません: {docs_path}",
+            "error": f"ドキュメントディレクトリが見つかりません: {docs_path}",
             "project_id": project_id,
+            "docs_source": docs_info["source"],
         }
 
     # ファイル名の正規化（バックスラッシュをスラッシュに統一）
@@ -155,7 +159,7 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
     if not _is_safe_path(docs_path, target_path):
         return {
             "success": False,
-            "error": f"アクセス禁止: docs/外のファイルにはアクセスできません: {filename}",
+            "error": f"アクセス禁止: ドキュメントルート外のファイルにはアクセスできません: {filename}",
             "project_id": project_id,
         }
 
@@ -202,6 +206,7 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
             "size_bytes": stat.st_size,
             "content": content,
             "content_type": content_type,
+            "docs_source": docs_info["source"],
         }
     except UnicodeDecodeError as e:
         return {
