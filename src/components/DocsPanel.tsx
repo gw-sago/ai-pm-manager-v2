@@ -1,12 +1,14 @@
 /**
  * DocsPanel.tsx - ドキュメントツリービュー & マルチフォーマットビューア
  *
- * PROJECTS/{project_id}/docs/ 配下のファイルをツリー表示し、
+ * プロジェクト設定に基づくドキュメントをツリー表示し、
  * 選択したファイルの内容をビューアで表示する。
+ * dev_workspace_path設定時はプロジェクトフォルダを、未設定時はdocs/を参照。
  * 対応形式: Markdown (.md), HTML (.html/.htm), テキスト (.txt)
  *
  * ORDER_057 / TASK_196: UIドキュメントツリービューとMarkdownビューアの実装
  * ORDER_095 / TASK_335: 複数ファイル形式対応（HTML/テキスト表示）
+ * ORDER_103 / TASK_359: ドキュメント参照先のdev_workspace_path対応
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -230,8 +232,8 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ projectId }) => {
       <div className="w-64 flex-shrink-0 border-r border-gray-200 flex flex-col">
         {/* ヘッダー */}
         <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            docs/
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider" title={docsList?.docs_path || ''}>
+            {docsList?.docs_source === 'dev_workspace' ? 'project/' : 'docs/'}
           </h3>
           <button
             onClick={loadDocsList}
@@ -292,10 +294,15 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ projectId }) => {
           })}
         </div>
 
-        {/* フッター: ファイル数 */}
+        {/* フッター: ファイル数 + 参照元情報 */}
         {docsList?.files && (
           <div className="px-3 py-2 border-t border-gray-100 text-xs text-gray-400">
-            {docsList.files.length} ファイル
+            <div>{docsList.files.length} ファイル</div>
+            {docsList.fallback_used && (
+              <div className="text-amber-500 mt-0.5" title="dev_workspace_pathが設定されていますがパスが見つからないため、docs/を参照しています">
+                フォールバック中
+              </div>
+            )}
           </div>
         )}
       </div>
