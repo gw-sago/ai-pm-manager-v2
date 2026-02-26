@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0-snapshot] - 2026-02-26
 
 ### Fixed
+- Workerボタン非表示バグの根本原因を修正（ORDER_097）
+  - DashboardService.tsのrelatedOrderIdマッピングを`item.backlog_id`→`item.id`に修正
+  - backlog経由でないORDER（直接作成）でWorkerボタンが表示されない問題を解消
+- order/create.pyの--statusオプションがDBに反映されないバグを修正（ORDER_100）
 - docs/ディレクトリ未作成時にdocs_list.pyがexit code 1で異常終了する不具合を修正（ORDER_094）
   - docs/が存在しない場合は空リスト（success: true, files: [], categories: []）を正常に返すように変更
 - PMボタン押下後にWorkerボタンが表示されないバグを修正（ORDER_093）
@@ -25,10 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ドキュメントタブのファイルツリーにファイル名が表示されないバグ修正（ORDER_087）
 
 ### Changed
+- ORDER詳細パネルのWorker実行・フルオートボタンを廃止し、ORDER一覧に統合（ORDER_099）
+- ORDER一覧のCANCELLEDステータスにグレーアイコン・色を適用し、DRAFTと差別化（ORDER_101）
 - 非推奨backlog関連コードを削除しORDER命名に統一（ORDER_089）
 - 「バックログ」タブを「ORDER一覧」に統一
 
 ### Added
+- /aipmコマンドの状態取得を統合スクリプト化（ORDER_096）
+  - 複数Pythonスクリプト呼び出し（最大5回）を1回のPython起動・1回のDB接続に集約
+  - N+1クエリ問題を解消しクエリ数をO(1)定数に最適化
+- ドキュメントタブでユーザー指定のプロジェクトフォルダを参照可能に（ORDER_103）
+  - プロジェクト設定のdev_workspace_pathからdocs/フォルダを自動検出
+  - 未指定時は従来のPROJECTS/{project}/docs/をフォールバック表示
+- 本番DBへのテストORDER作成防止バリデーション追加（ORDER_104）
+  - db_config.pyにRoaming環境検出・テスト実行検出ロジック追加
+  - Worker/フルオート実行時にテストデータ混入を防止
 - ドキュメントタブで.html/.txtファイルも表示可能に（ORDER_095）
   - docs_list.pyを複数拡張子（.md/.html/.txt）対応に拡張
   - docs_get.pyの拡張子なし時の.md自動付与ロジックを修正
