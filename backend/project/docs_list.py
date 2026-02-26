@@ -2,8 +2,9 @@
 """
 AI PM Framework - docs/配下ファイル一覧取得スクリプト
 
-プロジェクトのdocs/ディレクトリ配下にある全.mdファイルを一覧表示する。
-decisions/サブディレクトリも再帰的に探索し、各ファイルのタイトル（最初の#行）、
+プロジェクトのdocs/ディレクトリ配下にある全ドキュメントファイルを一覧表示する。
+対応形式: .md, .html, .htm, .txt
+decisions/サブディレクトリも再帰的に探索し、各ファイルのタイトル、
 サイズ、更新日時を返す。
 
 Usage:
@@ -57,22 +58,34 @@ if str(_package_root) not in sys.path:
 from config.db_config import setup_utf8_output, get_project_paths
 
 
+SUPPORTED_EXTENSIONS = {".md", ".html", ".htm", ".txt"}
+
+
 def _extract_title(file_path: Path) -> Optional[str]:
     """
-    Markdownファイルの最初の#行からタイトルを抽出する
+    ファイルからタイトルを抽出する（拡張子に応じた方式）
 
     Args:
-        file_path: Markdownファイルのパス
+        file_path: ドキュメントファイルのパス
 
     Returns:
         タイトル文字列、見つからない場合はNone
     """
     try:
+        ext = file_path.suffix.lower()
         with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("# "):
-                    return line[2:].strip()
+            if ext == ".md":
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("# "):
+                        return line[2:].strip()
+            elif ext in (".html", ".htm"):
+                import re
+                content = f.read(4096)  # 先頭4KBのみ読み取り
+                match = re.search(r"<title[^>]*>(.*?)</title>", content, re.IGNORECASE | re.DOTALL)
+                if match:
+                    return match.group(1).strip()
+            # .txt はファイル名をタイトルとして使用（Noneを返す）
         return None
     except Exception:
         return None
@@ -104,11 +117,12 @@ def list_docs(project_id: str) -> Dict[str, Any]:
 
     files: List[Dict[str, Any]] = []
 
-    # docs/配下の全.mdファイルを再帰的に探索
-    for md_file in sorted(docs_path.rglob("*.md")):
-        if not md_file.is_file():
-            continue
-
+    # docs/配下の対応拡張子ファイルを再帰的に探索
+    all_files = [
+        f for f in docs_path.rglob("*")
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
+    ]
+    for md_file in sorted(all_files):
         # docs/からの相対パス（Windowsでもスラッシュ区切り）
         relative_path = md_file.relative_to(docs_path).as_posix()
 
@@ -124,8 +138,11 @@ def list_docs(project_id: str) -> Dict[str, Any]:
         parts = relative_path.split("/")
         category = parts[0] if len(parts) > 1 else "root"
 
-        # ファイルID（拡張子なしの相対パス）
-        file_id = Path(relative_path).with_suffix("").as_posix()
+        # ファイルID（.md以外は拡張子を含めて一意性を確保）
+        if md_file.suffix.lower() == ".md":
+            file_id = Path(relative_path).with_suffix("").as_posix()
+        else:
+            file_id = relative_path
 
         files.append({
             "id": file_id,

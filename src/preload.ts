@@ -1014,6 +1014,7 @@ export interface DocContentResult {
   relative_path?: string;
   path?: string;
   content?: string;
+  content_type?: 'markdown' | 'html' | 'text';
   generated?: boolean;
   error?: string;
 }

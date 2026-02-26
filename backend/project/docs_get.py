@@ -49,22 +49,40 @@ if str(_package_root) not in sys.path:
 from config.db_config import setup_utf8_output, get_project_paths
 
 
+SUPPORTED_EXTENSIONS = [".md", ".html", ".htm", ".txt"]
+
+EXTENSION_CONTENT_TYPE = {
+    ".md": "markdown",
+    ".html": "html",
+    ".htm": "html",
+    ".txt": "text",
+}
+
+
 def _extract_title(file_path: Path) -> Optional[str]:
     """
-    Markdownファイルの最初の#行からタイトルを抽出する
+    ファイルからタイトルを抽出する（拡張子に応じた方式）
 
     Args:
-        file_path: Markdownファイルのパス
+        file_path: ドキュメントファイルのパス
 
     Returns:
         タイトル文字列、見つからない場合はNone
     """
     try:
+        ext = file_path.suffix.lower()
         with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("# "):
-                    return line[2:].strip()
+            if ext == ".md":
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("# "):
+                        return line[2:].strip()
+            elif ext in (".html", ".htm"):
+                import re
+                content = f.read(4096)
+                match = re.search(r"<title[^>]*>(.*?)</title>", content, re.IGNORECASE | re.DOTALL)
+                if match:
+                    return match.group(1).strip()
         return None
     except Exception:
         return None
@@ -117,12 +135,21 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
     # ファイル名の正規化（バックスラッシュをスラッシュに統一）
     normalized_filename = filename.replace("\\", "/")
 
-    # 拡張子がない場合は .md を自動付与（file.idから呼ばれるケース対応）
+    # 拡張子がない場合はフォールバック順に存在チェック
     if not Path(normalized_filename).suffix:
-        normalized_filename += ".md"
-
-    # パス構築
-    target_path = docs_path / normalized_filename
+        target_path = None
+        for ext in SUPPORTED_EXTENSIONS:
+            candidate = docs_path / (normalized_filename + ext)
+            if candidate.exists() and candidate.is_file():
+                target_path = candidate
+                normalized_filename = normalized_filename + ext
+                break
+        if target_path is None:
+            # どの拡張子でも見つからない場合、元のファイル名で進む（後段でエラー）
+            target_path = docs_path / (normalized_filename + ".md")
+    else:
+        # パス構築
+        target_path = docs_path / normalized_filename
 
     # パストラバーサル防止チェック
     if not _is_safe_path(docs_path, target_path):
@@ -155,8 +182,15 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
         relative_path = target_path.relative_to(docs_path).as_posix()
         title = _extract_title(target_path)
 
-        # ファイルID（拡張子なしの相対パス）
-        file_id = Path(relative_path).with_suffix("").as_posix()
+        # ファイルID（.md以外は拡張子を含めて一意性を確保）
+        ext = target_path.suffix.lower()
+        if ext == ".md":
+            file_id = Path(relative_path).with_suffix("").as_posix()
+        else:
+            file_id = relative_path
+
+        # content_type判定
+        content_type = EXTENSION_CONTENT_TYPE.get(ext, "text")
 
         return {
             "success": True,
@@ -167,6 +201,7 @@ def get_doc_content(project_id: str, filename: str) -> Dict[str, Any]:
             "title": title or target_path.stem,
             "size_bytes": stat.st_size,
             "content": content,
+            "content_type": content_type,
         }
     except UnicodeDecodeError as e:
         return {

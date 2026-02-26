@@ -1,13 +1,16 @@
 /**
- * DocsPanel.tsx - ドキュメントツリービュー & Markdownビューア
+ * DocsPanel.tsx - ドキュメントツリービュー & マルチフォーマットビューア
  *
  * PROJECTS/{project_id}/docs/ 配下のファイルをツリー表示し、
- * 選択したMarkdownファイルの内容をビューアで表示する。
+ * 選択したファイルの内容をビューアで表示する。
+ * 対応形式: Markdown (.md), HTML (.html/.htm), テキスト (.txt)
  *
  * ORDER_057 / TASK_196: UIドキュメントツリービューとMarkdownビューアの実装
+ * ORDER_095 / TASK_335: 複数ファイル形式対応（HTML/テキスト表示）
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { MarkdownViewer } from './MarkdownViewer';
 import type { DocFile, DocsListResult, DocContentResult } from '../preload';
 
@@ -214,7 +217,7 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ projectId }) => {
           </div>
           <h3 className="text-sm font-medium text-gray-900 mb-1">ドキュメントがありません</h3>
           <p className="text-xs text-gray-500">
-            {docsList.message || 'docs/ディレクトリにMarkdownファイルを追加してください'}
+            {docsList.message || 'docs/ディレクトリにファイルを追加してください（.md, .html, .txt）'}
           </p>
         </div>
       </div>
@@ -336,11 +339,32 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ projectId }) => {
                 <FileIcon fileId={docContent.file_id || ''} className="w-4 h-4" />
               </span>
               <span className="text-sm font-medium text-gray-900">{docContent.title}</span>
+              {docContent.content_type && docContent.content_type !== 'markdown' && (
+                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                  {docContent.content_type === 'html' ? 'HTML' : 'TEXT'}
+                </span>
+              )}
               {docContent.relative_path && (
                 <span className="text-xs text-gray-400 ml-auto">{docContent.relative_path}</span>
               )}
             </div>
-            <MarkdownViewer content={docContent.content} />
+            {/* content_typeに応じた表示切替 */}
+            {(!docContent.content_type || docContent.content_type === 'markdown') && (
+              <MarkdownViewer content={docContent.content} />
+            )}
+            {docContent.content_type === 'html' && (
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(docContent.content, { USE_PROFILES: { html: true } })
+                }}
+              />
+            )}
+            {docContent.content_type === 'text' && (
+              <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words font-mono bg-gray-50 rounded-lg p-4 border border-gray-200 overflow-auto">
+                {docContent.content}
+              </pre>
+            )}
           </div>
         )}
 
